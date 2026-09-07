@@ -9,24 +9,21 @@ import { ElephantDetailsScreen } from './screens/ElephantDetailsScreen';
 import { AssignmentsScreen } from './screens/AssignmentsScreen';
 
 export default function App() {
-  const { activeKeeperId } = useStore();
+  const { profile, loading } = useStore();
   const [currentScreen, setCurrentScreen] = useState<string>('today');
   const [selectedElephantId, setSelectedElephantId] = useState<string | null>(null);
 
-  // If no keeper is selected, force settings/keeper selection screen
   useEffect(() => {
-    if (!activeKeeperId && currentScreen !== 'settings') {
+    if (!loading && !profile && currentScreen !== 'settings') {
       setCurrentScreen('settings');
-    } else if (activeKeeperId && currentScreen === 'settings' && !activeKeeperId) {
-       // if activeKeeperId was just set and we are on settings, maybe go to today.
-       // actually let's just let them navigate manually if they are already on settings.
     }
-  }, [activeKeeperId, currentScreen]);
+  }, [profile, loading, currentScreen]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center font-bold text-zinc-500">Загрузка...</div>;
+  }
 
   const handleNavigate = (screen: string) => {
-    if (screen === 'elephant_details') {
-      // Must be called with an elephant id elsewhere
-    }
     setCurrentScreen(screen);
   };
 
@@ -36,7 +33,7 @@ export default function App() {
   };
 
   const renderScreen = () => {
-    if (!activeKeeperId && currentScreen !== 'settings') {
+    if (!profile) {
       return <KeeperSelectionScreen onComplete={() => setCurrentScreen('today')} />;
     }
 
@@ -60,9 +57,14 @@ export default function App() {
     }
   };
 
+  if (!profile) {
+    return renderScreen();
+  }
+
   return (
     <Layout currentScreen={currentScreen} onNavigate={handleNavigate}>
       {renderScreen()}
     </Layout>
   );
 }
+

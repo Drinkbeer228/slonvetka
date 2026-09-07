@@ -1,116 +1,95 @@
 import React, { useState, useRef } from 'react';
-import { Camera, X, Check } from 'lucide-react';
-import { Assignment, Elephant, TreatmentRecord } from '../types';
-import { useStore } from '../store';
+import { Camera, X, Check, Loader2 } from 'lucide-react';
+import { Assignment, Elephant } from '../types';
+import { compressImage } from '../utils/imageCompressor';
 
 interface ExecutionModalProps {
   assignment: Assignment;
   elephant: Elephant;
   onClose: () => void;
-  onComplete: (record: Omit<TreatmentRecord, 'id' | 'createdAt' | 'keeperId'>) => void;
+  onComplete: (data: {
+    assessment: string | null;
+    medicineUsed: string | null;
+    comment: string | null;
+    photoBlob: Blob | null;
+  }) => Promise<void>;
 }
 
 export function ExecutionModal({ assignment, elephant, onClose, onComplete }: ExecutionModalProps) {
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
+  
   const [assessment, setAssessment] = useState<string>('normal');
   const [needsCleaning, setNeedsCleaning] = useState<string>('no');
   const [result, setResult] = useState<string>('normal');
+  
+  const [medicineUsed, setMedicineUsed] = useState(assignment.medicine || '');
   const [comment, setComment] = useState('');
-  const [customFields, setCustomFields] = useState<Record<string, string>>({});
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Simple compression for mock
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 800;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) {
-            h = Math.round((h * maxDim) / w);
-            w = maxDim;
-          } else {
-            w = Math.round((w * maxDim) / h);
-            h = maxDim;
-          }
-        }
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, w, h);
-        setPhoto(canvas.toDataURL('image/jpeg', 0.8));
-      };
-      img.src = evt.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedBlob = await compressImage(file);
+      setPhotoBlob(compressedBlob);
+      setPhotoUrl(URL.createObjectURL(compressedBlob));
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при обработке фотографии');
+    }
   };
 
-  const handleCustomFieldChange = (field: string, value: string) => {
-    setCustomFields(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = () => {
-    if (assignment.requiresPhoto && !photo) {
+  const handleSubmit = async () => {
+    if (assignment.requires_photo && !photoBlob) {
       alert('Пожалуйста, прикрепите фотографию');
       return;
     }
 
-    let finalAssessment = assessment;
-    if (assignment.assessmentType === 'needs_cleaning') {
-      finalAssessment = needsCleaning === 'yes' ? 'Требуется чистка' : 'Норма';
-    } else if (assignment.assessmentType === 'result') {
+    let finalAssessment = null;
+    if (assignment.assessment_type === 'needs_cleaning') {
+      finalAssessment = needsCleaning === 'yes' ? 'Требуется чистка' : 'Чисто';
+    } else if (assignment.assessment_type === 'result') {
       finalAssessment = result === 'normal' ? 'Норма' : 'Требует наблюдения';
-    } else if (assignment.assessmentType === 'normal_or_issue') {
+    } else if (assignment.assessment_type === 'normal_or_issue') {
       finalAssessment = assessment === 'normal' ? 'Норма' : 'Есть изменения';
-    } else {
-      finalAssessment = '';
     }
 
-    const photos = [];
-    if (photo) {
-      photos.push({
-        id: 'ph-' + Date.now(),
-        treatmentRecordId: '',
-        type: 'general' as const,
-        dataUrl: photo,
-        createdAt: Date.now()
+    setLoading(true);
+    setError(null);
+    try {
+      await onComplete({
+        assessment: finalAssessment,
+        medicineUsed: medicineUsed.trim() || null,
+        comment: comment.trim() || null,
+        photoBlob
       });
+    } catch (err) {
+      console.error(err);
+      setError('Не удалось сохранить. Попробуйте ещё раз.');
+      setLoading(false);
     }
-
-    onComplete({
-      assignmentId: assignment.id,
-      elephantId: elephant.id,
-      assessment: finalAssessment,
-      comment,
-      customFieldValues: customFields,
-      photos
-    });
   };
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex flex-col justify-end sm:justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
         
-        {/* Header */}
         <div className="p-4 bg-zinc-900 text-white flex items-center justify-between shrink-0">
           <div>
             <div className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{elephant.name}</div>
             <div className="text-lg font-black leading-tight">{assignment.title}</div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-300 flex items-center justify-center transition">
+          <button onClick={onClose} disabled={loading} className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-300 flex items-center justify-center transition disabled:opacity-50">
             <X size={24} />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-5 overflow-y-auto space-y-6">
           {assignment.description && (
             <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl text-sm font-medium text-blue-900">
@@ -118,16 +97,15 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
             </div>
           )}
 
-          {/* Photo */}
-          {assignment.requiresPhoto && (
+          {assignment.requires_photo && (
             <div className="space-y-2">
               <label className="block text-sm font-bold text-zinc-700">Фотофиксация</label>
               
-              {photo ? (
+              {photoUrl ? (
                 <div className="relative rounded-2xl overflow-hidden bg-black flex justify-center border-2 border-zinc-200">
-                  <img src={photo} alt="Снимок" className="max-h-64 object-contain" />
+                  <img src={photoUrl} alt="Снимок" className="max-h-64 object-contain" />
                   <button 
-                    onClick={() => setPhoto(null)} 
+                    onClick={() => { setPhotoUrl(null); setPhotoBlob(null); }} 
                     className="absolute top-2 right-2 bg-black/70 text-white p-2 rounded-lg text-xs font-bold"
                   >
                     Удалить
@@ -154,12 +132,11 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
             </div>
           )}
 
-          {/* Assessment */}
-          {assignment.assessmentType !== 'none' && (
+          {assignment.assessment_type && assignment.assessment_type !== 'none' && (
             <div className="space-y-3">
               <label className="block text-sm font-bold text-zinc-700">Состояние / Оценка</label>
               
-              {assignment.assessmentType === 'normal_or_issue' && (
+              {assignment.assessment_type === 'normal_or_issue' && (
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     onClick={() => setAssessment('normal')}
@@ -176,24 +153,24 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
                 </div>
               )}
 
-              {assignment.assessmentType === 'needs_cleaning' && (
+              {assignment.assessment_type === 'needs_cleaning' && (
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     onClick={() => setNeedsCleaning('no')}
                     className={`py-3 px-2 rounded-xl border-2 font-bold text-sm transition ${needsCleaning === 'no' ? 'bg-emerald-50 border-emerald-500 text-emerald-900' : 'bg-white border-zinc-200 text-zinc-600'}`}
                   >
-                    Не требует чистки
+                    Чисто
                   </button>
                   <button 
                     onClick={() => setNeedsCleaning('yes')}
                     className={`py-3 px-2 rounded-xl border-2 font-bold text-sm transition ${needsCleaning === 'yes' ? 'bg-amber-50 border-amber-500 text-amber-900' : 'bg-white border-zinc-200 text-zinc-600'}`}
                   >
-                    Требует чистки
+                    Нужна чистка
                   </button>
                 </div>
               )}
               
-              {assignment.assessmentType === 'result' && (
+              {assignment.assessment_type === 'result' && (
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     onClick={() => setResult('normal')}
@@ -212,42 +189,45 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
             </div>
           )}
 
-          {/* Custom Fields */}
-          {assignment.customFields.map(field => (
-            <div key={field} className="space-y-1">
-              <label className="block text-sm font-bold text-zinc-700">{field}</label>
+          {assignment.medicine && (
+            <div className="space-y-1">
+              <label className="block text-sm font-bold text-zinc-700">Чем обработано?</label>
               <input 
                 type="text" 
-                value={customFields[field] || ''}
-                onChange={(e) => handleCustomFieldChange(field, e.target.value)}
+                value={medicineUsed}
+                onChange={(e) => setMedicineUsed(e.target.value)}
                 className="w-full bg-zinc-50 border border-zinc-300 p-3 rounded-xl font-medium focus:outline-none focus:border-zinc-900"
-                placeholder="Введите значение..."
+                placeholder={assignment.medicine}
               />
             </div>
-          ))}
+          )}
 
-          {/* Comment */}
           <div className="space-y-1">
-            <label className="block text-sm font-bold text-zinc-700">Комментарий (необязательно)</label>
-            <input 
-              type="text" 
+            <label className="block text-sm font-bold text-zinc-700">Есть что добавить? <span className="font-normal text-zinc-400">(необязательно)</span></label>
+            <textarea 
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="w-full bg-zinc-50 border border-zinc-300 p-3 rounded-xl font-medium focus:outline-none focus:border-zinc-900"
+              rows={2}
+              className="w-full bg-zinc-50 border border-zinc-300 p-3 rounded-xl font-medium focus:outline-none focus:border-zinc-900 resize-none"
               placeholder="Доп. информация..."
             />
           </div>
-
+          
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm font-bold border border-red-100">
+              {error}
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
         <div className="p-4 bg-zinc-50 border-t border-zinc-200 shrink-0">
           <button 
             onClick={handleSubmit}
-            className="w-full bg-zinc-900 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition"
+            disabled={loading}
+            className="w-full bg-zinc-900 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:scale-100 active:scale-95"
           >
-            <Check size={20} />
-            СОХРАНИТЬ ВЫПОЛНЕНИЕ
+            {loading ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
+            {loading ? 'СОХРАНЕНИЕ...' : 'СОХРАНИТЬ ВЫПОЛНЕНИЕ'}
           </button>
         </div>
       </div>

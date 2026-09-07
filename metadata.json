@@ -1,5 +1,5 @@
 {
-  "name": "Журнал ветобработок слонов",
+  "name": "СлоноВет",
   "description": "Ультра-минималистичный мобильный чеклист ветеринарных обработок слонов: стена задач на день с фотофиксацией и боковым меню.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

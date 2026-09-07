@@ -10,16 +10,14 @@ interface LayoutProps {
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { keepers, activeKeeperId } = useStore();
-  
-  const activeKeeper = keepers.find(k => k.id === activeKeeperId);
+  const { profile } = useStore();
 
   const navItems = [
-    { id: 'today', label: 'Сегодня' },
-    { id: 'journal', label: 'Журнал' },
-    { id: 'elephants', label: 'Слоны' },
-    { id: 'assignments', label: 'Назначения' },
-    { id: 'settings', label: 'Настройки' }
+    { id: 'today', label: 'Сегодня', role: 'all' },
+    { id: 'journal', label: 'Журнал', role: 'all' },
+    { id: 'elephants', label: 'Слоны', role: 'all' },
+    { id: 'assignments', label: 'Назначения', role: 'vet' },
+    { id: 'settings', label: 'Настройки', role: 'all' }
   ];
 
   const handleNav = (id: string) => {
@@ -37,14 +35,22 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
             onClick={() => onNavigate('today')}
           >
             <span className="text-2xl leading-none">🐘</span>
-            <span className="text-lg font-black tracking-tight text-white">СЛОНЫ</span>
+            <span className="text-lg font-black tracking-tight text-white">СлоноВет</span>
           </div>
 
           <div className="flex items-center gap-3">
-            {activeKeeper && (
+            {profile?.role === 'vet' && (
+              <button
+                onClick={() => onNavigate('assignments')}
+                className="hidden sm:flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition"
+              >
+                <span>Управление</span>
+              </button>
+            )}
+            {profile && (
               <div className="hidden sm:flex items-center gap-2 text-xs font-bold bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-700">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>{activeKeeper.name}</span>
+                <span>{profile.name} {profile.role === 'vet' ? '(Ветврач)' : ''}</span>
               </div>
             )}
             <button
@@ -89,7 +95,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
         </div>
 
         <div className="p-4 space-y-2 overflow-y-auto flex-1">
-          {navItems.map(item => (
+          {navItems.filter(i => i.role === 'all' || i.role === profile?.role).map(item => (
             <button
               key={item.id}
               onClick={() => handleNav(item.id)}
@@ -104,11 +110,13 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
           ))}
         </div>
         
-        {activeKeeper && (
+        {profile && (
           <div className="p-4 bg-zinc-50 border-t border-zinc-200">
-            <div className="text-xs text-zinc-500 font-bold mb-1 uppercase tracking-wider">Текущий кипер</div>
+            <div className="text-xs text-zinc-500 font-bold mb-1 uppercase tracking-wider">
+              {profile.role === 'vet' ? 'Ветврач' : 'Текущий кипер'}
+            </div>
             <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-zinc-200">
-              <span className="font-bold">{activeKeeper.name}</span>
+              <span className="font-bold">{profile.name} {profile.role === 'vet' ? '(Ветврач)' : ''}</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
             <button 
@@ -123,3 +131,4 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
     </div>
   );
 }
+
