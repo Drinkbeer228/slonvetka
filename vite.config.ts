@@ -48,7 +48,7 @@ export default defineConfig(() => {
           // We DO NOT use Cache API for our draft records/photos - that goes to IndexedDB.
         },
         devOptions: {
-          enabled: true, // Enables service worker in development
+          enabled: process.env.DISABLE_HMR !== 'true', // Disable in AI Studio to prevent ws errors
           type: 'module',
         },
       })

@@ -13,7 +13,13 @@ const tempSupabase = createClient(
     auth: {
       autoRefreshToken: false,
       persistSession: false,
-      detectSessionInUrl: false
+      detectSessionInUrl: false,
+      storageKey: 'temp-auth-token',
+      storage: {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {}
+      }
     }
   }
 );
@@ -21,7 +27,7 @@ const tempSupabase = createClient(
 interface StaffProfile {
   id: string;
   name: string;
-  role: 'vet' | 'keeper';
+  role: 'vet' | 'keeper' | 'director';
 }
 
 export function StaffScreen() {
@@ -33,7 +39,7 @@ export function StaffScreen() {
   const [regName, setRegName] = useState('');
   const [regLogin, setRegLogin] = useState('');
   const [regPin, setRegPin] = useState('');
-  const [regRole, setRegRole] = useState<'keeper' | 'vet'>('keeper');
+  const [regRole, setRegRole] = useState<'keeper' | 'vet' | 'director'>('keeper');
   
   const [createLoading, setCreateLoading] = useState(false);
   const [error, setError] = useState('');
@@ -148,9 +154,9 @@ export function StaffScreen() {
               <div>
                 <h3 className="font-black text-lg text-zinc-900">{member.name}</h3>
                 <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider ${
-                  member.role === 'vet' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                  member.role === 'vet' ? 'bg-blue-50 text-blue-600' : member.role === 'director' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
                 }`}>
-                  {member.role === 'vet' ? 'Ветврач' : 'Кипер'}
+                  {member.role === 'vet' ? 'Ветврач' : member.role === 'director' ? 'Дрессировщик' : 'Кипер'}
                 </span>
               </div>
             </div>
@@ -217,11 +223,12 @@ export function StaffScreen() {
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Роль</label>
                   <select
                     value={regRole}
-                    onChange={(e) => setRegRole(e.target.value as 'keeper' | 'vet')}
+                    onChange={(e) => setRegRole(e.target.value as 'keeper' | 'vet' | 'director')}
                     className="w-full px-4 py-3 bg-zinc-100 border-2 border-transparent focus:bg-white rounded-xl font-bold focus:outline-none focus:border-zinc-900 transition"
                   >
                     <option value="keeper">Кипер</option>
                     <option value="vet">Ветврач</option>
+                    <option value="director">Дрессировщик</option>
                   </select>
                 </div>
 
