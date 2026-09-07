@@ -3,37 +3,77 @@ import { useStore } from '../store';
 import { formatTime, formatDate } from '../utils/dates';
 import { supabaseService } from '../services/supabaseService';
 import { TreatmentRecordWithPhotos } from '../types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
+import { saveDraft } from '../lib/offlineDb';
+import { flushSyncQueue } from '../lib/syncManager';
+
+import { PhotoPreview } from '../components/PhotoPreview';
+import { ObservationModal } from '../components/ObservationModal';
 
 export function JournalScreen() {
   const { elephants, assignments, profile } = useStore();
   const [records, setRecords] = useState<TreatmentRecordWithPhotos[]>([]);
   const [loading, setLoading] = useState(true);
+  const [observationModalOpen, setObservationModalOpen] = useState(false);
   
-  // We don't have keepers locally anymore, we rely on the profile if it matches, 
-  // or we'd ideally fetch names from profiles table. 
-  // For MVP, we can just show "Кипер" or fetch profiles. 
-  // Let's just fetch treatment history.
-  
-  useEffect(() => {
-    async function loadHistory() {
-      try {
-        const data = await supabaseService.getTreatmentHistory(50);
-        setRecords(data);
-      } catch (err) {
-        console.error('Failed to load history', err);
-      } finally {
-        setLoading(false);
-      }
+  const loadHistory = async () => {
+    try {
+      const data = await supabaseService.getTreatmentHistory(50);
+      setRecords(data);
+    } catch (err) {
+      console.error('Failed to load history', err);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadHistory();
+    
+    const handleSyncComplete = () => {
+      loadHistory();
+    };
+    window.addEventListener('syncComplete', handleSyncComplete);
+    return () => window.removeEventListener('syncComplete', handleSyncComplete);
   }, []);
+
+  const handleAddNote = async (data: { elephantId: string; comment: string; photoBlob: Blob }) => {
+    if (!profile) return;
+    
+    await saveDraft({
+      id: crypto.randomUUID(),
+      assignmentId: null,
+      elephantId: data.elephantId,
+      keeperId: profile.id,
+      performedAt: new Date().toISOString(),
+      assessment: 'Наблюдение',
+      medicineUsed: null,
+      comment: data.comment,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    }, [{ blob: data.photoBlob, photoType: 'single' }]);
+    
+    setObservationModalOpen(false);
+    flushSyncQueue();
+  };
 
   return (
     <div className="pb-8 space-y-6 mt-4">
-      <div className="mb-6">
-        <h1 className="text-2xl font-black tracking-tight">Журнал процедур</h1>
-        <p className="text-zinc-500 font-medium text-sm mt-1">История всех выполненных задач</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight">Журнал процедур</h1>
+          <p className="text-zinc-500 font-medium text-sm mt-1">История всех выполненных задач</p>
+        </div>
+        {profile && (
+          <button 
+            onClick={() => setObservationModalOpen(true)}
+            className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-zinc-800 transition active:scale-95 shrink-0"
+          >
+            <Plus size={16} />
+            <span className="hidden sm:inline">Наблюдение / Фото</span>
+            <span className="sm:hidden">Наблюдение</span>
+          </button>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -99,15 +139,17 @@ export function JournalScreen() {
 
                 {record.photos && record.photos.length > 0 && (
                   <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                    {record.photos.map(p => (
-                      <div key={p.id} className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-zinc-200 bg-black">
-                        <img 
-                          src={supabaseService.getPublicUrl(p.storage_path)} 
-                          alt="Фото" 
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                    ))}
+                    {record.photos.map(p => {
+                      let typeStr = 'Одиночный снимок';
+                      if (p.photo_type === 'before') typeStr = 'Снимок ДО';
+                      if (p.photo_type === 'after') typeStr = 'Снимок ПОСЛЕ';
+                      
+                      const caption = `${elephant?.name || 'Слон'} • ${title} • ${formatDate(performedAt)} ${formatTime(performedAt)} • ${typeStr}`;
+                      
+                      return (
+                        <PhotoPreview key={p.id} photo={p} caption={caption} />
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -115,6 +157,14 @@ export function JournalScreen() {
           })
         )}
       </div>
+
+      {observationModalOpen && (
+        <ObservationModal
+          elephants={elephants}
+          onClose={() => setObservationModalOpen(false)}
+          onComplete={handleAddNote}
+        />
+      )}
     </div>
   );
 }

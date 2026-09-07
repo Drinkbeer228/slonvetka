@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { useStore } from '../store';
+import { InstallPrompt } from './InstallPrompt';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -51,7 +52,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
             {profile && (
               <div className="hidden sm:flex items-center gap-2 text-xs font-bold bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-700">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>{profile.name} {profile.role === 'vet' ? '(Ветврач)' : ''}</span>
+                <span>{profile.name} {profile.role === 'vet' ? '(Ветврач)' : profile.role === 'director' ? '(Дрессировщик)' : ''}</span>
               </div>
             )}
             <button
@@ -68,6 +69,8 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:px-6">
         {children}
       </main>
+
+      <InstallPrompt />
 
       {/* DRAWER BACKDROP */}
       {drawerOpen && (
@@ -114,10 +117,10 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
         {profile && (
           <div className="p-4 bg-zinc-50 border-t border-zinc-200">
             <div className="text-xs text-zinc-500 font-bold mb-1 uppercase tracking-wider">
-              {profile.role === 'vet' ? 'Ветврач' : 'Текущий кипер'}
+              {profile.role === 'vet' ? 'Ветврач' : profile.role === 'director' ? 'Дрессировщик' : 'Текущий кипер'}
             </div>
             <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-zinc-200">
-              <span className="font-bold">{profile.name} {profile.role === 'vet' ? '(Ветврач)' : ''}</span>
+              <span className="font-bold">{profile.name} {profile.role === 'vet' ? '(Ветврач)' : profile.role === 'director' ? '(Дрессировщик)' : ''}</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
             <button 

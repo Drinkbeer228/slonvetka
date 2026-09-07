@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { Assignment, Elephant, TreatmentRecordWithPhotos } from '../types';
 import { ExecutionModal } from '../components/ExecutionModal';
-import { CheckCircle2, ChevronRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import { formatTime } from '../utils/dates';
+import { saveDraft, getPendingDrafts, TreatmentDraft } from '../lib/offlineDb';
+import { flushSyncQueue } from '../lib/syncManager';
 
 interface TodayScreenProps {
   onElephantClick: (id: string) => void;
@@ -16,6 +18,7 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
   
   const [todayRecords, setTodayRecords] = useState<TreatmentRecordWithPhotos[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
+  const [pendingDrafts, setPendingDrafts] = useState<TreatmentDraft[]>([]);
 
   const fetchRecords = async () => {
     try {
@@ -28,8 +31,26 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
     }
   };
 
+  const fetchDrafts = async () => {
+    const drafts = await getPendingDrafts();
+    setPendingDrafts(drafts);
+  };
+
   useEffect(() => {
     fetchRecords();
+    fetchDrafts();
+    
+    const handleSyncUpdate = () => {
+      fetchRecords();
+      fetchDrafts();
+    };
+
+    window.addEventListener('syncComplete', handleSyncUpdate);
+    window.addEventListener('syncFailed', handleSyncUpdate);
+    return () => {
+      window.removeEventListener('syncComplete', handleSyncUpdate);
+      window.removeEventListener('syncFailed', handleSyncUpdate);
+    };
   }, []);
 
   const handleCompleteTask = async (data: {
@@ -40,29 +61,34 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
   }) => {
     if (!profile || !selectedTask) return;
     
-    // Create record first
-    const newRecord = await supabaseService.createTreatmentRecord({
-      assignment_id: selectedTask.assignment.id,
-      elephant_id: selectedTask.elephant.id,
-      keeper_id: profile.id,
+    const draft: TreatmentDraft = {
+      id: crypto.randomUUID(),
+      assignmentId: selectedTask.assignment.id,
+      elephantId: selectedTask.elephant.id,
+      keeperId: profile.id,
+      performedAt: new Date().toISOString(),
       assessment: data.assessment,
-      medicine_used: data.medicineUsed,
-      comment: data.comment
-    });
-
-    // Upload photo if present
-    if (data.photoBlob) {
-      await supabaseService.uploadTreatmentPhoto(
-        data.photoBlob, 
-        newRecord.id, 
-        selectedTask.elephant.id, 
-        'single'
-      );
-    }
-
-    // Refresh UI
+      medicineUsed: data.medicineUsed,
+      comment: data.comment,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    
+    const photos = data.photoBlob ? [{ blob: data.photoBlob, photoType: 'single' as const }] : [];
+    
+    // Save locally
+    await saveDraft(draft, photos);
+    
+    // Optimistic UI update
     setSelectedTask(null);
-    await fetchRecords();
+    await fetchDrafts();
+    
+    // Trigger sync
+    flushSyncQueue();
+  };
+  
+  const handleRetrySync = () => {
+    flushSyncQueue();
   };
 
   const activeAssignments = assignments.filter(a => a.is_active);
@@ -100,26 +126,40 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
               <div className="space-y-3">
                 {elAssignments.map(assignment => {
                   const doneRecord = todayRecords.find(r => r.assignment_id === assignment.id);
-                  const isDone = !!doneRecord;
+                  const draftRecord = pendingDrafts.find(d => d.assignmentId === assignment.id);
+                  
+                  const isDoneOnServer = !!doneRecord;
+                  const isPending = draftRecord?.status === 'pending' || draftRecord?.status === 'syncing';
+                  const isFailed = draftRecord?.status === 'failed';
 
                   return (
-                    <div key={assignment.id} className={`p-4 rounded-2xl border-2 transition ${isDone ? 'border-emerald-100 bg-emerald-50' : 'border-zinc-200 bg-zinc-50 hover:border-zinc-400'}`}>
+                    <div key={assignment.id} className={`p-4 rounded-2xl border-2 transition ${isDoneOnServer ? 'border-emerald-100 bg-emerald-50' : isPending ? 'border-amber-100 bg-amber-50' : isFailed ? 'border-red-100 bg-red-50' : 'border-zinc-200 bg-zinc-50 hover:border-zinc-400'}`}>
                       <div className="font-bold text-lg leading-tight mb-1">{assignment.title}</div>
                       
-                      {assignment.medicine && !isDone && (
+                      {assignment.medicine && !isDoneOnServer && !isPending && !isFailed && (
                         <div className="text-sm font-medium text-zinc-500 mb-3">
                           Требует: {assignment.medicine}
                         </div>
                       )}
 
-                      {isDone ? (
-                        <div className="flex items-center justify-between mt-3 text-sm font-bold text-emerald-700">
-                          <div className="flex items-center gap-1.5">
-                            <CheckCircle2 size={16} />
-                            <span>Выполнено</span>
-                          </div>
-                          <span>{formatTime(new Date(doneRecord.performed_at).getTime())}</span>
+                      {isDoneOnServer ? (
+                        <div className="flex items-center mt-3 text-sm font-bold text-emerald-700">
+                          <CheckCircle2 size={16} className="mr-1.5" />
+                          <span>ВЫПОЛНЕНО ({doneRecord.keeper?.name} &middot; {formatTime(new Date(doneRecord.performed_at).getTime())})</span>
                         </div>
+                      ) : isPending ? (
+                         <div className="flex items-center gap-2 mt-3 text-sm font-bold text-amber-700">
+                            <RefreshCw size={16} className="animate-spin" />
+                            <span>ВЫПОЛНЕНО (Синхронизация...)</span>
+                         </div>
+                      ) : isFailed ? (
+                         <div className="flex items-center justify-between mt-3 text-sm font-bold text-red-700">
+                            <div className="flex items-center gap-1.5">
+                               <AlertCircle size={16} />
+                               <span>Ошибка отправки</span>
+                            </div>
+                            <button onClick={handleRetrySync} className="underline hover:text-red-900">Повторить</button>
+                         </div>
                       ) : (
                         <button
                           onClick={() => setSelectedTask({ assignment, elephant })}

@@ -4,6 +4,7 @@ import { formatTime, formatDate } from '../utils/dates';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import { TreatmentRecordWithPhotos } from '../types';
+import { PhotoPreview } from '../components/PhotoPreview';
 
 interface ElephantDetailsScreenProps {
   elephantId: string;
@@ -105,15 +106,17 @@ export function ElephantDetailsScreen({ elephantId, onBack }: ElephantDetailsScr
 
                 {record.photos && record.photos.length > 0 && (
                   <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                    {record.photos.map(p => (
-                      <div key={p.id} className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-zinc-200 bg-black">
-                        <img 
-                          src={supabaseService.getPublicUrl(p.storage_path)} 
-                          alt="Фото" 
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                    ))}
+                    {record.photos.map(p => {
+                      let typeStr = 'Одиночный снимок';
+                      if (p.photo_type === 'before') typeStr = 'Снимок ДО';
+                      if (p.photo_type === 'after') typeStr = 'Снимок ПОСЛЕ';
+                      
+                      const caption = `${elephant?.name || 'Слон'} • ${title} • ${formatDate(performedAt)} ${formatTime(performedAt)} • ${typeStr}`;
+                      
+                      return (
+                        <PhotoPreview key={p.id} photo={p} caption={caption} />
+                      );
+                    })}
                   </div>
                 )}
               </div>

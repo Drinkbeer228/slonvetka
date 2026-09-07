@@ -1,7 +1,7 @@
 export interface Profile {
   id: string;
   name: string;
-  role: 'keeper' | 'vet';
+  role: 'keeper' | 'vet' | 'director';
   active: boolean;
   created_at: string;
 }

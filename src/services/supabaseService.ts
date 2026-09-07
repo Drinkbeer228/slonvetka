@@ -4,6 +4,8 @@ import {
   TreatmentPhoto, TreatmentRecordWithPhotos 
 } from '../types';
 
+const urlCache = new Map<string, { url: string, expiresAt: number }>();
+
 export const supabaseService = {
   async getProfile(userId: string): Promise<Profile | null> {
     const { data, error } = await supabase
@@ -175,5 +177,30 @@ export const supabaseService = {
       .from('elephant-treatments')
       .getPublicUrl(storagePath);
     return data.publicUrl;
+  },
+
+  async getSignedUrl(storagePath: string): Promise<string> {
+    const now = Date.now();
+    const cached = urlCache.get(storagePath);
+    // Use cache if it exists and expires in more than 5 minutes
+    if (cached && cached.expiresAt > now + 5 * 60 * 1000) {
+      return cached.url;
+    }
+
+    const { data, error } = await supabase.storage
+      .from('elephant-treatments')
+      .createSignedUrl(storagePath, 3600); // 1 hour
+
+    if (error) {
+      console.error('Failed to create signed URL', error);
+      return ''; // Fallback
+    }
+
+    urlCache.set(storagePath, {
+      url: data.signedUrl,
+      expiresAt: now + 3600 * 1000
+    });
+
+    return data.signedUrl;
   }
 };

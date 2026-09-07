@@ -28,7 +28,7 @@ export async function compressImage(file: File): Promise<Blob> {
         
         ctx.drawImage(img, 0, 0, w, h);
         
-        // Export to JPEG with 0.78 quality
+        // Export to JPEG with 0.7 quality
         canvas.toBlob(
           (blob) => {
             if (blob) {
@@ -38,7 +38,7 @@ export async function compressImage(file: File): Promise<Blob> {
             }
           },
           'image/jpeg',
-          0.78
+          0.7
         );
       };
       img.onerror = () => reject(new Error('Image load failed'));
