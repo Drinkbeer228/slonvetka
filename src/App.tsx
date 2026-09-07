@@ -7,6 +7,7 @@ import { JournalScreen } from './screens/JournalScreen';
 import { ElephantsScreen } from './screens/ElephantsScreen';
 import { ElephantDetailsScreen } from './screens/ElephantDetailsScreen';
 import { AssignmentsScreen } from './screens/AssignmentsScreen';
+import { StaffScreen } from './screens/StaffScreen';
 
 export default function App() {
   const { profile, loading } = useStore();
@@ -52,6 +53,8 @@ export default function App() {
           <ElephantsScreen onElephantClick={openElephantDetails} />;
       case 'assignments':
         return <AssignmentsScreen />;
+      case 'staff':
+        return <StaffScreen />;
       default:
         return <TodayScreen onElephantClick={openElephantDetails} />;
     }

@@ -17,6 +17,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
     { id: 'journal', label: 'Журнал', role: 'all' },
     { id: 'elephants', label: 'Слоны', role: 'all' },
     { id: 'assignments', label: 'Назначения', role: 'vet' },
+    { id: 'staff', label: 'Сотрудники', role: 'vet' },
     { id: 'settings', label: 'Настройки', role: 'all' }
   ];
 
