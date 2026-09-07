@@ -6,6 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
+    base: '/slonvetka/',
     plugins: [
       react(), 
       tailwindcss(),
@@ -13,15 +14,15 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: [],
         manifest: {
-          id: '/',
+          id: '/slonvetka/',
           name: 'СлоноВет',
           short_name: 'СлоноВет',
           description: 'Ультра-минималистичный мобильный чеклист ветеринарных обработок слонов.',
           theme_color: '#ffffff',
           background_color: '#ffffff',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: '/slonvetka/',
+          scope: '/slonvetka/',
           icons: [
             {
               src: '/pwa-192x192.png',
