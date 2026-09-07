@@ -9,6 +9,9 @@ import { getOfflineDb, TreatmentRecordQueueItem } from '../services/offlineDb';
 
 import { PhotoPreview } from '../components/PhotoPreview';
 import { ObservationModal } from '../components/ObservationModal';
+import { TreatmentRecordCard } from '../components/TreatmentRecordCard';
+import { EditRecordModal } from '../components/EditRecordModal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 
 export function JournalScreen() {
   const { elephants, assignments, profile } = useStore();
@@ -16,6 +19,11 @@ export function JournalScreen() {
   const [pendingDrafts, setPendingDrafts] = useState<TreatmentRecordQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [observationModalOpen, setObservationModalOpen] = useState(false);
+  
+  // Edit & Delete state for Vet
+  const [editingRecord, setEditingRecord] = useState<TreatmentRecordWithPhotos | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState<TreatmentRecordWithPhotos | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   
   const loadHistory = async () => {
     try {
@@ -69,6 +77,31 @@ export function JournalScreen() {
     
     setObservationModalOpen(false);
     await loadDrafts();
+  };
+
+  const handleSaveEdit = async (updated: TreatmentRecordWithPhotos) => {
+    await supabaseService.updateTreatmentRecord(updated.id, {
+      assessment: updated.assessment,
+      medicine_used: updated.medicine_used,
+      comment: updated.comment,
+    });
+
+    setRecords(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingRecord) return;
+    setDeleteLoading(true);
+    try {
+      await supabaseService.deleteTreatmentRecord(deletingRecord.id);
+      setRecords(prev => prev.filter(r => r.id !== deletingRecord.id));
+      setDeletingRecord(null);
+    } catch (err) {
+      console.error('Failed to delete record:', err);
+      alert('Ошибка при удалении записи. Попробуйте еще раз.');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   return (
@@ -163,75 +196,17 @@ export function JournalScreen() {
                 Записей пока нет
               </div>
             ) : (
-              records.map(record => {
-                const elephant = elephants.find(e => e.id === record.elephant_id);
-                const assignment = assignments.find(a => a.id === record.assignment_id);
-                const title = assignment ? assignment.title : 'Внеплановая задача';
-                
-                // If keeper_id matches our profile, show our name. Otherwise just 'Коллега'.
-                const keeperName = record.keeper_id === profile?.id ? profile.name : 'Сотрудник';
-                
-                const performedAt = new Date(record.performed_at).getTime();
-
-                return (
-                  <div key={record.id} className="bg-white rounded-2xl p-4 shadow-sm border border-zinc-200">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="font-bold text-lg leading-tight text-zinc-900">{title}</div>
-                      <div className="text-xs font-bold text-zinc-500 text-right whitespace-nowrap ml-3">
-                        <div>{formatDate(performedAt)}</div>
-                        <div>{formatTime(performedAt)}</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-black bg-zinc-100 px-2 py-1 rounded-md uppercase tracking-wider">{elephant?.name || 'Неизвестно'}</span>
-                      <span className="text-xs font-medium text-zinc-500">•</span>
-                      <span className="text-xs font-bold text-zinc-600">{keeperName}</span>
-                    </div>
-
-                    <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100 text-sm space-y-2">
-                      {record.assessment && (
-                        <div className="flex justify-between">
-                          <span className="text-zinc-500 font-medium">Статус:</span>
-                          <span className={`font-bold ${record.assessment.toLowerCase().includes('норма') || record.assessment.toLowerCase().includes('чисто') ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {record.assessment}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {record.medicine_used && (
-                        <div className="flex justify-between">
-                          <span className="text-zinc-500 font-medium">Обработка:</span>
-                          <span className="font-bold">{record.medicine_used}</span>
-                        </div>
-                      )}
-
-                      {record.comment && (
-                        <div className="pt-2 border-t border-zinc-200 mt-2">
-                          <span className="text-zinc-500 font-medium">Комментарий: </span>
-                          <span className="text-zinc-800">{record.comment}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {record.photos && record.photos.length > 0 && (
-                      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                        {record.photos.map(p => {
-                          let typeStr = 'Одиночный снимок';
-                          if (p.photo_type === 'before') typeStr = 'Снимок ДО';
-                          if (p.photo_type === 'after') typeStr = 'Снимок ПОСЛЕ';
-                          
-                          const caption = `${elephant?.name || 'Слон'} • ${title} • ${formatDate(performedAt)} ${formatTime(performedAt)} • ${typeStr}`;
-                          
-                          return (
-                            <PhotoPreview key={p.id} photo={p} caption={caption} />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+              records.map(record => (
+                <TreatmentRecordCard
+                  key={record.id}
+                  record={record}
+                  elephants={elephants}
+                  assignments={assignments}
+                  currentProfile={profile}
+                  onEdit={(rec) => setEditingRecord(rec)}
+                  onDelete={(rec) => setDeletingRecord(rec)}
+                />
+              ))
             )}
           </>
         )}
@@ -242,6 +217,26 @@ export function JournalScreen() {
           elephants={elephants}
           onClose={() => setObservationModalOpen(false)}
           onComplete={handleAddNote}
+        />
+      )}
+
+      {editingRecord && (
+        <EditRecordModal
+          record={editingRecord}
+          elephantName={elephants.find(e => e.id === editingRecord.elephant_id)?.name}
+          assignmentTitle={assignments.find(a => a.id === editingRecord.assignment_id)?.title || 'Внеплановая задача'}
+          onClose={() => setEditingRecord(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
+
+      {deletingRecord && (
+        <ConfirmDeleteModal
+          title="Удалить запись из журнала?"
+          description={`Запись слона «${elephants.find(e => e.id === deletingRecord.elephant_id)?.name || 'Слон'}» будет удалена безвозвратно.`}
+          loading={deleteLoading}
+          onClose={() => setDeletingRecord(null)}
+          onConfirm={handleConfirmDelete}
         />
       )}
     </div>

@@ -68,7 +68,8 @@ export const supabaseService = {
       .from('treatment_records')
       .select(`
         *,
-        photos:treatment_photos(*)
+        photos:treatment_photos(*),
+        keeper:profiles(id, name)
       `)
       .gte('performed_at', isoString);
 
@@ -81,7 +82,8 @@ export const supabaseService = {
       .from('treatment_records')
       .select(`
         *,
-        photos:treatment_photos(*)
+        photos:treatment_photos(*),
+        keeper:profiles(id, name)
       `)
       .order('performed_at', { ascending: false })
       .limit(limit);
@@ -95,7 +97,8 @@ export const supabaseService = {
       .from('treatment_records')
       .select(`
         *,
-        photos:treatment_photos(*)
+        photos:treatment_photos(*),
+        keeper:profiles(id, name)
       `)
       .eq('elephant_id', elephantId)
       .order('performed_at', { ascending: false })
@@ -144,6 +147,37 @@ export const supabaseService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async updateTreatmentRecord(
+    id: string,
+    updates: Partial<Pick<TreatmentRecord, 'assessment' | 'medicine_used' | 'comment'>>
+  ): Promise<TreatmentRecord> {
+    const { data, error } = await supabase
+      .from('treatment_records')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteTreatmentRecord(id: string): Promise<void> {
+    // Delete related photos in storage or db if needed
+    const { error: photoErr } = await supabase
+      .from('treatment_photos')
+      .delete()
+      .eq('treatment_record_id', id);
+    if (photoErr) {
+      console.warn('Non-fatal error deleting treatment photos reference:', photoErr);
+    }
+
+    const { error } = await supabase
+      .from('treatment_records')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
   },
 
   async uploadTreatmentPhoto(file: Blob, recordId: string, elephantId: string, photoType: 'single' | 'before' | 'after'): Promise<TreatmentPhoto> {

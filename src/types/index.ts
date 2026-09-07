@@ -54,5 +54,9 @@ export interface TreatmentPhoto {
 // Extends for UI convenience
 export interface TreatmentRecordWithPhotos extends TreatmentRecord {
   photos: TreatmentPhoto[];
+  keeper?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
