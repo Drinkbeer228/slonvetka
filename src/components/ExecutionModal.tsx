@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, X, Check, Loader2 } from 'lucide-react';
+import { Camera, Image, X, Check, Loader2 } from 'lucide-react';
 import { Assignment, Elephant } from '../types';
 import { compressImage } from '../utils/imageCompressor';
 
@@ -29,7 +29,8 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,6 +43,8 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
     } catch (err) {
       console.error(err);
       alert('Ошибка при обработке фотографии');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -104,29 +107,56 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
               {photoUrl ? (
                 <div className="relative rounded-2xl overflow-hidden bg-black flex justify-center border-2 border-zinc-200">
                   <img src={photoUrl} alt="Снимок" className="max-h-64 object-contain" />
-                  <button 
-                    onClick={() => { setPhotoUrl(null); setPhotoBlob(null); }} 
-                    className="absolute top-2 right-2 bg-black/70 text-white p-2 rounded-lg text-xs font-bold"
-                  >
-                    Удалить
-                  </button>
+                  <div className="absolute top-2 right-2 flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => { setPhotoUrl(null); setPhotoBlob(null); }} 
+                      className="bg-black/75 hover:bg-black text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 backdrop-blur-sm shadow"
+                    >
+                      <X size={14} />
+                      Удалить
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-32 border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded-2xl bg-zinc-50 flex flex-col items-center justify-center text-zinc-500 transition"
-                >
-                  <Camera size={32} className="mb-2" />
-                  <span className="font-bold">Сделать снимок</span>
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="h-28 border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded-2xl bg-zinc-50 flex flex-col items-center justify-center text-zinc-700 transition active:scale-95"
+                  >
+                    <Camera size={28} className="mb-1.5 text-zinc-600" />
+                    <span className="font-bold text-sm">Сделать фото</span>
+                    <span className="text-[11px] font-medium text-zinc-400">Камера</span>
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="h-28 border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded-2xl bg-zinc-50 flex flex-col items-center justify-center text-zinc-700 transition active:scale-95"
+                  >
+                    <Image size={28} className="mb-1.5 text-zinc-600" />
+                    <span className="font-bold text-sm">Из галереи</span>
+                    <span className="text-[11px] font-medium text-zinc-400">Медиатека / Файл</span>
+                  </button>
+                </div>
               )}
               
+              {/* Камера (с флагом capture="environment" для мгновенного запуска камеры) */}
               <input 
                 type="file" 
                 accept="image/*" 
                 capture="environment" 
                 className="hidden" 
-                ref={fileInputRef}
+                ref={cameraInputRef}
+                onChange={handlePhotoCapture}
+              />
+              {/* Выбор из галереи / файлов (без флага capture, чтобы на iPhone открывался выбор из Фото) */}
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                ref={galleryInputRef}
                 onChange={handlePhotoCapture}
               />
             </div>

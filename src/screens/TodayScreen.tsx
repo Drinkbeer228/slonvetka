@@ -5,8 +5,8 @@ import { ExecutionModal } from '../components/ExecutionModal';
 import { CheckCircle2, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import { formatTime } from '../utils/dates';
-import { saveDraft, getPendingDrafts, TreatmentDraft } from '../lib/offlineDb';
-import { flushSyncQueue } from '../lib/syncManager';
+import { SyncManager } from '../services/SyncManager';
+import { getOfflineDb, TreatmentRecordQueueItem } from '../services/offlineDb';
 
 interface TodayScreenProps {
   onElephantClick: (id: string) => void;
@@ -18,7 +18,7 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
   
   const [todayRecords, setTodayRecords] = useState<TreatmentRecordWithPhotos[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
-  const [pendingDrafts, setPendingDrafts] = useState<TreatmentDraft[]>([]);
+  const [pendingDrafts, setPendingDrafts] = useState<TreatmentRecordQueueItem[]>([]);
 
   const fetchRecords = async () => {
     try {
@@ -32,7 +32,8 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
   };
 
   const fetchDrafts = async () => {
-    const drafts = await getPendingDrafts();
+    const db = await getOfflineDb();
+    const drafts = await db.getAll('records_queue');
     setPendingDrafts(drafts);
   };
 
@@ -46,10 +47,11 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
     };
 
     window.addEventListener('syncComplete', handleSyncUpdate);
-    window.addEventListener('syncFailed', handleSyncUpdate);
+    window.addEventListener('syncStatusChange', handleSyncUpdate);
+
     return () => {
       window.removeEventListener('syncComplete', handleSyncUpdate);
-      window.removeEventListener('syncFailed', handleSyncUpdate);
+      window.removeEventListener('syncStatusChange', handleSyncUpdate);
     };
   }, []);
 
@@ -61,34 +63,23 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
   }) => {
     if (!profile || !selectedTask) return;
     
-    const draft: TreatmentDraft = {
-      id: crypto.randomUUID(),
-      assignmentId: selectedTask.assignment.id,
-      elephantId: selectedTask.elephant.id,
-      keeperId: profile.id,
-      performedAt: new Date().toISOString(),
+    await SyncManager.saveRecordLocally({
+      assignment_id: selectedTask.assignment.id,
+      elephant_id: selectedTask.elephant.id,
+      keeper_id: profile.id,
+      performed_at: new Date().toISOString(),
       assessment: data.assessment,
-      medicineUsed: data.medicineUsed,
+      medicine_used: data.medicineUsed,
       comment: data.comment,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    };
-    
-    const photos = data.photoBlob ? [{ blob: data.photoBlob, photoType: 'single' as const }] : [];
-    
-    // Save locally
-    await saveDraft(draft, photos);
+    }, data.photoBlob);
     
     // Optimistic UI update
     setSelectedTask(null);
     await fetchDrafts();
-    
-    // Trigger sync
-    flushSyncQueue();
   };
   
   const handleRetrySync = () => {
-    flushSyncQueue();
+    SyncManager.triggerSync();
   };
 
   const activeAssignments = assignments.filter(a => a.is_active);
@@ -126,7 +117,7 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
               <div className="space-y-3">
                 {elAssignments.map(assignment => {
                   const doneRecord = todayRecords.find(r => r.assignment_id === assignment.id);
-                  const draftRecord = pendingDrafts.find(d => d.assignmentId === assignment.id);
+                  const draftRecord = pendingDrafts.find(d => d.payload.assignment_id === assignment.id);
                   
                   const isDoneOnServer = !!doneRecord;
                   const isPending = draftRecord?.status === 'pending' || draftRecord?.status === 'syncing';

@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { StoreProvider } from './store';
-import { initSyncManager } from './lib/syncManager';
+import { initSyncManager } from './services/SyncManager';
 
 initSyncManager();
 

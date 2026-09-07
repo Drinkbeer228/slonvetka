@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabaseService } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { Profile, Elephant, Assignment } from '../types';
+import { cacheElephants, cacheAssignments, getCachedElephants, getCachedAssignments } from '../services/offlineDb';
 
 interface StoreState {
   profile: Profile | null;
@@ -74,17 +75,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function initData() {
       if (!profile) return;
+      
       try {
+        // Try to load from offline cache first for instant display
+        const cachedEls = await getCachedElephants();
+        const cachedAsgs = await getCachedAssignments();
+        
+        if (cachedEls.length > 0) setElephants(cachedEls);
+        if (cachedAsgs.length > 0) setAssignments(cachedAsgs);
+        
+        // Then fetch latest from server
         const [els, asgs] = await Promise.all([
           supabaseService.getElephants(),
           supabaseService.getActiveAssignments()
         ]);
+        
         setElephants(els);
         setAssignments(asgs);
+        
+        // Update cache
+        await cacheElephants(els);
+        await cacheAssignments(asgs);
+        
       } catch (err) {
-        console.error('Failed to load data:', err);
+        console.error('Failed to load data, relying on cache if available:', err);
       }
     }
+
     initData();
   }, [profile]);
 
@@ -118,8 +135,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshAssignments = async () => {
-    const asgs = await supabaseService.getActiveAssignments();
-    setAssignments(asgs);
+    try {
+      const asgs = await supabaseService.getActiveAssignments();
+      setAssignments(asgs);
+      await cacheAssignments(asgs);
+    } catch (e) {
+      console.error('Failed to refresh assignments in background', e);
+    }
   };
 
   return (
