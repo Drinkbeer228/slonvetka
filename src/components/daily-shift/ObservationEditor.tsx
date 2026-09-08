@@ -21,6 +21,29 @@ const URINATION_OPTIONS = [
   'Малыми порциями ⚠️'
 ];
 
+const MOOD_GLASS_STYLES: Record<string, { selected: string; unselected: string }> = {
+  'Грустная / Вялая': {
+    selected: 'bg-sky-50 text-sky-950 border-sky-300 ring-2 ring-sky-200/80 shadow-[0_4px_16px_rgba(56,189,248,0.18)] font-black',
+    unselected: 'bg-white/80 border-slate-200/70 text-slate-600 hover:bg-sky-50/40 hover:border-sky-200'
+  },
+  'Спокойная / В норме': {
+    selected: 'bg-emerald-50 text-emerald-950 border-emerald-300 ring-2 ring-emerald-200/80 shadow-[0_4px_16px_rgba(16,185,129,0.18)] font-black',
+    unselected: 'bg-white/80 border-slate-200/70 text-slate-600 hover:bg-emerald-50/40 hover:border-emerald-200'
+  },
+  'Бодрая / Отличный аппетит': {
+    selected: 'bg-teal-50 text-teal-950 border-teal-300 ring-2 ring-teal-200/80 shadow-[0_4px_16px_rgba(20,184,166,0.18)] font-black',
+    unselected: 'bg-white/80 border-slate-200/70 text-slate-600 hover:bg-teal-50/40 hover:border-teal-200'
+  },
+  'Игривая / Контактная': {
+    selected: 'bg-purple-50 text-purple-950 border-purple-300 ring-2 ring-purple-200/80 shadow-[0_4px_16px_rgba(168,85,247,0.18)] font-black',
+    unselected: 'bg-white/80 border-slate-200/70 text-slate-600 hover:bg-purple-50/40 hover:border-purple-200'
+  },
+  'Беспокойная / Настороже': {
+    selected: 'bg-amber-50 text-amber-950 border-amber-300 ring-2 ring-amber-200/80 shadow-[0_4px_16px_rgba(245,158,11,0.18)] font-black',
+    unselected: 'bg-white/80 border-slate-200/70 text-slate-600 hover:bg-amber-50/40 hover:border-amber-200'
+  },
+};
+
 interface Props {
   elephant: Elephant;
   metrics: ElephantDailyMetrics;
@@ -182,6 +205,10 @@ export function ObservationEditor({
         <div className="grid grid-cols-5 gap-2">
           {ELEPHANT_MOODS.map(mood => {
             const isSelected = currentBehavior === mood.id;
+            const style = MOOD_GLASS_STYLES[mood.id] || {
+              selected: 'bg-emerald-50 text-emerald-950 border-emerald-300 ring-2 ring-emerald-200 shadow-sm font-black',
+              unselected: 'bg-white/80 border-slate-200/60 text-slate-600 hover:bg-slate-50'
+            };
             return (
               <button
                 key={mood.id}
@@ -190,8 +217,8 @@ export function ObservationEditor({
                 onClick={() => onMetricChange('behavior', mood.id)}
                 className={`py-2 px-1 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
                   isSelected 
-                    ? 'bg-slate-800 text-white border-slate-800 shadow-md scale-105' 
-                    : 'bg-white border-slate-200/60 text-slate-600 hover:bg-slate-50 active:scale-95'
+                    ? `${style.selected} scale-105` 
+                    : `${style.unselected} active:scale-95`
                 }`}
               >
                 <span className="text-2xl mb-1 shrink-0">{mood.emoji}</span>

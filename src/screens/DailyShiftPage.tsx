@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { supabaseService } from '../services/supabaseService';
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
 import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
-import { FeedControl } from '../components/daily-shift/FeedControl';
+import { FeedControl, DailyRationData } from '../components/daily-shift/FeedControl';
 import { ObservationEditor } from '../components/daily-shift/ObservationEditor';
 
 const FECES_OPTIONS = [
@@ -38,31 +38,31 @@ export const ELEPHANT_MOODS = [
     id: 'Грустная / Вялая', 
     label: 'Спит / Вялая', 
     emoji: '🌧️',
-    activeClass: 'bg-blue-50 dark:bg-blue-950/40 border-2 border-blue-500 text-blue-600 shadow-sm'
+    activeClass: 'bg-sky-50 border-2 border-sky-300 text-sky-950 shadow-xs ring-2 ring-sky-200/80 font-bold'
   },
   { 
     id: 'Спокойная / В норме', 
     label: 'Спокойно', 
     emoji: '🐘',
-    activeClass: 'bg-slate-100 dark:bg-slate-700 border-2 border-slate-400 text-slate-800 dark:text-slate-100 shadow-sm'
+    activeClass: 'bg-emerald-50 border-2 border-emerald-300 text-emerald-950 shadow-xs ring-2 ring-emerald-200/80 font-bold'
   },
   { 
     id: 'Бодрая / Отличный аппетит', 
     label: 'Ест с аппетитом', 
     emoji: '🍏',
-    activeClass: 'bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-600 shadow-sm'
+    activeClass: 'bg-teal-50 border-2 border-teal-300 text-teal-950 shadow-xs ring-2 ring-teal-200/80 font-bold'
   },
   { 
     id: 'Игривая / Контактная', 
     label: 'Игривая', 
     emoji: '🎸',
-    activeClass: 'bg-purple-50 dark:bg-purple-950/40 border-2 border-purple-500 text-purple-600 shadow-sm'
+    activeClass: 'bg-purple-50 border-2 border-purple-300 text-purple-950 shadow-xs ring-2 ring-purple-200/80 font-bold'
   },
   { 
     id: 'Беспокойная / Настороже', 
     label: 'Стресс / Шум', 
     emoji: '⚡',
-    activeClass: 'bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-500 text-amber-600 shadow-sm'
+    activeClass: 'bg-amber-50 border-2 border-amber-300 text-amber-950 shadow-xs ring-2 ring-amber-200/80 font-bold'
   },
 ];
 
@@ -105,6 +105,36 @@ const getDaysInMonth = (year: number, month: number) => {
 const getFirstDayOfWeek = (year: number, month: number) => {
   let day = new Date(year, month, 1).getDay();
   return day === 0 ? 6 : day - 1;
+};
+
+const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
+  const defaultRation: DailyRationData = {
+    morning_porridge: 'none',
+    lunch_porridge: 'none',
+    evening_salad_chips: ['Морковь', 'Яблоки', 'Капуста'],
+    salad_notes: ''
+  };
+  if (!feedNotes) return defaultRation;
+  try {
+    const parsed = JSON.parse(feedNotes);
+    return {
+      morning_porridge: parsed.morning_porridge || 'none',
+      lunch_porridge: parsed.lunch_porridge || 'none',
+      evening_salad_chips: Array.isArray(parsed.evening_salad_chips) 
+        ? parsed.evening_salad_chips 
+        : defaultRation.evening_salad_chips,
+      salad_notes: parsed.salad_notes || ''
+    };
+  } catch {
+    return {
+      ...defaultRation,
+      salad_notes: feedNotes
+    };
+  }
+};
+
+const serializeDailyRation = (ration: DailyRationData): string => {
+  return JSON.stringify(ration);
 };
 
 export function DailyShiftPage() {
@@ -385,12 +415,39 @@ export function DailyShiftPage() {
   };
 
   
-  const handleSaveAllStocks = async () => {
-    const newBales = await shiftService.setHayStock('bales', Number(modalBales));
-    const newRolls = await shiftService.setHayStock('rolls', Number(modalRolls));
-    setHayStockBales(newBales);
-    setHayStockRolls(newRolls);
-    setReplenishModalOpen(false);
+  const currentRation = useMemo<DailyRationData>(() => {
+    return parseDailyRation(shift?.feed_notes);
+  }, [shift?.feed_notes]);
+
+  const handlePorridgeChange = (meal: 'morning' | 'lunch', status: 'none' | 'all' | 'partial') => {
+    if (isLocked || !shift) return;
+    const updatedRation: DailyRationData = {
+      ...currentRation,
+      [meal === 'morning' ? 'morning_porridge' : 'lunch_porridge']: status
+    };
+    handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
+  };
+
+  const handleVegetableToggle = (chip: string) => {
+    if (isLocked || !shift) return;
+    const currentChips = currentRation.evening_salad_chips || [];
+    const updatedChips = currentChips.includes(chip)
+      ? currentChips.filter(c => c !== chip)
+      : [...currentChips, chip];
+    const updatedRation: DailyRationData = {
+      ...currentRation,
+      evening_salad_chips: updatedChips
+    };
+    handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
+  };
+
+  const handleSaladNotesChange = (notes: string) => {
+    if (isLocked || !shift) return;
+    const updatedRation: DailyRationData = {
+      ...currentRation,
+      salad_notes: notes
+    };
+    handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), false);
   };
 
   const handleCompleteTask = async (data: {
@@ -709,13 +766,18 @@ export function DailyShiftPage() {
         })()}
       </div>
 
-      {/* FEED CONTROL SECTION */}
+      {/* FEED CONTROL & DAILY RATION SECTION */}
       <div className="space-y-6 pt-6">
         <FeedControl
           hayBalesDistributed={hayBalesDistributed}
           hayBagsDistributed={hayBagsDistributed}
+          ration={currentRation}
+          isLocked={isLocked}
           onBalesChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
           onBagsChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
+          onPorridgeChange={handlePorridgeChange}
+          onVegetableToggle={handleVegetableToggle}
+          onSaladNotesChange={handleSaladNotesChange}
         />
       </div>
 
