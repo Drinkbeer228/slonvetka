@@ -13,7 +13,9 @@ import {
   Check, Camera, PackagePlus, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2
 } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
-import { ElephantPhysiology } from '../components/ElephantPhysiology';
+import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
+import { FeedControl } from '../components/daily-shift/FeedControl';
+import { ObservationEditor } from '../components/daily-shift/ObservationEditor';
 
 const FECES_OPTIONS = [
   'Сформирован (норма)',
@@ -106,16 +108,9 @@ const getFirstDayOfWeek = (year: number, month: number) => {
 };
 
 export function DailyShiftPage() {
-  const { profile, elephants, assignments, selectedDate, setSelectedDate } = useStore();
+  const { profile, elephants, assignments, selectedDate, setSelectedDate, activeElephantId, setActiveElephantId } = useStore();
   
   const todayStr = new Date().toISOString().split('T')[0];
-  const [activeElephantId, setActiveElephantId] = useState<string>('');
-
-  useEffect(() => {
-    if (elephants.length > 0 && (!activeElephantId || !(elephants || []).find(e => e.id === activeElephantId))) {
-      setActiveElephantId((elephants || [])[0].id);
-    }
-  }, [elephants]);
 
   // Touch swipe refs for mobile
   const touchStartX = useRef<number>(0);
@@ -162,7 +157,6 @@ export function DailyShiftPage() {
   const [modalRolls, setModalRolls] = useState<number>(15);
 
   const [newReminderText, setNewReminderText] = useState<string>('');
-  const [shiftCompletedModalOpen, setShiftCompletedModalOpen] = useState(false);
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [viewYear, setViewYear] = useState<number>(() => parseDateString(selectedDate).year);
@@ -479,11 +473,35 @@ export function DailyShiftPage() {
     setAdhocPreviewUrl(URL.createObjectURL(file));
   };
 
-  const formattedDateLabel = new Date(selectedDate).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  const formattedDateLabel = (() => {
+    try {
+      const parts = selectedDate.split('-');
+      if (parts.length === 3) {
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        return d.toLocaleDateString('ru-RU', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+      }
+      return selectedDate;
+    } catch {
+      return selectedDate;
+    }
+  })();
+
+  const changeDateByDays = (days: number) => {
+    try {
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const d = new Date(year, month - 1, day + days);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dt = String(d.getDate()).padStart(2, '0');
+      setSelectedDate(`${y}-${m}-${dt}`);
+    } catch (e) {
+      console.error('Failed to change date:', e);
+    }
+  };
 
   const dutyKeeper = (staffList || []).find(s => s.id === shift?.duty_keeper_id);
   const hayBalesDistributed = shift?.hay_bales_distributed || 0;
@@ -515,494 +533,194 @@ export function DailyShiftPage() {
     );
   }
   return (
-    <div className="pb-24 space-y-6 mt-4">
-      {/* SAVING STATUS INDICATOR BAR */}
+        <div className="pb-32 space-y-6 mt-2 relative">
+      
+      {/* SAVING STATUS */}
       <div className="fixed bottom-6 right-6 z-50">
         {savingStatus === 'saving' && (
-          <div className="bg-zinc-900/90 text-white px-4 py-2 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900/80 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold backdrop-blur-md animate-in fade-in">
             <Loader2 className="animate-spin" size={14} /> Сохранение...
           </div>
         )}
         {savingStatus === 'saved' && (
-          <div className="bg-emerald-600 text-white px-4 py-2 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold backdrop-blur-md animate-in fade-in">
+          <div className="bg-emerald-500/90 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold backdrop-blur-md animate-in fade-in fade-out delay-1000">
             <Check size={14} /> Сохранено ✓
           </div>
         )}
       </div>
 
-      {/* FUTURE DATE BANNER (PLANNING MODE) */}
+      {/* FUTURE DATE BANNER */}
       {isFutureDate && (
-        <div className="bg-slate-50 border border-slate-200 text-slate-800 px-5 py-4 rounded-3xl flex items-center justify-between shadow-sm">
+        <div className="bg-blue-50/80 backdrop-blur-xl border border-blue-200/80 text-blue-900 px-5 py-3.5 rounded-[24px] flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-slate-700 shrink-0">
-              <CalendarIcon size={20} />
-            </div>
+            <CalendarIcon className="text-blue-600 shrink-0" size={20} />
             <div>
-              <div className="font-black text-sm">Режим планирования ({formattedDateLabel})</div>
-              <div className="text-xs font-medium text-slate-600 mt-0.5">
-                Фактический ввод дежурства заблокирован. Установите дежурного.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ARCHIVE DATE BANNER */}
-      {isArchiveMode && !isFutureDate && (
-        <div className="bg-slate-50 border border-slate-200 text-slate-800 px-5 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-slate-700 shrink-0">
-              <CalendarIcon size={20} />
-            </div>
-            <div>
-              <div className="font-black text-sm">Архив смены за {formattedDateLabel}</div>
-              <div className="text-xs font-medium text-slate-600 mt-0.5">
-                Дежурный: {dutyKeeper ? dutyKeeper.name : 'Не указан'} • Режим чтения
-              </div>
+              <div className="font-bold text-xs sm:text-sm">Режим планирования будущей смены</div>
+              <div className="text-[11px] text-blue-700/80 mt-0.5">Фактический ввод дежурства заблокирован до наступления даты смены.</div>
             </div>
           </div>
           <button
             onClick={() => setSelectedDate(todayStr)}
-            className="px-3.5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold transition shadow-sm shrink-0"
           >
             К сегодня
           </button>
         </div>
       )}
 
-      {/* HEADER / KEEPER INFO */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-200 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <UserCheck size={18} className="text-slate-500" />
-            <span className="text-sm font-bold text-slate-700">Дежурный кипер:</span>
+      {/* ARCHIVE BANNER */}
+      {isArchiveMode && (
+        <div className="bg-amber-50/80 backdrop-blur-xl border border-amber-200/80 text-amber-900 px-5 py-3.5 rounded-[24px] flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <History className="text-amber-600 shrink-0" size={20} />
+            <div>
+              <div className="font-bold text-xs sm:text-sm">Архив смены • Режим чтения</div>
+              <div className="text-[11px] text-amber-700/80 mt-0.5">Редактирование закрыто (просмотр исторических записей).</div>
+            </div>
           </div>
-          <select
-            disabled={isArchiveMode && !isVet}
-            value={shift?.duty_keeper_id || profile?.id || ''}
-            onChange={(e) => handleShiftFieldChange('duty_keeper_id', e.target.value, true)}
-            className="w-full sm:w-auto min-w-[240px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:outline-none focus:border-slate-900 disabled:opacity-60 text-slate-800"
+          <button
+            onClick={() => setSelectedDate(todayStr)}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-xs font-bold transition shadow-sm shrink-0"
           >
-            <option value="">-- Выберите дежурного --</option>
-            {staffList.map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
-            ))}
-          </select>
+            К сегодня
+          </button>
+        </div>
+      )}
+
+      {/* HEADER CARD */}
+      <div className="bg-white/60 backdrop-blur-xl border border-white/80 p-5 rounded-[24px] shadow-[0_4px_32px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Рабочая смена</h2>
+            {selectedDate !== todayStr && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/80 text-slate-700">
+                {isFutureDate ? 'План' : 'Архив'}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2.5 mt-1 flex-wrap">
+            <div className="text-xl font-black text-slate-800 tracking-tight">{formattedDateLabel}</div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => changeDateByDays(-1)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold transition active:scale-95"
+                title="Предыдущий день"
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                onClick={() => changeDateByDays(1)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold transition active:scale-95"
+                title="Следующий день"
+              >
+                →
+              </button>
+              {selectedDate !== todayStr && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(todayStr)}
+                  className="px-2.5 py-0.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-full transition ml-1"
+                >
+                  Сегодня
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col sm:items-end gap-1">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            Дежурный: {dutyKeeper ? dutyKeeper.name : 'Не указан'} {isLocked ? '• Режим чтения' : ''}
+          </div>
+          {!isLocked && (
+             <div className="flex -space-x-2">
+                {staffList.map(s => (
+                  <button 
+                    key={s.id} 
+                    onClick={() => handleShiftFieldChange('duty_keeper_id', s.id, true)}
+                    className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
+                      shift?.duty_keeper_id === s.id ? 'bg-slate-800 text-white z-10 scale-110' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                    title={s.name}
+                  >
+                    {s.name.charAt(0)}
+                  </button>
+                ))}
+             </div>
+          )}
         </div>
       </div>
 
-      {/* IF FUTURE DATE, DO NOT RENDER FACTUAL SHIFT BLOCKS */}
-      {isFutureDate ? (
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-3 shadow-sm">
-          <h2 className="text-xl font-black text-slate-900">Будущая дата заблокирована для фактического ввода</h2>
-          <p className="text-sm text-slate-500 max-w-md mx-auto">
-            Фактические показатели дефекации, мочеиспускания и раздачи кормов можно будет заполнить в день наступления смены ({formattedDateLabel}).
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* SECTION 1: СЕЙЧАС (NOW) */}
-          <div className="space-y-4 pt-2">
-            <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-2">1. Сейчас</h2>
-            <div className="space-y-3">
-              {(elephants || []).map(elephant => {
-                const m = (metrics || {})[elephant.id] || {
-                  shift_id: shift?.id || '',
-                  elephant_id: elephant.id,
-                  poop_count: 0,
-                  feces_traits: ['Сформирован (норма)'],
-                  urination_count: 0,
-                  urination_traits: ['Светлая / Прозрачная'],
-                  behavior: 'Спокойная / В норме',
-                  notes: ''
-                };
-                
-                const assignmentsForEle = (assignments || []).filter(a => a.elephant_id === elephant.id);
-                
-                const isPoopWarn = (m.feces_traits || []).some(t => t.includes('⚠️'));
-                const isUrineWarn = (m.urination_traits || []).some(t => t.includes('⚠️') || t.includes('Темная') || t.includes('Мутная') || t.includes('Бурая'));
-                
-                const poopColor = isPoopWarn ? 'text-amber-600' : 'text-emerald-600';
-                const urineColor = isUrineWarn ? 'text-amber-600' : 'text-emerald-600';
-
+      {/* ACTIVE ELEPHANT CONTENT */}
+      <div className="space-y-6">
+        {(() => {
+          const activeElephant = (elephants || []).find(e => e.id === activeElephantId) || (elephants || [])[0];
+          if (!activeElephant) return null;
+          
+          const m = (metrics || {})[activeElephant.id] || {
+            shift_id: shift?.id || '',
+            elephant_id: activeElephant.id,
+            poop_count: 0,
+            feces_traits: ['Сформирован (норма)'],
+            urination_count: 0,
+            urination_traits: ['Светлая / Прозрачная'],
+            behavior: 'Спокойная / В норме',
+            sleep_minutes: 420,
+            notes: ''
+          };
+          
+          const assignmentsForEle = (assignments || []).filter(a => a.elephant_id === activeElephant.id);
+          
+          const assignmentsContent = assignmentsForEle.length > 0 ? (
+            <div className="space-y-2 mt-2">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                <span className="text-base leading-none">🩺</span> Вет. назначения
+              </div>
+              {assignmentsForEle.map(assignment => {
+                const relatedRecord = (shiftRecords || []).find(r => r.assignment_id === assignment.id);
+                const isCompletedToday = !!relatedRecord;
                 return (
-                  <div key={elephant.id} className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <h3 className="font-black text-slate-900 text-lg">{elephant.name}</h3>
-                      <button 
-                        onClick={() => {
-                          setActiveElephantId(elephant.id);
-                          document.getElementById('observations-section')?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        className="text-blue-700 text-xs font-bold bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm"
-                      >
-                        Изменить
-                      </button>
-                    </div>
-                    
-                    {/* Quick Summary */}
-                    <div className="text-[13px] font-semibold text-slate-600 space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">Дефекация:</span>
-                        <span className="text-slate-900">{m.poop_count}</span>
-                        <span className={poopColor}>· {(m.feces_traits?.[0] || 'Норма').replace(' ⚠️', '').toLowerCase()}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">Мочеиспускание:</span>
-                        <span className="text-slate-900">{m.urination_count}</span>
-                        <span className={urineColor}>· {(m.urination_traits?.[0] || 'Норма').replace(' ⚠️', '').toLowerCase()}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">Состояние:</span>
-                        <span className="text-slate-900">{m.behavior}</span>
-                      </div>
-                    </div>
-
-                    {/* Vet Assignments for this elephant */}
-                    {assignmentsForEle.length > 0 && (
-                      <div className="pt-3 border-t border-slate-100 space-y-2">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Назначения:</div>
-                        {assignmentsForEle.map(assignment => {
-                          const relatedRecord = (shiftRecords || []).find(r => r.assignment_id === assignment.id);
-                          const isCompletedToday = !!relatedRecord;
-                          return (
-                            <div key={assignment.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-                               <div className="flex flex-col gap-0.5">
-                                 <div className="text-sm font-bold text-slate-800">{assignment.title}</div>
-                                 <div className={`text-[11px] font-bold ${isCompletedToday ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                   {isCompletedToday ? '✓ Выполнено' : '🟡 Активно'}
-                                 </div>
-                               </div>
-                               {!isLocked && (
-                                 isCompletedToday ? (
-                                   <div className="flex gap-1">
-                                     <button onClick={() => setSelectedTask({ assignment, elephant, existingRecord: relatedRecord })} className="px-2 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition">Изм.</button>
-                                     <button onClick={() => handleUnmarkTask(relatedRecord.id)} className="px-2 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition"><Trash2 size={14}/></button>
-                                   </div>
-                                 ) : (
-                                   <button onClick={() => setSelectedTask({ assignment, elephant })} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm transition">
-                                     Выполнить
-                                   </button>
-                                 )
-                               )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* SECTION 2: НАБЛЮДЕНИЯ (OBSERVATIONS) */}
-          <div id="observations-section" className="space-y-4 pt-6 scroll-mt-6">
-            <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-2">2. Наблюдения</h2>
-            
-            {/* TABS */}
-            <div className="flex bg-slate-200/70 p-1 rounded-xl w-full">
-              {(elephants || []).map((elephant) => {
-                const isActive = elephant.id === activeElephantId;
-                const m = (metrics || {})[elephant.id];
-                const hasNotes = m && m.notes && m.notes.trim().length > 0;
-                return (
-                  <button
-                    key={elephant.id}
-                    type="button"
-                    onClick={() => setActiveElephantId(elephant.id)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-sm transition-all relative ${
-                      isActive 
-                        ? 'bg-white shadow-sm text-slate-900 font-bold' 
-                        : 'text-slate-500 hover:text-slate-700 font-semibold'
-                    }`}
-                  >
-                    <span className="truncate">{elephant.name}</span>
-                    {hasNotes && (
-                      <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* ACTIVE ELEPHANT FORM */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-              {(() => {
-                const activeElephant = (elephants || []).find(e => e.id === activeElephantId) || (elephants || [])[0];
-                if (!activeElephant) return null;
-                const m = metrics[activeElephant.id] || {
-                  shift_id: shift?.id || '',
-                  elephant_id: activeElephant.id,
-                  poop_count: 0,
-                  feces_traits: ['Сформирован (норма)'],
-                  urination_count: 0,
-                  urination_traits: ['Светлая / Прозрачная'],
-                  behavior: 'Спокойная / В норме',
-                  notes: ''
-                };
-                return (
-                  <ElephantPhysiology 
-                    elephant={activeElephant}
-                    metrics={m}
+                  <VeterinaryAssignmentCard
+                    key={assignment.id}
+                    assignment={assignment}
+                    isCompletedToday={isCompletedToday}
                     isLocked={isLocked}
-                    onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
-                    onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
-                    onNotesBlur={() => shift && persistChanges(shift, metrics)}
+                    onExecute={() => setSelectedTask({ assignment, elephant: activeElephant })}
+                    onUnmark={() => handleUnmarkTask(relatedRecord.id)}
+                    onEdit={() => setSelectedTask({ assignment, elephant: activeElephant, existingRecord: relatedRecord })}
                   />
                 );
-              })()}
+              })}
             </div>
-          </div>
+          ) : null;
 
-          {/* SECTION 3: СМЕНА (SHIFT) */}
-          <div className="space-y-4 pt-6">
-            <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-2">3. Смена</h2>
-            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-              
-              {/* FOOD */}
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                   <h3 className="text-base font-black text-slate-900">Выдача корма (Сено)</h3>
-                   {isVet && (
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setModalBales(hayStockBales);
-                         setModalRolls(hayStockRolls);
-                         setReplenishModalOpen(true);
-                       }}
-                       className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl font-bold text-xs"
-                     >
-                       Склад
-                     </button>
-                   )}
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">Тюки сена</div>
-                      <div className="text-xs text-slate-400 mt-1 font-medium">На складе: {Math.max(0, hayStockBales - hayBalesDistributed)}</div>
-                    </div>
-                    <CounterButton
-                      label=""
-                      value={hayBalesDistributed}
-                      onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">Рулоны и мешки</div>
-                      <div className="text-xs text-slate-400 mt-1 font-medium">На складе: {hayStockRolls}</div>
-                    </div>
-                    <CounterButton
-                      label=""
-                      value={hayBagsDistributed}
-                      onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
-                    />
-                  </div>
-                </div>
-              </div>
+          return (
+            <ObservationEditor
+              elephant={activeElephant}
+              metrics={m}
+              isLocked={isLocked}
+              onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
+              onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
+              onNotesBlur={() => shift && persistChanges(shift, metrics)}
+              assignmentsContent={assignmentsContent}
+            />
+          );
+        })()}
+      </div>
 
-              {/* HANDOVER */}
-              <div className="pt-5 border-t border-slate-100 space-y-3">
-                <h3 className="text-base font-black text-slate-900">Сдача смены</h3>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Что важно передать следующей смене?</label>
-                  <textarea
-                    disabled={isLocked}
-                    value={shift?.handover_notes || ''}
-                    onChange={(e) => handleShiftFieldChange('handover_notes', e.target.value, false)}
-                    onBlur={() => shift && persistChanges(shift, metrics)}
-                    placeholder="Например: Прэтти не доела сено, Марго была беспокойной..."
-                    className="w-full h-24 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-slate-900 resize-none text-slate-800 placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
+      {/* FEED CONTROL SECTION */}
+      <div className="space-y-6 pt-6">
+        <FeedControl
+          hayBalesDistributed={hayBalesDistributed}
+          hayBagsDistributed={hayBagsDistributed}
+          onBalesChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
+          onBagsChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
+        />
+      </div>
 
-              {!isLocked && (
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleShiftFieldChange('status', 'completed', true)}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition shadow-sm"
-                  >
-                    Сдать смену
-                  </button>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ALL MODALS GO HERE (unchanged structure) */}
-      {/* REPLENISH WAREHOUSE STOCK MODAL */}
-      {replenishModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-in fade-in duration-200">
-            <div className="p-4 bg-zinc-900 text-white flex items-center justify-between">
-              <h3 className="font-black text-base">Остатки на складе</h3>
-              <button type="button" onClick={() => setReplenishModalOpen(false)} className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="p-5 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-zinc-700 whitespace-nowrap">📦 Тюки сена (шт.)</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setModalBales(Math.max(0, modalBales - 1))}
-                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-lg flex items-center justify-center transition shadow-sm"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    value={modalBales}
-                    onChange={(e) => setModalBales(Math.max(0, Number(e.target.value)))}
-                    className="w-16 h-10 px-1 bg-zinc-100 border border-zinc-300 rounded-xl font-bold text-lg text-center focus:outline-none focus:border-zinc-900"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setModalBales(modalBales + 1)}
-                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-lg flex items-center justify-center transition shadow-sm"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-zinc-700 whitespace-nowrap">🔄 Рулоны сена (шт.)</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setModalRolls(Math.max(0, modalRolls - 1))}
-                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-lg flex items-center justify-center transition shadow-sm"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    value={modalRolls}
-                    onChange={(e) => setModalRolls(Math.max(0, Number(e.target.value)))}
-                    className="w-16 h-10 px-1 bg-zinc-100 border border-zinc-300 rounded-xl font-bold text-lg text-center focus:outline-none focus:border-zinc-900"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setModalRolls(modalRolls + 1)}
-                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-lg flex items-center justify-center transition shadow-sm"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleSaveAllStocks}
-                  className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-black text-xs transition shadow-sm uppercase tracking-wider"
-                >
-                  Сохранить
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AD-HOC TREATMENT MODAL */}
-      {adhocModalElephant && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl animate-in fade-in duration-200">
-            <div className="p-4 bg-zinc-900 text-white flex items-center justify-between">
-              <div>
-                <div className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{adhocModalElephant.name}</div>
-                <h3 className="font-black text-base">Внеплановая заметка / Обработка</h3>
-              </div>
-              <button type="button" onClick={() => setAdhocModalElephant(null)} className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleSaveAdhocRecord} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Препарат (если применялся)</label>
-                <input
-                  type="text"
-                  value={adhocMedicine}
-                  onChange={(e) => setAdhocMedicine(e.target.value)}
-                  placeholder="Например: Мазь Вишневского, Йод..."
-                  className="w-full px-4 py-2.5 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-medium focus:outline-none focus:border-zinc-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Описание / Наблюдение *</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={adhocDescription}
-                  onChange={(e) => setAdhocDescription(e.target.value)}
-                  placeholder="Опишите состояние или выполненную внеплановую процедуру..."
-                  className="w-full px-4 py-2.5 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-medium focus:outline-none focus:border-zinc-900 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Фотофиксация</label>
-                {adhocPreviewUrl ? (
-                  <div className="relative rounded-2xl overflow-hidden bg-black flex justify-center border border-zinc-300 max-h-40">
-                    <img src={adhocPreviewUrl} alt="Preview" className="h-40 object-contain" />
-                    <button
-                      type="button"
-                      onClick={() => { setAdhocPhotoBlob(null); setAdhocPreviewUrl(null); }}
-                      className="absolute top-2 right-2 bg-black/80 text-white px-2.5 py-1 rounded-xl text-xs font-bold"
-                    >
-                      Удалить
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-zinc-300 rounded-2xl cursor-pointer bg-zinc-50 hover:bg-zinc-100 transition">
-                    <Camera size={24} className="text-zinc-500 mb-1" />
-                    <span className="text-xs font-bold text-zinc-700">Сделать или выбрать фото</span>
-                    <input type="file" accept="image/*" onChange={handleAdhocPhotoSelected} className="hidden" />
-                  </label>
-                )}
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setAdhocModalElephant(null)}
-                  className="px-4 py-2.5 rounded-xl font-bold text-zinc-600 bg-zinc-100"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingAdhoc}
-                  className="px-5 py-2.5 bg-zinc-900 text-white rounded-xl font-bold flex items-center gap-2"
-                >
-                  {submittingAdhoc && <Loader2 size={16} className="animate-spin" />}
-                  <span>Сохранить заметку</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* EXECUTION MODAL FOR VET ASSIGNMENTS */}
+      {/* MODALS */}
+{/* EXECUTION MODAL FOR VET ASSIGNMENTS */}
       {selectedTask && (
         <ExecutionModal
           assignment={selectedTask.assignment}
@@ -1028,26 +746,6 @@ export function DailyShiftPage() {
       )}
 
       {/* SHIFT COMPLETED CONFIRMATION MODAL */}
-      {shiftCompletedModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 text-center space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-inner">
-              ✓
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-black text-zinc-900 tracking-tight">Смена успешно сдана!</h3>
-              <p className="text-xs text-zinc-500 font-medium">Статус смены переведен в «Завершена». Все данные зафиксированы в системе.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShiftCompletedModalOpen(false)}
-              className="w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-black text-xs transition uppercase tracking-wider shadow-sm"
-            >
-              Понятно
-            </button>
-          </div>
-        </div>
-      )}
     </div>
     );
 }

@@ -31,6 +31,7 @@ export interface ElephantDailyMetrics {
   urination_count: number;
   urination_traits: string[];
   behavior_score?: number; // legacy
-  behavior?: string; // e.g. 'Спокойная / В норме'
+  behavior?: string;
+  sleep_minutes?: number; // e.g. 'Спокойная / В норме'
   notes?: string;
 }

@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>СлоноВет</title>
-    <meta name="description" content="Ветеринарный журнал слоновника" />
-    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
-  <script>
+import fs from 'fs';
+let code = fs.readFileSync('index.html', 'utf8');
+
+if (!code.includes('window.onerror')) {
+  code = code.replace(
+    '</head>',
+    `<script>
       window.onerror = function(message, source, lineno, colno, error) {
         document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif;">' + 
           '<h3>Runtime Error</h3>' + 
@@ -21,9 +19,8 @@
           '<pre>' + (event.reason && event.reason.stack ? event.reason.stack : '') + '</pre>' + 
           '</div>';
       });
-    </script></head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+    </script></head>`
+  );
+  fs.writeFileSync('index.html', code);
+  console.log('Injected error handler');
+}

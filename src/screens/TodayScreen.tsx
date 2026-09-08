@@ -121,7 +121,7 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
                   
                   const isDoneOnServer = !!doneRecord;
                   const isPending = draftRecord?.status === 'pending' || draftRecord?.status === 'syncing';
-                  const isFailed = draftRecord?.status === 'failed';
+                  const isFailed = draftRecord?.status === 'error';
 
                   return (
                     <div key={assignment.id} className={`p-4 rounded-2xl border-2 transition ${isDoneOnServer ? 'border-emerald-100 bg-emerald-50' : isPending ? 'border-amber-100 bg-amber-50' : isFailed ? 'border-red-100 bg-red-50' : 'border-zinc-200 bg-zinc-50 hover:border-zinc-400'}`}>

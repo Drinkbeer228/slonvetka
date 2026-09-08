@@ -10,6 +10,7 @@ interface StoreState {
   assignments: Assignment[];
   loading: boolean;
   selectedDate: string;
+  activeElephantId: string;
 }
 
 interface StoreContextType extends StoreState {
@@ -17,6 +18,7 @@ interface StoreContextType extends StoreState {
   logout: () => Promise<void>;
   refreshAssignments: () => Promise<void>;
   setSelectedDate: (date: string) => void;
+  setActiveElephantId: (id: string) => void;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -24,9 +26,16 @@ const StoreContext = createContext<StoreContextType | null>(null);
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [elephants, setElephants] = useState<Elephant[]>([]);
+  const [activeElephantId, setActiveElephantId] = useState<string>('');
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    if (elephants.length > 0 && (!activeElephantId || !elephants.some(e => e.id === activeElephantId))) {
+      setActiveElephantId(elephants[0].id);
+    }
+  }, [elephants, activeElephantId]);
 
   // Initial session check and auth state listener
   useEffect(() => {
@@ -149,7 +158,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      profile, elephants, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate
+      profile, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate
     }}>
       {children}
     </StoreContext.Provider>

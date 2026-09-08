@@ -59,7 +59,8 @@ export const shiftService = {
               ...m,
               feces_traits: m.feces_traits && m.feces_traits.length > 0 ? m.feces_traits : ['Сформирован (норма)'],
               urination_traits: m.urination_traits && m.urination_traits.length > 0 ? m.urination_traits : ['Светлая / Прозрачная'],
-              behavior: m.behavior || (m.behavior_score === 1 ? 'Грустная / Вялая' : m.behavior_score === 3 ? 'Бодрая / Отличный аппетит' : 'Спокойная / В норме')
+              behavior: m.behavior || (m.behavior_score === 1 ? 'Грустная / Вялая' : m.behavior_score === 3 ? 'Бодрая / Отличный аппетит' : 'Спокойная / В норме'),
+              sleep_minutes: m.behavior_score && m.behavior_score > 10 ? m.behavior_score : 420
             };
             await db.put('elephant_daily_metrics', metricsMap[m.elephant_id]);
           }
@@ -80,7 +81,7 @@ export const shiftService = {
         const metricsList = await db.getAllFromIndex('elephant_daily_metrics', 'by-shiftId', cachedShift.id);
         const metricsMap: Record<string, ElephantDailyMetrics> = {};
         for (const m of metricsList) {
-          metricsMap[m.elephant_id] = m;
+          metricsMap[m.elephant_id] = { ...m, sleep_minutes: m.sleep_minutes ?? (m.behavior_score && m.behavior_score > 10 ? m.behavior_score : 420) };
         }
         return { shift: cachedShift, metrics: metricsMap };
       }
@@ -127,7 +128,13 @@ export const shiftService = {
 
       if (shiftError) throw shiftError;
 
-      const metricsArray = Object.values(metricsMap);
+      const metricsArray = Object.values(metricsMap).map(m => {
+        const { sleep_minutes, ...rest } = m;
+        return {
+          ...rest,
+          behavior_score: sleep_minutes
+        };
+      });
       if (metricsArray.length > 0) {
         const { error: metricsError } = await supabase
           .from('elephant_daily_metrics')
