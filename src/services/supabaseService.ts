@@ -77,6 +77,24 @@ export const supabaseService = {
     return data as any;
   },
 
+  async getRecordsByDate(dateStr: string): Promise<TreatmentRecordWithPhotos[]> {
+    const startOfDay = `${dateStr}T00:00:00.000Z`;
+    const endOfDay = `${dateStr}T23:59:59.999Z`;
+
+    const { data, error } = await supabase
+      .from('treatment_records')
+      .select(`
+        *,
+        photos:treatment_photos(*),
+        keeper:profiles(id, name)
+      `)
+      .gte('performed_at', startOfDay)
+      .lte('performed_at', endOfDay);
+
+    if (error) throw error;
+    return data as any;
+  },
+
   async getTreatmentHistory(limit = 100): Promise<TreatmentRecordWithPhotos[]> {
     const { data, error } = await supabase
       .from('treatment_records')

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { useStore } from './store';
 import { KeeperSelectionScreen } from './screens/KeeperSelectionScreen';
+import { DailyShiftPage } from './screens/DailyShiftPage';
 import { TodayScreen } from './screens/TodayScreen';
 import { JournalScreen } from './screens/JournalScreen';
 import { ElephantsScreen } from './screens/ElephantsScreen';
@@ -11,7 +12,7 @@ import { StaffScreen } from './screens/StaffScreen';
 
 export default function App() {
   const { profile, loading } = useStore();
-  const [currentScreen, setCurrentScreen] = useState<string>('today');
+  const [currentScreen, setCurrentScreen] = useState<string>('daily_shift');
   const [selectedElephantId, setSelectedElephantId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,12 +36,14 @@ export default function App() {
 
   const renderScreen = () => {
     if (!profile) {
-      return <KeeperSelectionScreen onComplete={() => setCurrentScreen('today')} />;
+      return <KeeperSelectionScreen onComplete={() => setCurrentScreen('daily_shift')} />;
     }
 
     switch (currentScreen) {
       case 'settings':
-        return <KeeperSelectionScreen onComplete={() => setCurrentScreen('today')} />;
+        return <KeeperSelectionScreen onComplete={() => setCurrentScreen('daily_shift')} />;
+      case 'daily_shift':
+        return <DailyShiftPage />;
       case 'today':
         return <TodayScreen onElephantClick={openElephantDetails} />;
       case 'journal':
@@ -56,7 +59,7 @@ export default function App() {
       case 'staff':
         return <StaffScreen />;
       default:
-        return <TodayScreen onElephantClick={openElephantDetails} />;
+        return <DailyShiftPage />;
     }
   };
 

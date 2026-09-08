@@ -9,12 +9,14 @@ interface StoreState {
   elephants: Elephant[];
   assignments: Assignment[];
   loading: boolean;
+  selectedDate: string;
 }
 
 interface StoreContextType extends StoreState {
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAssignments: () => Promise<void>;
+  setSelectedDate: (date: string) => void;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -24,6 +26,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [elephants, setElephants] = useState<Elephant[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   // Initial session check and auth state listener
   useEffect(() => {
@@ -146,7 +149,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      profile, elephants, assignments, loading, login, logout, refreshAssignments
+      profile, elephants, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate
     }}>
       {children}
     </StoreContext.Provider>

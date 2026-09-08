@@ -11,9 +11,16 @@ interface LayoutProps {
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { profile } = useStore();
+  const { profile, selectedDate } = useStore();
+
+  const formattedHeaderDate = selectedDate ? new Date(selectedDate).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }) : '';
 
   const navItems = [
+    { id: 'daily_shift', label: 'Дежурство', role: 'all' },
     { id: 'today', label: 'Сегодня', role: 'all' },
     { id: 'journal', label: 'Журнал', role: 'all' },
     { id: 'elephants', label: 'Слоны', role: 'all' },
@@ -32,29 +39,12 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
       {/* HEADER */}
       <header className="bg-zinc-900 text-white sticky top-0 z-30 shadow-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div 
-            className="flex items-center gap-2 select-none cursor-pointer"
-            onClick={() => onNavigate('today')}
-          >
-            <span className="text-2xl leading-none">🐘</span>
-            <span className="text-lg font-black tracking-tight text-white">СлоноВет</span>
+          <div className="flex items-center gap-2 select-none font-bold text-sm sm:text-base tracking-wide text-zinc-100">
+            <span>📅</span>
+            <span>{formattedHeaderDate}</span>
           </div>
 
           <div className="flex items-center gap-3">
-            {profile?.role === 'vet' && (
-              <button
-                onClick={() => onNavigate('assignments')}
-                className="hidden sm:flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition"
-              >
-                <span>Управление</span>
-              </button>
-            )}
-            {profile && (
-              <div className="hidden sm:flex items-center gap-2 text-xs font-bold bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>{profile.name} {profile.role === 'vet' ? '(Ветврач)' : profile.role === 'director' ? '(Дрессировщик)' : ''}</span>
-              </div>
-            )}
             <button
               onClick={() => setDrawerOpen(true)}
               className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center transition border border-zinc-700"
@@ -87,8 +77,9 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
         }`}
       >
         <div className="p-4 bg-zinc-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 font-bold text-sm">
-            <span>Меню</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl leading-none">🐘</span>
+            <span className="text-base font-black tracking-tight text-white">СлоноВет</span>
           </div>
           <button 
             onClick={() => setDrawerOpen(false)} 

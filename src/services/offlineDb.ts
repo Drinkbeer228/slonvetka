@@ -1,5 +1,6 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Elephant, Assignment } from '../types';
+import { DailyShift, ElephantDailyMetrics } from '../types/shift';
 
 export interface TreatmentRecordQueueItem {
   temp_id: string; // UUID/nanoid
@@ -44,14 +45,24 @@ interface SlonovetDB extends DBSchema {
     key: string;
     value: Assignment;
   };
+  daily_shifts: {
+    key: string;
+    value: DailyShift;
+    indexes: { 'by-date': string };
+  };
+  elephant_daily_metrics: {
+    key: string;
+    value: ElephantDailyMetrics;
+    indexes: { 'by-shiftId': string };
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<SlonovetDB>> | null = null;
 
 export function getOfflineDb() {
   if (!dbPromise) {
-    dbPromise = openDB<SlonovetDB>('slonvet_db', 1, {
-      upgrade(db) {
+    dbPromise = openDB<SlonovetDB>('slonvet_db', 2, {
+      upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains('records_queue')) {
           db.createObjectStore('records_queue', { keyPath: 'temp_id' });
         }
@@ -64,6 +75,14 @@ export function getOfflineDb() {
         }
         if (!db.objectStoreNames.contains('cached_assignments')) {
           db.createObjectStore('cached_assignments', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('daily_shifts')) {
+          const shiftStore = db.createObjectStore('daily_shifts', { keyPath: 'id' });
+          shiftStore.createIndex('by-date', 'date', { unique: true });
+        }
+        if (!db.objectStoreNames.contains('elephant_daily_metrics')) {
+          const metricsStore = db.createObjectStore('elephant_daily_metrics', { keyPath: 'id' });
+          metricsStore.createIndex('by-shiftId', 'shift_id');
         }
       },
     });
