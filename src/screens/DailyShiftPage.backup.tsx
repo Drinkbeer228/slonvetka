@@ -112,8 +112,8 @@ export function DailyShiftPage() {
   const [activeElephantId, setActiveElephantId] = useState<string>('');
 
   useEffect(() => {
-    if (elephants.length > 0 && (!activeElephantId || !(elephants || []).find(e => e.id === activeElephantId))) {
-      setActiveElephantId((elephants || [])[0].id);
+    if (elephants.length > 0 && (!activeElephantId || !elephants.find(e => e.id === activeElephantId))) {
+      setActiveElephantId(elephants[0].id);
     }
   }, [elephants]);
 
@@ -135,7 +135,7 @@ export function DailyShiftPage() {
     const minSwipeDistance = 50;
 
     if (Math.abs(distance) > minSwipeDistance) {
-      const currentIndex = (elephants || []).findIndex(e => e.id === activeElephantId);
+      const currentIndex = elephants.findIndex(e => e.id === activeElephantId);
       if (distance > 0 && currentIndex < elephants.length - 1) {
         setActiveElephantId(elephants[currentIndex + 1].id);
       } else if (distance < 0 && currentIndex > 0) {
@@ -205,7 +205,7 @@ export function DailyShiftPage() {
       const localRecords: TreatmentRecordWithPhotos[] = [];
       for (const qr of queuedRecords) {
         if (qr.status === 'pending' || qr.status === 'syncing' || qr.status === 'error') {
-          const recordDateStr = (qr.payload.performed_at || '').split('T')[0];
+          const recordDateStr = qr.payload.performed_at.split('T')[0];
           if (recordDateStr === dateStr) {
             const photosForRecord = queuedPhotos.filter(qp => qp.temp_record_id === qr.temp_id);
             const photos = photosForRecord.map(qp => ({
@@ -213,7 +213,7 @@ export function DailyShiftPage() {
               storage_path: URL.createObjectURL(qp.file_blob),
               photo_type: qp.photo_type
             }));
-            const keeper = (staffList || []).find(s => s.id === qr.payload.keeper_id) || profile;
+            const keeper = staffList.find(s => s.id === qr.payload.keeper_id) || profile;
 
             localRecords.push({
               id: qr.temp_id,
@@ -231,10 +231,10 @@ export function DailyShiftPage() {
         }
       }
 
-      const serverAssignmentIds = new Set((records || []).map(r => r.assignment_id).filter(Boolean));
+      const serverAssignmentIds = new Set(records.map(r => r.assignment_id).filter(Boolean));
       const filteredLocalRecords = localRecords.filter(lr => !lr.assignment_id || !serverAssignmentIds.has(lr.assignment_id));
 
-      setShiftRecords([...(records || []), ...filteredLocalRecords]);
+      setShiftRecords([...records, ...filteredLocalRecords]);
     } catch (err) {
       console.error('Failed to fetch shift records:', err);
     }
@@ -244,8 +244,8 @@ export function DailyShiftPage() {
     setLoading(true);
     try {
       const data = await shiftService.getShiftData(selectedDate);
-      setShift(data.shift || null);
-      setMetrics(data.metrics || {});
+      setShift(data.shift);
+      setMetrics(data.metrics);
 
       const bales = await shiftService.getHayStock('bales');
       const rolls = await shiftService.getHayStock('rolls');
@@ -260,9 +260,9 @@ export function DailyShiftPage() {
       const dateObj = new Date(d.year, d.month - 1, d.day - 1);
       const prevDateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
       const prevData = await shiftService.getShiftData(prevDateStr);
-      setPrevShift(prevData?.shift);
-      if (prevData?.shift?.duty_keeper_id) {
-        const k = staff.find(s => s.id === prevData?.shift?.duty_keeper_id);
+      setPrevShift(prevData.shift);
+      if (prevData.shift.duty_keeper_id) {
+        const k = staff.find(s => s.id === prevData.shift.duty_keeper_id);
         setPrevKeeperName(k?.name || 'Кипер предыдущей смены');
       } else {
         setPrevKeeperName('Не указан');
@@ -485,7 +485,7 @@ export function DailyShiftPage() {
     year: 'numeric'
   });
 
-  const dutyKeeper = (staffList || []).find(s => s.id === shift?.duty_keeper_id);
+  const dutyKeeper = staffList.find(s => s.id === shift?.duty_keeper_id);
   const hayBalesDistributed = shift?.hay_bales_distributed || 0;
   const hayBagsDistributed = shift?.hay_bags_distributed || 0;
 
@@ -493,10 +493,10 @@ export function DailyShiftPage() {
   const allPhotos: { url: string; elephantName: string; timeStr: string; recordId: string }[] = [];
   for (const rec of shiftRecords) {
     if (rec.photos && rec.photos.length > 0) {
-      const elephant = (elephants || []).find(e => e.id === rec.elephant_id);
-      const timeStr = new Date(rec.performed_at || Date.now()).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const elephant = elephants.find(e => e.id === rec.elephant_id);
+      const timeStr = new Date(rec.performed_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
       for (const p of rec.photos) {
-        const url = (p.storage_path || '').startsWith('blob:') ? p.storage_path : supabaseService.getPublicUrl(p.storage_path);
+        const url = supabaseService.getPublicUrl(p.storage_path);
         allPhotos.push({
           url,
           elephantName: elephant ? elephant.name : 'Слон',
@@ -509,11 +509,12 @@ export function DailyShiftPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900" />
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="animate-spin text-zinc-400" size={36} />
       </div>
     );
   }
+
   return (
     <div className="pb-24 space-y-6 mt-4">
       {/* SAVING STATUS INDICATOR BAR */}
@@ -532,56 +533,63 @@ export function DailyShiftPage() {
 
       {/* FUTURE DATE BANNER (PLANNING MODE) */}
       {isFutureDate && (
-        <div className="bg-slate-50 border border-slate-200 text-slate-800 px-5 py-4 rounded-3xl flex items-center justify-between shadow-sm">
+        <div className="bg-indigo-50 border-2 border-indigo-200 text-indigo-900 px-5 py-4 rounded-3xl flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-slate-700 shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-200 flex items-center justify-center text-indigo-800 shrink-0">
               <CalendarIcon size={20} />
             </div>
             <div>
-              <div className="font-black text-sm">Режим планирования ({formattedDateLabel})</div>
-              <div className="text-xs font-medium text-slate-600 mt-0.5">
-                Фактический ввод дежурства заблокирован. Установите дежурного.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ARCHIVE DATE BANNER */}
-      {isArchiveMode && !isFutureDate && (
-        <div className="bg-slate-50 border border-slate-200 text-slate-800 px-5 py-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-200 flex items-center justify-center text-slate-700 shrink-0">
-              <CalendarIcon size={20} />
-            </div>
-            <div>
-              <div className="font-black text-sm">Архив смены за {formattedDateLabel}</div>
-              <div className="text-xs font-medium text-slate-600 mt-0.5">
-                Дежурный: {dutyKeeper ? dutyKeeper.name : 'Не указан'} • Режим чтения
+              <div className="font-black text-sm">Режим планирования будущей смены ({formattedDateLabel})</div>
+              <div className="text-xs font-medium text-indigo-700 mt-0.5">
+                Фактический ввод дежурства заблокирован. Установите дежурного и добавьте напоминания.
               </div>
             </div>
           </div>
           <button
             onClick={() => setSelectedDate(todayStr)}
-            className="px-3.5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+            className="px-3.5 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition"
           >
             К сегодня
           </button>
         </div>
       )}
 
-      {/* HEADER / KEEPER INFO */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-200 space-y-4">
+      {/* ARCHIVE BANNER IF IN ARCHIVE MODE */}
+      {isArchiveMode && (
+        <div className="bg-amber-50 border-2 border-amber-300 text-amber-900 px-5 py-4 rounded-3xl flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-200 flex items-center justify-center text-amber-800 shrink-0">
+              <History size={20} />
+            </div>
+            <div>
+              <div className="font-black text-sm">Архив смены за {formattedDateLabel}</div>
+              <div className="text-xs font-medium text-amber-700 mt-0.5">
+                Дежурный: {dutyKeeper ? dutyKeeper.name : 'Не указан'} • Режим чтения
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setSelectedDate(todayStr)}
+            className="px-3.5 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition"
+          >
+            К сегодня
+          </button>
+        </div>
+      )}
+
+      {/* KEEPER & TASKS COMPACT BLOCK */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-zinc-200 space-y-4">
+        {/* KEEPER SELECTION */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <UserCheck size={18} className="text-slate-500" />
-            <span className="text-sm font-bold text-slate-700">Дежурный кипер:</span>
+            <UserCheck size={18} className="text-zinc-500" />
+            <span className="text-sm font-bold text-zinc-700">Дежурный кипер:</span>
           </div>
           <select
             disabled={isArchiveMode && !isVet}
             value={shift?.duty_keeper_id || profile?.id || ''}
             onChange={(e) => handleShiftFieldChange('duty_keeper_id', e.target.value, true)}
-            className="w-full sm:w-auto min-w-[240px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:outline-none focus:border-slate-900 disabled:opacity-60 text-slate-800"
+            className="w-full sm:w-auto min-w-[240px] px-3.5 py-2.5 bg-zinc-100 border border-zinc-300 rounded-xl font-bold text-sm focus:outline-none focus:border-zinc-900 disabled:opacity-60"
           >
             <option value="">-- Выберите дежурного --</option>
             {staffList.map(s => (
@@ -589,159 +597,151 @@ export function DailyShiftPage() {
             ))}
           </select>
         </div>
+
+        {/* REMINDERS MANAGEMENT */}
+        <div className="pt-3 border-t border-zinc-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Bell size={14} /> Напоминания и задачи на смену
+            </span>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newReminderText}
+              onChange={(e) => setNewReminderText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAddReminder(); }}
+              placeholder="Например: Привоз сена в 15:00, разгрузка моркови..."
+              className="flex-1 px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-medium focus:outline-none focus:border-zinc-900"
+            />
+            <button
+              type="button"
+              onClick={handleAddReminder}
+              className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition shrink-0"
+            >
+              <Plus size={16} /> Добавить
+            </button>
+          </div>
+
+          {shift?.reminders && shift.reminders.length > 0 && (
+            <div className="space-y-1.5">
+              {shift.reminders.map((reminder, idx) => (
+                <div key={idx} className="flex items-center justify-between p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 text-xs font-medium">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                    <span className="text-zinc-800 font-bold">{reminder}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveReminder(idx)}
+                    className="text-zinc-400 hover:text-red-600 transition p-1"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* IF FUTURE DATE, DO NOT RENDER FACTUAL SHIFT BLOCKS */}
       {isFutureDate ? (
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-3 shadow-sm">
-          <h2 className="text-xl font-black text-slate-900">Будущая дата заблокирована для фактического ввода</h2>
-          <p className="text-sm text-slate-500 max-w-md mx-auto">
+        <div className="bg-white p-8 rounded-3xl border border-zinc-200 text-center space-y-3 shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto text-2xl font-black">
+            📅
+          </div>
+          <h2 className="text-xl font-black text-zinc-900">Будущая дата заблокирована для фактического ввода</h2>
+          <p className="text-sm text-zinc-500 max-w-md mx-auto">
             Фактические показатели дефекации, мочеиспускания и раздачи кормов можно будет заполнить в день наступления смены ({formattedDateLabel}).
           </p>
         </div>
       ) : (
         <>
-          {/* SECTION 1: СЕЙЧАС (NOW) */}
-          <div className="space-y-4 pt-2">
-            <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-2">1. Сейчас</h2>
-            <div className="space-y-3">
-              {(elephants || []).map(elephant => {
-                const m = (metrics || {})[elephant.id] || {
-                  shift_id: shift?.id || '',
-                  elephant_id: elephant.id,
-                  poop_count: 0,
-                  feces_traits: ['Сформирован (норма)'],
-                  urination_count: 0,
-                  urination_traits: ['Светлая / Прозрачная'],
-                  behavior: 'Спокойная / В норме',
-                  notes: ''
-                };
-                
-                const assignmentsForEle = (assignments || []).filter(a => a.elephant_id === elephant.id);
-                
-                const isPoopWarn = (m.feces_traits || []).some(t => t.includes('⚠️'));
-                const isUrineWarn = (m.urination_traits || []).some(t => t.includes('⚠️') || t.includes('Темная') || t.includes('Мутная') || t.includes('Бурая'));
-                
-                const poopColor = isPoopWarn ? 'text-amber-600' : 'text-emerald-600';
-                const urineColor = isUrineWarn ? 'text-amber-600' : 'text-emerald-600';
-
-                return (
-                  <div key={elephant.id} className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <h3 className="font-black text-slate-900 text-lg">{elephant.name}</h3>
-                      <button 
-                        onClick={() => {
-                          setActiveElephantId(elephant.id);
-                          document.getElementById('observations-section')?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        className="text-blue-700 text-xs font-bold bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm"
-                      >
-                        Изменить
-                      </button>
-                    </div>
-                    
-                    {/* Quick Summary */}
-                    <div className="text-[13px] font-semibold text-slate-600 space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">Дефекация:</span>
-                        <span className="text-slate-900">{m.poop_count}</span>
-                        <span className={poopColor}>· {(m.feces_traits?.[0] || 'Норма').replace(' ⚠️', '').toLowerCase()}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">Мочеиспускание:</span>
-                        <span className="text-slate-900">{m.urination_count}</span>
-                        <span className={urineColor}>· {(m.urination_traits?.[0] || 'Норма').replace(' ⚠️', '').toLowerCase()}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">Состояние:</span>
-                        <span className="text-slate-900">{m.behavior}</span>
-                      </div>
-                    </div>
-
-                    {/* Vet Assignments for this elephant */}
-                    {assignmentsForEle.length > 0 && (
-                      <div className="pt-3 border-t border-slate-100 space-y-2">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Назначения:</div>
-                        {assignmentsForEle.map(assignment => {
-                          const relatedRecord = (shiftRecords || []).find(r => r.assignment_id === assignment.id);
-                          const isCompletedToday = !!relatedRecord;
-                          return (
-                            <div key={assignment.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-                               <div className="flex flex-col gap-0.5">
-                                 <div className="text-sm font-bold text-slate-800">{assignment.title}</div>
-                                 <div className={`text-[11px] font-bold ${isCompletedToday ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                   {isCompletedToday ? '✓ Выполнено' : '🟡 Активно'}
-                                 </div>
-                               </div>
-                               {!isLocked && (
-                                 isCompletedToday ? (
-                                   <div className="flex gap-1">
-                                     <button onClick={() => setSelectedTask({ assignment, elephant, existingRecord: relatedRecord })} className="px-2 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition">Изм.</button>
-                                     <button onClick={() => handleUnmarkTask(relatedRecord.id)} className="px-2 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition"><Trash2 size={14}/></button>
-                                   </div>
-                                 ) : (
-                                   <button onClick={() => setSelectedTask({ assignment, elephant })} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm transition">
-                                     Выполнить
-                                   </button>
-                                 )
-                               )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          {/* BLOCK 1: PHYSIOLOGICAL MONITORING */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+              <h2 className="text-lg font-black tracking-tight text-zinc-800">
+                🐘 1. Физиологический мониторинг слонов
+              </h2>
+              <span className="text-xs font-bold text-zinc-400">
+                Свайпните влево/вправо для смены слона
+              </span>
             </div>
-          </div>
 
-          {/* SECTION 2: НАБЛЮДЕНИЯ (OBSERVATIONS) */}
-          <div id="observations-section" className="space-y-4 pt-6 scroll-mt-6">
-            <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-2">2. Наблюдения</h2>
-            
-            {/* TABS */}
-            <div className="flex bg-slate-200/70 p-1 rounded-xl w-full">
-              {(elephants || []).map((elephant) => {
+            {/* ELEPHANT TABS SEGMENTED CONTROL */}
+            <div className="flex bg-slate-200/70 dark:bg-slate-800 p-1 rounded-xl w-full">
+              {elephants.map((elephant) => {
                 const isActive = elephant.id === activeElephantId;
-                const m = (metrics || {})[elephant.id];
+                const m = metrics[elephant.id];
                 const hasNotes = m && m.notes && m.notes.trim().length > 0;
                 return (
                   <button
                     key={elephant.id}
                     type="button"
                     onClick={() => setActiveElephantId(elephant.id)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-sm transition-all relative ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all relative ${
                       isActive 
-                        ? 'bg-white shadow-sm text-slate-900 font-bold' 
-                        : 'text-slate-500 hover:text-slate-700 font-semibold'
+                        ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white font-bold' 
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     }`}
                   >
+                    <span className="text-sm shrink-0">🐘</span>
                     <span className="truncate">{elephant.name}</span>
                     {hasNotes && (
-                      <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400" title="Есть заметки" />
                     )}
                   </button>
                 );
               })}
             </div>
 
-            {/* ACTIVE ELEPHANT FORM */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-              {(() => {
-                const activeElephant = (elephants || []).find(e => e.id === activeElephantId) || (elephants || [])[0];
-                if (!activeElephant) return null;
-                const m = metrics[activeElephant.id] || {
-                  shift_id: shift?.id || '',
-                  elephant_id: activeElephant.id,
-                  poop_count: 0,
-                  feces_traits: ['Сформирован (норма)'],
-                  urination_count: 0,
-                  urination_traits: ['Светлая / Прозрачная'],
-                  behavior: 'Спокойная / В норме',
-                  notes: ''
-                };
-                return (
+            {/* ACTIVE ELEPHANT CARD WITH SWIPE GESTURE */}
+            {(() => {
+              const activeElephant = elephants.find(e => e.id === activeElephantId) || elephants[0];
+              if (!activeElephant) return null;
+
+              const m = metrics[activeElephant.id] || {
+                shift_id: shift?.id || '',
+                elephant_id: activeElephant.id,
+                poop_count: 0,
+                feces_traits: ['Сформирован (норма)'],
+                urination_count: 0,
+                urination_traits: ['Светлая / Прозрачная'],
+                behavior: 'Спокойная / В норме',
+                notes: ''
+              };
+
+              const fecesTraits = m.feces_traits || ['Сформирован (норма)'];
+              const urinationTraits = m.urination_traits || ['Светлая / Прозрачная'];
+
+              return (
+                <div
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  className="bg-white p-5 sm:p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-5"
+                >
+                  <div className="flex items-center justify-between pb-4 border-b border-zinc-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-black text-xl shadow-sm">
+                        🐘
+                      </div>
+                      <div>
+                        <h3 className="font-black text-xl text-zinc-900">{activeElephant.name}</h3>
+                        <p className="text-xs text-zinc-400 font-medium">Физиологический статус и показатели</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAdhocModalElephant(activeElephant)}
+                      className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-2xl font-bold text-xs transition flex items-center gap-1.5 border border-blue-200 shadow-sm"
+                    >
+                      <Camera size={15} /> + Заметка / Обработка
+                    </button>
+                  </div>
+
                   <ElephantPhysiology 
                     elephant={activeElephant}
                     metrics={m}
@@ -750,95 +750,199 @@ export function DailyShiftPage() {
                     onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
                     onNotesBlur={() => shift && persistChanges(shift, metrics)}
                   />
-                );
-              })()}
-            </div>
+                </div>
+              );
+            })()}
           </div>
 
-          {/* SECTION 3: СМЕНА (SHIFT) */}
-          <div className="space-y-4 pt-6">
-            <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-2">3. Смена</h2>
-            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-              
-              {/* FOOD */}
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                   <h3 className="text-base font-black text-slate-900">Выдача корма (Сено)</h3>
-                   {isVet && (
-                     <button
-                       type="button"
-                       onClick={() => {
-                         setModalBales(hayStockBales);
-                         setModalRolls(hayStockRolls);
-                         setReplenishModalOpen(true);
-                       }}
-                       className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl font-bold text-xs"
-                     >
-                       Склад
-                     </button>
-                   )}
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">Тюки сена</div>
-                      <div className="text-xs text-slate-400 mt-1 font-medium">На складе: {Math.max(0, hayStockBales - hayBalesDistributed)}</div>
-                    </div>
-                    <CounterButton
-                      label=""
-                      value={hayBalesDistributed}
-                      onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">Рулоны и мешки</div>
-                      <div className="text-xs text-slate-400 mt-1 font-medium">На складе: {hayStockRolls}</div>
-                    </div>
-                    <CounterButton
-                      label=""
-                      value={hayBagsDistributed}
-                      onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* BLOCK 2: VETERINARY ASSIGNMENTS */}
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+            <h2 className="text-lg font-black tracking-tight text-zinc-800">
+              🩺 2. Назначения
+            </h2>
+            <div className="space-y-3">
+              {assignments.length === 0 ? (
+                <p className="text-sm text-zinc-400 font-medium py-2">Назначений нет</p>
+              ) : (
+                assignments.map(assignment => {
+                  const elephant = elephants.find(e => e.id === assignment.elephant_id);
+                  const relatedRecord = shiftRecords.find(r => r.assignment_id === assignment.id);
+                  const isCompletedToday = !!relatedRecord;
 
-              {/* HANDOVER */}
-              <div className="pt-5 border-t border-slate-100 space-y-3">
-                <h3 className="text-base font-black text-slate-900">Сдача смены</h3>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">Что важно передать следующей смене?</label>
-                  <textarea
-                    disabled={isLocked}
-                    value={shift?.handover_notes || ''}
-                    onChange={(e) => handleShiftFieldChange('handover_notes', e.target.value, false)}
-                    onBlur={() => shift && persistChanges(shift, metrics)}
-                    placeholder="Например: Прэтти не доела сено, Марго была беспокойной..."
-                    className="w-full h-24 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:border-slate-900 resize-none text-slate-800 placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
+                  return (
+                    <div key={assignment.id} className="p-4 rounded-2xl border bg-slate-50 border-slate-200 flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-1 text-left">
+                          <span className="font-bold text-sm text-slate-900">
+                            {elephant ? elephant.name : 'Слон'} · {assignment.title}
+                          </span>
+                          <span className={`text-xs font-bold ${isCompletedToday ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {isCompletedToday ? '✓ Выполнено' : '🟡 Активно'}
+                          </span>
+                          {assignment.medicine && (
+                            <span className="text-xs text-slate-500 mt-1 line-clamp-1">💊 {assignment.medicine}</span>
+                          )}
+                        </div>
+                        {relatedRecord?.photos && relatedRecord.photos.length > 0 && (
+                          <div className="flex gap-1 shrink-0">
+                            {relatedRecord.photos.slice(0,1).map(p => {
+                              const thumbUrl = supabaseService.getPublicUrl(p.storage_path);
+                              return (
+                                <img
+                                  key={p.id}
+                                  src={thumbUrl}
+                                  alt="Фотоотчет"
+                                  onClick={() => setPreviewPhotoUrl(thumbUrl)}
+                                  className="w-12 h-12 rounded-lg object-cover border border-slate-300 shadow-sm"
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
 
-              {!isLocked && (
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleShiftFieldChange('status', 'completed', true)}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition shadow-sm"
-                  >
-                    Сдать смену
-                  </button>
-                </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        {isCompletedToday ? (
+                          !isLocked && elephant && (
+                            <div className="flex items-center gap-2 w-full">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTask({ assignment, elephant, existingRecord: relatedRecord })}
+                                className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs transition text-center"
+                              >
+                                Редактировать
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUnmarkTask(relatedRecord.id)}
+                                className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition border border-red-100"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )
+                        ) : (
+                          !isLocked && elephant && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTask({ assignment, elephant })}
+                              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs transition"
+                            >
+                              Выполнить
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
-
             </div>
           </div>
+
+          {/* BLOCK 3: КОРМ */}
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-black tracking-tight text-zinc-800">🌾 3. Корм</h2>
+              {isVet && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalBales(hayStockBales);
+                    setModalRolls(hayStockRolls);
+                    setReplenishModalOpen(true);
+                  }}
+                  className="p-2 bg-blue-50 text-blue-600 rounded-lg font-bold text-xs"
+                >
+                  Склад
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div className="text-sm font-bold text-slate-800 mb-3">Тюки сена</div>
+                <CounterButton
+                  label="Выдано сегодня"
+                  value={hayBalesDistributed}
+                  onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
+                />
+                <div className="text-xs text-slate-400 mt-2 font-medium">На складе: {Math.max(0, hayStockBales - hayBalesDistributed)} тюков</div>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div className="text-sm font-bold text-slate-800 mb-3">Рулоны и мешки</div>
+                <CounterButton
+                  label="Выдано сегодня"
+                  value={hayBagsDistributed}
+                  onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
+                />
+                <div className="text-xs text-slate-400 mt-2 font-medium">На складе: {hayStockRolls} шт</div>
+              </div>
+            </div>
+          </div>
+
+          {/* BLOCK 4: HANDOVER (СДАЧА СМЕНЫ СЛЕДУЮЩЕМУ) */}
+          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+            <h2 className="text-lg font-black tracking-tight text-zinc-800">
+              🤝 Сдача смены следующему дежурному
+            </h2>
+
+            <div>
+              <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Что важно знать следующей смене (состояние слонов, нюансы по кормам, задачи)...</label>
+              <textarea
+                disabled={isLocked}
+                rows={3}
+                value={shift?.handover_notes || ''}
+                onChange={(e) => handleShiftFieldChange('handover_notes', e.target.value, false)}
+                onBlur={() => shift && persistChanges(shift, metrics)}
+                placeholder="Важная информация для сменщика..."
+                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-medium focus:outline-none focus:border-zinc-900 resize-none"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-zinc-100">
+              {shift?.status !== 'completed' && !isArchiveMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleShiftFieldChange('status', 'completed', true);
+                    setShiftCompletedModalOpen(true);
+                  }}
+                  className="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 uppercase tracking-wider text-sm"
+                >
+                  <CheckCircle2 size={18} />
+                  <span>СДАТЬ СМЕНУ</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION: ФОТО ДНЯ (PHOTOS OF THE DAY GALLERY) */}
+          {allPhotos.length > 0 && (
+            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="text-zinc-700" size={20} />
+                <h2 className="text-lg font-black tracking-tight text-zinc-800">Фото дня ({allPhotos.length})</h2>
+              </div>
+              <p className="text-xs text-zinc-500 font-medium">Все фотоотчеты и внеплановые снимки за текущие сутки</p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {allPhotos.map((item, idx) => (
+                  <div key={idx} className="group relative rounded-2xl overflow-hidden border border-zinc-200 bg-zinc-100 aspect-square shadow-sm cursor-zoom-in" onClick={() => setPreviewPhotoUrl(item.url)}>
+                    <img src={item.url} alt={item.elephantName} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-white">
+                      <div className="text-[11px] font-black">{item.elephantName}</div>
+                      <div className="text-[9px] text-zinc-300">{item.timeStr}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 
-      {/* ALL MODALS GO HERE (unchanged structure) */}
       {/* REPLENISH WAREHOUSE STOCK MODAL */}
       {replenishModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
@@ -1049,5 +1153,5 @@ export function DailyShiftPage() {
         </div>
       )}
     </div>
-    );
+  );
 }
