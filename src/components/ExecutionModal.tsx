@@ -22,6 +22,7 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
   const [assessment, setAssessment] = useState<string>('normal');
   const [needsCleaning, setNeedsCleaning] = useState<string>('no');
   const [result, setResult] = useState<string>('normal');
+  const [footStatus, setFootStatus] = useState<string>('Норма');
   
   const [medicineUsed, setMedicineUsed] = useState(assignment.medicine || '');
   const [comment, setComment] = useState('');
@@ -61,6 +62,8 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
       finalAssessment = result === 'normal' ? 'Норма' : 'Требует наблюдения';
     } else if (assignment.assessment_type === 'normal_or_issue') {
       finalAssessment = assessment === 'normal' ? 'Норма' : 'Есть изменения';
+    } else if (assignment.assessment_type === 'foot_status') {
+      finalAssessment = footStatus;
     }
 
     setLoading(true);
@@ -214,6 +217,20 @@ export function ExecutionModal({ assignment, elephant, onClose, onComplete }: Ex
                   >
                     Требует наблюдения
                   </button>
+                </div>
+              )}
+
+              {assignment.assessment_type === 'foot_status' && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {['Норма', 'Загрязнение', 'Трещина', 'Повреждение', 'Требуется очистка'].map(status => (
+                    <button 
+                      key={status}
+                      onClick={() => setFootStatus(status)}
+                      className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition ${footStatus === status ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-200 text-zinc-700'}`}
+                    >
+                      {status}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>

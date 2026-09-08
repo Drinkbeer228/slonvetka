@@ -13,7 +13,7 @@ export interface Elephant {
 }
 
 export type ScheduleType = 'daily' | 'weekly' | 'as_needed';
-export type AssessmentType = 'none' | 'normal_or_issue' | 'needs_cleaning' | 'result';
+export type AssessmentType = 'none' | 'normal_or_issue' | 'needs_cleaning' | 'result' | 'foot_status';
 
 export interface Assignment {
   id: string;
