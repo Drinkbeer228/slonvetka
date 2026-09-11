@@ -1,3 +1,10 @@
+
+export interface ShiftPhoto {
+  id: string;
+  timestamp: string;
+  section: 'stool' | 'urine' | 'sleep' | 'general';
+  dataUrl: string;
+}
 export interface HandoverComplaint {
   id: string;
   author_name: string;
@@ -5,6 +12,12 @@ export interface HandoverComplaint {
   comment: string;
   photo_url?: string;
   created_at: string;
+}
+
+export interface SleepInterval {
+  id: string;
+  start: string; // HH:MM
+  end: string;   // HH:MM
 }
 
 export interface DailyShift {
@@ -32,6 +45,8 @@ export interface ElephantDailyMetrics {
   urination_traits: string[];
   behavior_score?: number; // legacy
   behavior?: string;
-  sleep_minutes?: number; // e.g. 'Спокойная / В норме'
+  sleep_minutes?: number; 
+  sleep_intervals?: SleepInterval[];
   notes?: string;
+  photos?: ShiftPhoto[];
 }

@@ -11,7 +11,7 @@ import { CounterButton } from '../components/common/CounterButton';
 import { 
   Calendar as CalendarIcon, CheckCircle2, Loader2, Save, UserCheck, 
   Check, Camera, PackagePlus, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2
-} from 'lucide-react';
+, LogOut } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
 import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
 import { FeedControl, DailyRationData } from '../components/daily-shift/FeedControl';
@@ -112,7 +112,8 @@ const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
     morning_porridge: 'none',
     lunch_porridge: 'none',
     evening_salad_chips: ['Морковь', 'Яблоки', 'Капуста'],
-    salad_notes: ''
+    salad_notes: '',
+    coarse_branches: 0
   };
   if (!feedNotes) return defaultRation;
   try {
@@ -123,7 +124,8 @@ const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
       evening_salad_chips: Array.isArray(parsed.evening_salad_chips) 
         ? parsed.evening_salad_chips 
         : defaultRation.evening_salad_chips,
-      salad_notes: parsed.salad_notes || ''
+      salad_notes: parsed.salad_notes || '',
+      coarse_branches: parsed.coarse_branches || 0
     };
   } catch {
     return {
@@ -138,7 +140,7 @@ const serializeDailyRation = (ration: DailyRationData): string => {
 };
 
 export function DailyShiftPage() {
-  const { profile, elephants, assignments, selectedDate, setSelectedDate, activeElephantId, setActiveElephantId } = useStore();
+  const { profile, elephants, assignments, selectedDate, setSelectedDate, activeElephantId, setActiveElephantId, setGlobalSaveStatus, logout } = useStore();
   
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -192,6 +194,31 @@ export function DailyShiftPage() {
   const [viewYear, setViewYear] = useState<number>(() => parseDateString(selectedDate).year);
   const [viewMonth, setViewMonth] = useState<number>(() => parseDateString(selectedDate).month);
 
+  const [activeDays, setActiveDays] = useState<string[]>([]);
+  useEffect(() => {
+    if (isDatePickerOpen) {
+      shiftService.getActiveDaysForMonth(viewYear, viewMonth).then(setActiveDays);
+    }
+  }, [isDatePickerOpen, viewYear, viewMonth]);
+  
+  const generateCalendarDays = () => {
+    const daysInMonth = getDaysInMonth(viewYear, viewMonth);
+    const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
+    const days = [];
+    
+    // Fill empty slots for first week
+    for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) {
+      days.push(null);
+    }
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+    return days;
+  };
+
+
+
   // Ad-hoc treatment modal state
   const [adhocModalElephant, setAdhocModalElephant] = useState<Elephant | null>(null);
   const [adhocDescription, setAdhocDescription] = useState('');
@@ -204,8 +231,10 @@ export function DailyShiftPage() {
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [savingStatus, setSavingStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const statusTimerRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSavesRef = useRef(0);
+  const minSaveTimeRef = useRef<NodeJS.Timeout | null>(null);
 
   const [selectedTask, setSelectedTask] = useState<{ assignment: Assignment; elephant: Elephant; existingRecord?: TreatmentRecordWithPhotos } | null>(null);
 
@@ -268,7 +297,16 @@ export function DailyShiftPage() {
     setLoading(true);
     try {
       const data = await shiftService.getShiftData(selectedDate);
-      setShift(data.shift || null);
+      let loadedShift = data.shift || null;
+      if (loadedShift && (!loadedShift.duty_keeper_id || loadedShift.duty_keeper_id !== profile?.id)) {
+        const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && profile?.role !== 'vet';
+        if (!isThisShiftLocked && profile?.id) {
+           loadedShift = { ...loadedShift, duty_keeper_id: profile.id };
+           // Trigger immediate save in background so it's locked to this user
+           shiftService.saveShiftData(loadedShift, data.metrics || {}).catch(console.error);
+        }
+      }
+      setShift(loadedShift);
       setMetrics(data.metrics || {});
 
       const bales = await shiftService.getHayStock('bales');
@@ -302,31 +340,51 @@ export function DailyShiftPage() {
 
   // Instant save helper for counters, chips, selectors
   const persistChanges = async (currentShift: DailyShift, currentMetrics: Record<string, ElephantDailyMetrics>) => {
-    setSavingStatus('saving');
+    pendingSavesRef.current++;
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    if (minSaveTimeRef.current) clearTimeout(minSaveTimeRef.current);
+    
+    setGlobalSaveStatus('saving');
+    
     try {
       await shiftService.saveShiftData(currentShift, currentMetrics);
-      setSavingStatus('saved');
-      setTimeout(() => setSavingStatus('idle'), 2000);
     } catch (err) {
       console.error('Autosave error:', err);
-      setSavingStatus('idle');
+      setGlobalSaveStatus('error');
+      statusTimerRef.current = setTimeout(() => setGlobalSaveStatus('idle'), 3000);
+      pendingSavesRef.current--;
+      return;
+    }
+
+    pendingSavesRef.current--;
+    if (pendingSavesRef.current === 0) {
+      minSaveTimeRef.current = setTimeout(() => {
+        if (pendingSavesRef.current === 0) {
+          setGlobalSaveStatus('saved');
+          statusTimerRef.current = setTimeout(() => setGlobalSaveStatus('idle'), 3000);
+        }
+      }, 1000); // Wait 1 second before showing saved so the GTA save icon spins!
     }
   };
 
   // Debounced autosave for text inputs
   const triggerDebouncedSave = useCallback((updatedShift: DailyShift, updatedMetrics: Record<string, ElephantDailyMetrics>) => {
-    setSavingStatus('saving');
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    if (minSaveTimeRef.current) clearTimeout(minSaveTimeRef.current);
+    setGlobalSaveStatus('saving');
+    
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       try {
         await shiftService.saveShiftData(updatedShift, updatedMetrics);
-        setSavingStatus('saved');
-        setTimeout(() => setSavingStatus('idle'), 2000);
+        setGlobalSaveStatus('saved');
+        statusTimerRef.current = setTimeout(() => setGlobalSaveStatus('idle'), 3000);
       } catch (err) {
         console.error('Debounced save error:', err);
-        setSavingStatus('idle');
+        setGlobalSaveStatus('error');
+        statusTimerRef.current = setTimeout(() => setGlobalSaveStatus('idle'), 3000);
       }
-    }, 800);
+    }, 1200); // Slower debounce to match the slower animations
   }, []);
 
   const handleMetricChange = (elephantId: string, field: keyof ElephantDailyMetrics, value: any) => {
@@ -350,7 +408,13 @@ export function DailyShiftPage() {
         }
       };
       if (shift) {
-        persistChanges(shift, updatedMetrics);
+        setTimeout(() => {
+          if (field === 'notes' || field === 'photos') {
+            triggerDebouncedSave(shift, updatedMetrics);
+          } else {
+            persistChanges(shift, updatedMetrics);
+          }
+        }, 0);
       }
       return updatedMetrics;
     });
@@ -424,6 +488,15 @@ export function DailyShiftPage() {
     const updatedRation: DailyRationData = {
       ...currentRation,
       [meal === 'morning' ? 'morning_porridge' : 'lunch_porridge']: status
+    };
+    handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
+  };
+
+  const handleBranchesChange = (val: number) => {
+    if (isLocked || !shift) return;
+    const updatedRation: DailyRationData = {
+      ...currentRation,
+      coarse_branches: val
     };
     handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
   };
@@ -592,20 +665,6 @@ export function DailyShiftPage() {
   return (
         <div className="pb-32 space-y-6 mt-2 relative">
       
-      {/* SAVING STATUS */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {savingStatus === 'saving' && (
-          <div className="bg-slate-900/80 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold backdrop-blur-md animate-in fade-in">
-            <Loader2 className="animate-spin" size={14} /> Сохранение...
-          </div>
-        )}
-        {savingStatus === 'saved' && (
-          <div className="bg-emerald-500/90 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold backdrop-blur-md animate-in fade-in fade-out delay-1000">
-            <Check size={14} /> Сохранено ✓
-          </div>
-        )}
-      </div>
-
       {/* FUTURE DATE BANNER */}
       {isFutureDate && (
         <div className="bg-blue-50/80 backdrop-blur-xl border border-blue-200/80 text-blue-900 px-5 py-3.5 rounded-[24px] flex items-center justify-between shadow-sm">
@@ -645,68 +704,43 @@ export function DailyShiftPage() {
       )}
 
       {/* HEADER CARD */}
-      <div className="bg-white/60 backdrop-blur-xl border border-white/80 p-5 rounded-[24px] shadow-[0_4px_32px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="bg-white/80 backdrop-blur-md border border-white/40 p-3 sm:p-5 rounded-[28px] shadow-lg flex flex-row items-center justify-between gap-2 sm:gap-4">
+        
+        {/* LEFT SIDE: MINI PROFILE */}
+        <div className="flex items-center bg-white/60 backdrop-blur-md border border-white/80 px-2 sm:px-3 py-1 sm:py-1.5 rounded-2xl shadow-sm transition-all shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Рабочая смена</h2>
-            {selectedDate !== todayStr && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/80 text-slate-700">
-                {isFutureDate ? 'План' : 'Архив'}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2.5 mt-1 flex-wrap">
-            <div className="text-xl font-black text-slate-800 tracking-tight">{formattedDateLabel}</div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => changeDateByDays(-1)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold transition active:scale-95"
-                title="Предыдущий день"
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                onClick={() => changeDateByDays(1)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold transition active:scale-95"
-                title="Следующий день"
-              >
-                →
-              </button>
-              {selectedDate !== todayStr && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate(todayStr)}
-                  className="px-2.5 py-0.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-full transition ml-1"
-                >
-                  Сегодня
-                </button>
-              )}
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center text-[12px] font-black shrink-0 shadow-inner ring-2 ring-white">
+              {profile?.name?.charAt(0) || '?'}
+            </div>
+            <div className="flex flex-col pr-1">
+              <span className="text-[10px] sm:text-[11px] font-black text-slate-800 leading-tight tracking-tight truncate max-w-[75px] sm:max-w-full">{profile?.name || 'Гость'}</span>
+              <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase leading-tight truncate">{profile?.role === 'vet' ? 'Ветврач' : 'Кипер'} {isLocked ? '(Чтение)' : ''}</span>
             </div>
           </div>
         </div>
-        <div className="flex flex-col sm:items-end gap-1">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-            Дежурный: {dutyKeeper ? dutyKeeper.name : 'Не указан'} {isLocked ? '• Режим чтения' : ''}
-          </div>
-          {!isLocked && (
-             <div className="flex -space-x-2">
-                {staffList.map(s => (
-                  <button 
-                    key={s.id} 
-                    onClick={() => handleShiftFieldChange('duty_keeper_id', s.id, true)}
-                    className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
-                      shift?.duty_keeper_id === s.id ? 'bg-slate-800 text-white z-10 scale-110' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                    title={s.name}
-                  >
-                    {s.name.charAt(0)}
-                  </button>
-                ))}
-             </div>
+
+        {/* RIGHT SIDE: DATE */}
+        <div className="flex items-center gap-2 shrink-0">
+          {selectedDate !== todayStr && (
+            <span className="px-2 py-1 rounded-full text-[9px] font-bold bg-slate-500/10 border border-slate-500/20 text-slate-600 hidden md:flex">
+              {isFutureDate ? 'План' : 'Архив'}
+            </span>
           )}
+          
+          {selectedDate !== todayStr && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr)}
+              className="px-3 py-1.5 text-[10px] sm:text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-full transition-all shadow-md shadow-slate-900/20 active:scale-95 shrink-0"
+            >
+              Сегодня
+            </button>
+          )}
+          <button onClick={() => setIsDatePickerOpen(true)} className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight hover:opacity-80 transition-opacity flex items-center gap-1 shrink-0">
+            {formattedDateLabel} <span className="text-[10px] sm:text-sm opacity-50">▼</span>
+          </button>
         </div>
+
       </div>
 
       {/* ACTIVE ELEPHANT CONTENT */}
@@ -778,10 +812,90 @@ export function DailyShiftPage() {
           onPorridgeChange={handlePorridgeChange}
           onVegetableToggle={handleVegetableToggle}
           onSaladNotesChange={handleSaladNotesChange}
+          onBranchesChange={handleBranchesChange}
         />
       </div>
 
       {/* MODALS */}
+
+      {/* CALENDAR MODAL */}
+      {isDatePickerOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in" onClick={() => setIsDatePickerOpen(false)}>
+          <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Выбор даты</h2>
+              <button onClick={() => setIsDatePickerOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="flex justify-between items-center mb-4">
+              <button onClick={() => {
+                let m = viewMonth - 1;
+                let y = viewYear;
+                if (m < 1) { m = 12; y--; }
+                setViewMonth(m); setViewYear(y);
+              }} className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors">←</button>
+              
+              <div className="font-bold text-slate-700 capitalize">
+                {new Date(viewYear, viewMonth - 1).toLocaleString('ru', { month: 'long', year: 'numeric' })}
+              </div>
+              
+              <button onClick={() => {
+                let m = viewMonth + 1;
+                let y = viewYear;
+                if (m > 12) { m = 1; y++; }
+                setViewMonth(m); setViewYear(y);
+              }} className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors">→</button>
+            </div>
+            
+            <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-slate-400">
+              <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+            </div>
+            
+            <div className="grid grid-cols-7 gap-2">
+              {generateCalendarDays().map((d, i) => {
+                if (!d) return <div key={`empty-${i}`} className="h-10" />;
+                
+                const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const isSelected = dateStr === selectedDate;
+                const isToday = dateStr === todayStr;
+                const isFilled = activeDays.includes(dateStr);
+                
+                let bgClass = 'bg-white border-2 border-slate-100 hover:border-slate-300 text-slate-700';
+                
+                if (isSelected) {
+                  bgClass = 'bg-slate-800 border-2 border-slate-800 text-white shadow-md';
+                } else if (isFilled) {
+                  bgClass = 'bg-emerald-50 border-2 border-emerald-200 text-emerald-800 hover:bg-emerald-100';
+                } else if (dateStr < todayStr) {
+                  bgClass = 'bg-rose-50 border-2 border-rose-100 text-rose-700 hover:bg-rose-100';
+                }
+                
+                return (
+                  <button
+                    key={d}
+                    onClick={() => {
+                      setSelectedDate(dateStr);
+                      setIsDatePickerOpen(false);
+                    }}
+                    className={`h-10 rounded-xl flex items-center justify-center font-bold text-sm transition-all active:scale-90 ${bgClass} ${isToday && !isSelected ? 'ring-2 ring-blue-400 ring-offset-2' : ''}`}
+                  >
+                    {d}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="mt-6 flex flex-wrap gap-3 text-[11px] font-bold text-slate-500 justify-center">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-200"></div> Заполнено</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-50 border border-rose-100"></div> Пусто</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-slate-800"></div> Текущий</div>
+            </div>
+          </div>
+        </div>
+      )}
+
 {/* EXECUTION MODAL FOR VET ASSIGNMENTS */}
       {selectedTask && (
         <ExecutionModal

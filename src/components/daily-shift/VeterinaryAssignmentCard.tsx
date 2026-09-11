@@ -20,13 +20,13 @@ export function VeterinaryAssignmentCard({
   onEdit 
 }: VeterinaryAssignmentCardProps) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-2xl bg-white/40 border border-white/60 shadow-sm backdrop-blur-sm mb-2 last:mb-0 group transition-all hover:bg-white/60">
+    <div className="flex items-center justify-between p-4 rounded-[20px] bg-white/60 border border-white/40 shadow-sm backdrop-blur-md mb-2 last:mb-0 group transition-all hover:bg-white/80">
       <div className="flex items-start gap-3 flex-1 min-w-0">
-        <div className="mt-0.5 shrink-0">
+        <div className="mt-0.5 shrink-0 drop-shadow-sm">
           {isCompletedToday ? (
-            <CheckCircle2 size={18} className="text-emerald-500" />
+            <CheckCircle2 size={20} className="text-emerald-500" />
           ) : (
-            <Circle size={18} className="text-amber-500 fill-amber-50" />
+            <Circle size={20} className="text-amber-500 fill-amber-500/10" />
           )}
         </div>
         <div className="flex flex-col gap-0.5 min-w-0">
@@ -38,26 +38,26 @@ export function VeterinaryAssignmentCard({
       </div>
       
       {!isLocked && (
-        <div className="flex gap-1.5 shrink-0 ml-2">
+        <div className="flex gap-2 shrink-0 ml-3">
           {isCompletedToday ? (
             <>
               <button 
                 onClick={onEdit} 
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition"
+                className="px-3 py-2 bg-white/50 border border-white/40 hover:bg-white text-slate-600 text-xs font-bold rounded-2xl transition-all shadow-sm active:scale-95"
               >
                 Изм.
               </button>
               <button 
                 onClick={onUnmark} 
-                className="p-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl transition"
+                className="p-2 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-600 rounded-2xl transition-all shadow-sm active:scale-95"
               >
-                <Trash2 size={14}/>
+                <Trash2 size={16}/>
               </button>
             </>
           ) : (
             <button 
               onClick={onExecute} 
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95"
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-2xl shadow-lg shadow-slate-900/20 transition-all active:scale-95"
             >
               Выполнить
             </button>

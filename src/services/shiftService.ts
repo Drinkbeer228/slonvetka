@@ -129,7 +129,7 @@ export const shiftService = {
       if (shiftError) throw shiftError;
 
       const metricsArray = Object.values(metricsMap).map(m => {
-        const { sleep_minutes, ...rest } = m;
+        const { sleep_minutes, sleep_intervals, ...rest } = m;
         return {
           ...rest,
           behavior_score: sleep_minutes
@@ -145,5 +145,42 @@ export const shiftService = {
     } catch (err) {
       console.warn('Network error saving shift to Supabase, saved locally in IDB:', err);
     }
+  
+},
+  async getActiveDaysForMonth(year: number, month: number): Promise<string[]> {
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
+    
+    const activeDays = new Set<string>();
+
+    try {
+      const { data, error } = await supabase
+        .from('daily_shifts')
+        .select('date, duty_keeper_id')
+        .gte('date', startDate)
+        .lte('date', endDate);
+      
+      if (!error && data) {
+        data.forEach(r => activeDays.add(r.date));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch active days from Supabase', e);
+    }
+    
+    try {
+      const db = await getOfflineDb();
+      const tx = db.transaction('daily_shifts', 'readonly');
+      const index = tx.store.index('by-date');
+      const keys = await index.getAllKeys();
+      keys.forEach(k => {
+        if (typeof k === 'string' && k >= startDate && k <= endDate) {
+          activeDays.add(k);
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to fetch active days from IDB', e);
+    }
+    
+    return Array.from(activeDays);
   }
 };

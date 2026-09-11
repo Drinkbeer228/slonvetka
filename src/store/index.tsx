@@ -11,6 +11,7 @@ interface StoreState {
   loading: boolean;
   selectedDate: string;
   activeElephantId: string;
+  globalSaveStatus: 'idle' | 'saving' | 'saved' | 'error';
 }
 
 interface StoreContextType extends StoreState {
@@ -19,6 +20,7 @@ interface StoreContextType extends StoreState {
   refreshAssignments: () => Promise<void>;
   setSelectedDate: (date: string) => void;
   setActiveElephantId: (id: string) => void;
+  setGlobalSaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => void;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -30,6 +32,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [globalSaveStatus, setGlobalSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   useEffect(() => {
     if (elephants.length > 0 && (!activeElephantId || !elephants.some(e => e.id === activeElephantId))) {
@@ -115,7 +118,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     initData();
-  }, [profile]);
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!profile) return;
@@ -129,7 +132,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile]);
+  }, [profile?.id]);
 
   const login = async (email: string, pass: string) => {
     try {
@@ -158,7 +161,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      profile, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate
+      profile, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate, globalSaveStatus, setGlobalSaveStatus
     }}>
       {children}
     </StoreContext.Provider>

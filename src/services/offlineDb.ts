@@ -102,7 +102,8 @@ export async function cacheElephants(elephants: Elephant[]) {
 
 export async function getCachedElephants(): Promise<Elephant[]> {
   const db = await getOfflineDb();
-  return db.getAll('cached_elephants');
+  const els = await db.getAll('cached_elephants');
+  return els.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function cacheAssignments(assignments: Assignment[]) {
