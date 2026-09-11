@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CounterButton } from '../common/CounterButton';
 import { BookOpen, Check, ChevronDown, ChevronUp, Sparkles, Utensils, Wheat } from 'lucide-react';
+import { EveningSaladSection } from './EveningSaladSection';
 
 export interface DailyRationData {
   morning_porridge: 'none' | 'all' | 'partial';
@@ -8,6 +9,8 @@ export interface DailyRationData {
   evening_salad_chips: string[];
   salad_notes: string;
   coarse_branches?: number;
+  salad_base_included?: boolean;
+  salad_photo_url?: string;
 }
 
 const VEGETABLE_CHIPS = [
@@ -51,6 +54,8 @@ interface FeedControlProps {
   onVegetableToggle: (chip: string) => void;
   onSaladNotesChange: (notes: string) => void;
   onBranchesChange: (val: number) => void;
+  onSaladBaseToggle?: (included: boolean) => void;
+  onSaladPhotoChange?: (photoUrl?: string) => void;
 }
 
 export function FeedControl({
@@ -63,7 +68,9 @@ export function FeedControl({
   onPorridgeChange,
   onVegetableToggle,
   onSaladNotesChange,
-  onBranchesChange
+  onBranchesChange,
+  onSaladBaseToggle,
+  onSaladPhotoChange
 }: FeedControlProps) {
   const [recipeOpen, setRecipeOpen] = useState(false);
 
@@ -255,52 +262,17 @@ export function FeedControl({
       </div>
 
       {/* 2. EVENING VEGETABLE SALAD */}
-      <div className="bg-white/40 backdrop-blur-lg border border-white/40 rounded-[28px] p-5 shadow-sm space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center text-xl shadow-inner">
-            🌆
-          </div>
-          <div>
-            <div className="font-bold text-slate-800 text-sm tracking-wide">Вечерний салат</div>
-            <div className="text-[11px] text-slate-500 font-medium">Ингредиенты замеса</div>
-          </div>
-        </div>
-
-        {/* CHIPS MULTI-SELECT */}
-        <div className="flex flex-wrap gap-2 pt-2">
-          {VEGETABLE_CHIPS.map((veg) => {
-            const isSelected = eveningChips.includes(veg.id);
-            return (
-              <button
-                key={veg.id}
-                type="button"
-                disabled={isLocked}
-                onClick={() => onVegetableToggle(veg.id)}
-                className={`min-h-[44px] px-4 py-2 rounded-full border border-white/40 text-xs font-bold transition-all flex items-center gap-2 active:scale-95 ${
-                  isSelected
-                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                    : 'bg-white/60 text-slate-600 hover:bg-white/90'
-                }`}
-              >
-                <span className="text-lg leading-none drop-shadow-sm">{veg.emoji}</span>
-                <span>{veg.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* APPETITE NOTES */}
-        <div className="pt-2">
-          <input
-            type="text"
-            disabled={isLocked}
-            value={ration.salad_notes || ''}
-            onChange={(e) => onSaladNotesChange(e.target.value)}
-            placeholder="Заметка по аппетиту (напр. «тыкву не доели»)..."
-            className="w-full px-5 py-4 bg-white/60 backdrop-blur-md border border-white/40 rounded-[20px] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all shadow-inner placeholder:text-slate-400 text-slate-800"
-          />
-        </div>
-      </div>
+      <EveningSaladSection
+        baseIncluded={ration.salad_base_included !== false}
+        extras={eveningChips}
+        notes={ration.salad_notes || ''}
+        photoUrl={ration.salad_photo_url}
+        isLocked={isLocked}
+        onBaseToggle={onSaladBaseToggle}
+        onExtraToggle={onVegetableToggle}
+        onNotesChange={onSaladNotesChange}
+        onPhotoChange={onSaladPhotoChange}
+      />
 
       {/* 3. COARSE FEED (HAY STEPPERS) */}
       <div className="bg-white/40 backdrop-blur-lg border border-white/40 rounded-[28px] p-5 shadow-sm space-y-5">

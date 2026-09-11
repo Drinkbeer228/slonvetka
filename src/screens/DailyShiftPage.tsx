@@ -111,9 +111,11 @@ const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
   const defaultRation: DailyRationData = {
     morning_porridge: 'none',
     lunch_porridge: 'none',
-    evening_salad_chips: ['Морковь', 'Яблоки', 'Капуста'],
+    evening_salad_chips: [],
     salad_notes: '',
-    coarse_branches: 0
+    coarse_branches: 0,
+    salad_base_included: true,
+    salad_photo_url: ''
   };
   if (!feedNotes) return defaultRation;
   try {
@@ -125,7 +127,9 @@ const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
         ? parsed.evening_salad_chips 
         : defaultRation.evening_salad_chips,
       salad_notes: parsed.salad_notes || '',
-      coarse_branches: parsed.coarse_branches || 0
+      coarse_branches: parsed.coarse_branches || 0,
+      salad_base_included: parsed.salad_base_included !== false,
+      salad_photo_url: parsed.salad_photo_url || ''
     };
   } catch {
     return {
@@ -523,6 +527,24 @@ export function DailyShiftPage() {
     handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), false);
   };
 
+  const handleSaladBaseToggle = (included: boolean) => {
+    if (isLocked || !shift) return;
+    const updatedRation: DailyRationData = {
+      ...currentRation,
+      salad_base_included: included
+    };
+    handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
+  };
+
+  const handleSaladPhotoChange = (photoUrl?: string) => {
+    if (isLocked || !shift) return;
+    const updatedRation: DailyRationData = {
+      ...currentRation,
+      salad_photo_url: photoUrl || ''
+    };
+    handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
+  };
+
   const handleCompleteTask = async (data: {
     assessment: string | null;
     medicineUsed: string | null;
@@ -813,6 +835,8 @@ export function DailyShiftPage() {
           onVegetableToggle={handleVegetableToggle}
           onSaladNotesChange={handleSaladNotesChange}
           onBranchesChange={handleBranchesChange}
+          onSaladBaseToggle={handleSaladBaseToggle}
+          onSaladPhotoChange={handleSaladPhotoChange}
         />
       </div>
 
