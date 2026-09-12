@@ -110,7 +110,6 @@ const getFirstDayOfWeek = (year: number, month: number) => {
 const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
   const defaultRation: DailyRationData = {
     morning_porridge: 'none',
-    lunch_porridge: 'none',
     evening_salad_chips: [],
     salad_notes: '',
     coarse_branches: 0,
@@ -122,7 +121,6 @@ const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
     const parsed = JSON.parse(feedNotes);
     return {
       morning_porridge: parsed.morning_porridge || 'none',
-      lunch_porridge: parsed.lunch_porridge || 'none',
       evening_salad_chips: Array.isArray(parsed.evening_salad_chips) 
         ? parsed.evening_salad_chips 
         : defaultRation.evening_salad_chips,
@@ -487,11 +485,11 @@ export function DailyShiftPage() {
     return parseDailyRation(shift?.feed_notes);
   }, [shift?.feed_notes]);
 
-  const handlePorridgeChange = (meal: 'morning' | 'lunch', status: 'none' | 'all' | 'partial') => {
+  const handlePorridgeFieldChange = (field: keyof DailyRationData, value: any) => {
     if (isLocked || !shift) return;
     const updatedRation: DailyRationData = {
       ...currentRation,
-      [meal === 'morning' ? 'morning_porridge' : 'lunch_porridge']: status
+      [field]: value
     };
     handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
   };
@@ -831,7 +829,7 @@ export function DailyShiftPage() {
           isLocked={isLocked}
           onBalesChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
           onBagsChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
-          onPorridgeChange={handlePorridgeChange}
+          onPorridgeFieldChange={handlePorridgeFieldChange}
           onVegetableToggle={handleVegetableToggle}
           onSaladNotesChange={handleSaladNotesChange}
           onBranchesChange={handleBranchesChange}
