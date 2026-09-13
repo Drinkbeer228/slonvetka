@@ -18,6 +18,7 @@ interface Props {
   onNotesBlur: () => void;
   onClose?: () => void;
   assignmentsContent?: React.ReactNode;
+  showExcretion?: boolean;
 }
 
 export function ObservationEditor({
@@ -31,7 +32,8 @@ export function ObservationEditor({
   onTraitToggle,
   onNotesBlur,
   onClose,
-  assignmentsContent
+  assignmentsContent,
+  showExcretion = false
 }: Props) {
   const photos = metrics.photos || [];
   
@@ -67,7 +69,7 @@ export function ObservationEditor({
       )}
 
       {/* DEFECATION, URINATION & SLEEP 3-COLUMN UNIFIED SECTIONS */}
-      {(() => {
+      {showExcretion && (() => {
         const effectiveMetrics = (allMetrics && Object.keys(allMetrics).length > 0)
           ? { ...allMetrics, [elephant.id]: { ...(allMetrics[elephant.id] || {}), ...metrics } }
           : { [elephant.id]: metrics };

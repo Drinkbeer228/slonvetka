@@ -15,6 +15,8 @@ interface ShiftSummaryModalProps {
   washedCount?: number;
   poopCount?: number;
   damages?: CounterItem[];
+  isShowDay?: boolean;
+  noonMashStatus?: 'pending' | 'fed' | 'skipped_show_day';
 }
 
 export function ShiftSummaryModal({
@@ -28,7 +30,9 @@ export function ShiftSummaryModal({
   hayBales = 0,
   washedCount = 0,
   poopCount = 0,
-  damages = []
+  damages = [],
+  isShowDay = false,
+  noonMashStatus = 'pending'
 }: ShiftSummaryModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -87,8 +91,12 @@ export function ShiftSummaryModal({
           </h3>
           <div className="bg-slate-50/80 border border-slate-200/60 rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-700">Утренняя каша (08:30)</span>
-              {porridgeIssued ? (
+              <span className="text-sm font-semibold text-slate-700">Утренняя каша (07:00)</span>
+              {isShowDay ? (
+                <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                  🎪 День шоу (отменена)
+                </span>
+              ) : porridgeIssued ? (
                 <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                   <Check size={14} /> Выдано
                 </span>
@@ -97,7 +105,21 @@ export function ShiftSummaryModal({
               )}
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-700">Ужин (19:00)</span>
+              <span className="text-sm font-semibold text-slate-700">Дневная каша</span>
+              {isShowDay ? (
+                <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                  🎪 День шоу (отменена)
+                </span>
+              ) : noonMashStatus === 'fed' ? (
+                <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                  <Check size={14} /> Выдано (остыл)
+                </span>
+              ) : (
+                <span className="text-xs font-bold text-slate-400">Не выдано</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700">Вечерний рацион (19:00)</span>
               {saladIssued ? (
                 <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                   <Check size={14} /> Выдан

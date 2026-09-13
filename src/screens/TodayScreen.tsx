@@ -78,6 +78,25 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
     await fetchDrafts();
   };
   
+  const handleQuickExecuteTask = async (assignment: Assignment, elephant: Elephant) => {
+    if (!profile) return;
+    if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(15);
+    }
+
+    await SyncManager.saveRecordLocally({
+      assignment_id: assignment.id,
+      elephant_id: elephant.id,
+      keeper_id: profile.id,
+      performed_at: new Date().toISOString(),
+      assessment: 'В норме',
+      medicine_used: assignment.medicine || null,
+      comment: 'Штатно',
+    }, null);
+
+    await fetchDrafts();
+  };
+
   const handleRetrySync = () => {
     SyncManager.triggerSync();
   };
@@ -150,8 +169,14 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
                          </div>
                       ) : (
                         <button
-                          onClick={() => setSelectedTask({ assignment, elephant })}
-                          className="mt-3 w-full py-2.5 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-zinc-800 transition active:scale-95"
+                          onClick={() => {
+                            if (assignment.requires_photo) {
+                              setSelectedTask({ assignment, elephant });
+                            } else {
+                              handleQuickExecuteTask(assignment, elephant);
+                            }
+                          }}
+                          className="mt-3 w-full py-2.5 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-zinc-800 transition active:scale-95 flex items-center justify-center gap-2"
                         >
                           {assignment.requires_photo ? 'ВЫПОЛНИТЬ + ФОТО' : 'ВЫПОЛНИТЬ'}
                         </button>

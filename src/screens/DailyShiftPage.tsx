@@ -15,6 +15,7 @@ import {
 import { ExecutionModal } from '../components/ExecutionModal';
 import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
 import { FeedControl, DailyRationData } from '../components/daily-shift/FeedControl';
+import { ExcretionControl } from '../components/daily-shift/ExcretionControl';
 import { ObservationEditor } from '../components/daily-shift/ObservationEditor';
 import { SubmitShiftButton } from '../components/daily-shift/SubmitShiftButton';
 import { DynamicCounterSection, CounterItem } from '../components/daily-shift/DynamicCounterSection';
@@ -107,14 +108,27 @@ const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
     salad_base_included: false,
     salad_photo_url: '',
     salad_appetite: null,
-    salad_base_time: null
+    salad_base_time: null,
+    morning_mash_fed: false,
+    morning_mash_time: null,
+    is_show_day: false,
+    noon_mash_status: 'pending',
+    noon_mash_cooldown_confirmed: false,
+    noon_mash_time: null,
+    evening_diet_fed: false,
+    evening_diet_time: null
   };
   if (!feedNotes) return defaultRation;
   try {
     const parsed = JSON.parse(feedNotes);
+    const morningFed = Boolean(parsed.morning_mash_fed ?? (parsed.morning_porridge && parsed.morning_porridge !== 'none'));
+    const isShowDay = Boolean(parsed.is_show_day);
+    const noonStatus = parsed.noon_mash_status || (isShowDay ? 'skipped_show_day' : 'pending');
+    const eveningFed = Boolean(parsed.evening_diet_fed ?? parsed.salad_base_included);
+
     return {
-      morning_porridge: parsed.morning_porridge || 'none',
-      morning_porridge_time: parsed.morning_porridge_time || null,
+      morning_porridge: parsed.morning_porridge || (morningFed ? 'all' : 'none'),
+      morning_porridge_time: parsed.morning_porridge_time || parsed.morning_mash_time || null,
       morning_porridge_keeper: parsed.morning_porridge_keeper || null,
       morning_porridge_photo: parsed.morning_porridge_photo || null,
       evening_salad_chips: Array.isArray(parsed.evening_salad_chips) 
@@ -122,10 +136,18 @@ const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
         : defaultRation.evening_salad_chips,
       salad_notes: parsed.salad_notes || '',
       coarse_branches: parsed.coarse_branches || 0,
-      salad_base_included: Boolean(parsed.salad_base_included),
+      salad_base_included: eveningFed,
       salad_photo_url: parsed.salad_photo_url || '',
       salad_appetite: parsed.salad_appetite || null,
-      salad_base_time: parsed.salad_base_time || null
+      salad_base_time: parsed.salad_base_time || parsed.evening_diet_time || null,
+      morning_mash_fed: morningFed,
+      morning_mash_time: parsed.morning_mash_time || parsed.morning_porridge_time || null,
+      is_show_day: isShowDay,
+      noon_mash_status: noonStatus,
+      noon_mash_cooldown_confirmed: Boolean(parsed.noon_mash_cooldown_confirmed),
+      noon_mash_time: parsed.noon_mash_time || null,
+      evening_diet_fed: eveningFed,
+      evening_diet_time: parsed.evening_diet_time || parsed.salad_base_time || null
     };
   } catch {
     return {
@@ -565,6 +587,55 @@ export function DailyShiftPage() {
     handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
   };
 
+  const handleQuickExecuteTask = async (assignment: Assignment) => {
+    if (!profile || !activeElephant || isLocked) return;
+    if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(15);
+    }
+
+    const tempId = crypto.randomUUID();
+    const nowIso = new Date().toISOString();
+    const optimisticRecord: TreatmentRecordWithPhotos = {
+      id: tempId,
+      assignment_id: assignment.id,
+      elephant_id: activeElephant.id,
+      keeper_id: profile.id,
+      performed_at: nowIso,
+      assessment: 'В норме',
+      medicine_used: assignment.medicine || null,
+      comment: 'Штатно',
+      created_at: nowIso,
+      photos: [],
+      keeper: {
+        id: profile.id,
+        name: profile.name,
+      },
+    };
+
+    // Optimistically update UI immediately
+    setShiftRecords(prev => [
+      ...prev.filter(r => r.assignment_id !== assignment.id),
+      optimisticRecord,
+    ]);
+
+    try {
+      await SyncManager.saveRecordLocally({
+        assignment_id: assignment.id,
+        elephant_id: activeElephant.id,
+        keeper_id: profile.id,
+        performed_at: nowIso,
+        assessment: 'В норме',
+        medicine_used: assignment.medicine || null,
+        comment: 'Штатно',
+      }, null);
+
+      await fetchShiftRecords(selectedDate);
+    } catch (err) {
+      console.error('Failed to quick execute task:', err);
+      await fetchShiftRecords(selectedDate);
+    }
+  };
+
   const handleCompleteTask = async (data: {
     assessment: string | null;
     medicineUsed: string | null;
@@ -572,6 +643,34 @@ export function DailyShiftPage() {
     photoBlob: Blob | null;
   }) => {
     if (!profile || !selectedTask) return;
+    if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(15);
+    }
+
+    const tempId = crypto.randomUUID();
+    const nowIso = new Date().toISOString();
+    const optimisticRecord: TreatmentRecordWithPhotos = {
+      id: tempId,
+      assignment_id: selectedTask.assignment.id,
+      elephant_id: selectedTask.elephant.id,
+      keeper_id: profile.id,
+      performed_at: nowIso,
+      assessment: data.assessment,
+      medicine_used: data.medicineUsed,
+      comment: data.comment,
+      created_at: nowIso,
+      photos: data.photoBlob ? [{
+        id: crypto.randomUUID(),
+        treatment_record_id: tempId,
+        storage_path: URL.createObjectURL(data.photoBlob),
+        photo_type: 'single',
+        created_at: nowIso,
+      }] : [],
+      keeper: {
+        id: profile.id,
+        name: profile.name,
+      },
+    };
     
     // If editing existing record, remove old record first
     if (selectedTask.existingRecord) {
@@ -582,28 +681,46 @@ export function DailyShiftPage() {
       }
     }
 
-    await SyncManager.saveRecordLocally({
-      assignment_id: selectedTask.assignment.id,
-      elephant_id: selectedTask.elephant.id,
-      keeper_id: profile.id,
-      performed_at: new Date().toISOString(),
-      assessment: data.assessment,
-      medicine_used: data.medicineUsed,
-      comment: data.comment,
-    }, data.photoBlob);
-    
+    // Optimistic UI update
+    setShiftRecords(prev => [
+      ...prev.filter(r => r.assignment_id !== selectedTask.assignment.id),
+      optimisticRecord,
+    ]);
     setSelectedTask(null);
-    await fetchShiftRecords(selectedDate);
+
+    try {
+      await SyncManager.saveRecordLocally({
+        assignment_id: selectedTask.assignment.id,
+        elephant_id: selectedTask.elephant.id,
+        keeper_id: profile.id,
+        performed_at: nowIso,
+        assessment: data.assessment,
+        medicine_used: data.medicineUsed,
+        comment: data.comment,
+      }, data.photoBlob);
+      
+      await fetchShiftRecords(selectedDate);
+    } catch (err) {
+      console.error('Failed to complete task:', err);
+      await fetchShiftRecords(selectedDate);
+    }
   };
 
-  const handleUnmarkTask = async (recordId: string) => {
+  const handleUnmarkTask = async (recordId: string, assignmentId?: string) => {
     if (!confirm('Вы уверены, что хотите снять выполнение этой задачи?')) return;
+    if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+
+    // Optimistically remove from state
+    setShiftRecords(prev => prev.filter(r => r.id !== recordId && (!assignmentId || r.assignment_id !== assignmentId)));
     try {
       await supabaseService.deleteTreatmentRecord(recordId);
       await fetchShiftRecords(selectedDate);
     } catch (err) {
       console.error('Failed to unmark task:', err);
       alert('Ошибка при снятии выполнения задачи');
+      await fetchShiftRecords(selectedDate);
     }
   };
 
@@ -704,6 +821,24 @@ export function DailyShiftPage() {
       </div>
     );
   }
+
+  const activeElephant = (elephants || []).find(e => e.id === activeElephantId) || (elephants || [])[0];
+  const m = activeElephant ? ((metrics || {})[activeElephant.id] || {
+    shift_id: shift?.id || '',
+    elephant_id: activeElephant.id,
+    poop_count: 0,
+    feces_traits: ['Сформирован (норма)'],
+    urination_count: 0,
+    urination_traits: ['Светлая / Прозрачная'],
+    behavior: 'Спокойная / В норме',
+    sleep_minutes: 420,
+    notes: ''
+  }) : null;
+
+  const assignmentsForEle = activeElephant
+    ? (assignments || []).filter(a => a.elephant_id === activeElephant.id)
+    : [];
+
   return (
     <div className="pb-32 space-y-6 mt-3 relative">
       
@@ -761,77 +896,88 @@ export function DailyShiftPage() {
         </div>
       )}
 
-      {/* ACTIVE ELEPHANT CONTENT */}
-      <div className="space-y-6">
-        {(() => {
-          const activeElephant = (elephants || []).find(e => e.id === activeElephantId) || (elephants || [])[0];
-          if (!activeElephant) return null;
-          
-          const m = (metrics || {})[activeElephant.id] || {
-            shift_id: shift?.id || '',
-            elephant_id: activeElephant.id,
-            poop_count: 0,
-            feces_traits: ['Сформирован (норма)'],
-            urination_count: 0,
-            urination_traits: ['Светлая / Прозрачная'],
-            behavior: 'Спокойная / В норме',
-            sleep_minutes: 420,
-            notes: ''
-          };
-          
-          const assignmentsForEle = (assignments || []).filter(a => a.elephant_id === activeElephant.id);
-          
-          const assignmentsContent = assignmentsForEle.length > 0 ? (
-            <div className="space-y-2 mt-2">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                <span className="text-base leading-none">🩺</span> Вет. назначения
-              </div>
-              {assignmentsForEle.map(assignment => {
-                const relatedRecord = (shiftRecords || []).find(r => r.assignment_id === assignment.id);
-                const isCompletedToday = !!relatedRecord;
-                return (
-                  <VeterinaryAssignmentCard
-                    key={assignment.id}
-                    assignment={assignment}
-                    isCompletedToday={isCompletedToday}
-                    isLocked={isLocked}
-                    onExecute={() => setSelectedTask({ assignment, elephant: activeElephant })}
-                    onUnmark={() => handleUnmarkTask(relatedRecord.id)}
-                    onEdit={() => setSelectedTask({ assignment, elephant: activeElephant, existingRecord: relatedRecord })}
-                  />
-                );
-              })}
-            </div>
-          ) : null;
+      {/* 2. ФИЗИОЛОГИЯ И СОН: <ExcretionControl ... /> (КУЧИ, ЛУЖИ, СОН) */}
+      <ExcretionControl
+        elephants={elephants}
+        metrics={metrics}
+        onMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
+        isLocked={isLocked}
+      />
 
-          return (
-            <ObservationEditor
-              elephant={activeElephant}
-              elephants={elephants}
-              allMetrics={metrics}
-              metrics={m}
-              isLocked={isLocked}
-              onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
-              onAllMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
-              onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
-              onNotesBlur={() => shift && persistChanges(shift, metrics)}
-              assignmentsContent={assignmentsContent}
+      {/* 3. ГРУБЫЕ КОРМА: СЕТКА 3 КОЛОНОК (ТЮКИ, РУЛОНЫ, ВЕТКИ) */}
+      <div className="bg-white/70 backdrop-blur-xl border border-white/80 rounded-[22px] p-3.5 sm:p-4 shadow-[0_4px_16px_rgba(15,23,42,0.03)] space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xl leading-none">🌾</span>
+            <div>
+              <span className="font-extrabold text-slate-900 text-sm tracking-tight">Грубые корма</span>
+              <span className="text-[11px] text-slate-400 font-medium ml-2">Основной фураж и клетчатка</span>
+            </div>
+          </div>
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-lime-700 bg-lime-100/70 border border-lime-200/80 px-2 py-0.5 rounded-full">
+            Без ограничений
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+          {/* Тюки сена */}
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <div className="text-center select-none px-0.5">
+              <div className="text-xs font-black text-slate-800 tracking-tight truncate">Тюки сена</div>
+              <div className="text-[10px] text-slate-400 font-semibold truncate">Основная раздача</div>
+            </div>
+            <CounterButton
+              value={hayBalesDistributed}
+              onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
+              disabled={isLocked}
+              variant="vertical"
+              unit="тюков"
             />
-          );
-        })()}
+          </div>
+
+          {/* Рулоны / Мешки */}
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <div className="text-center select-none px-0.5">
+              <div className="text-xs font-black text-slate-800 tracking-tight truncate">Рулоны</div>
+              <div className="text-[10px] text-slate-400 font-semibold truncate">Доп. фураж</div>
+            </div>
+            <CounterButton
+              value={hayBagsDistributed}
+              onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
+              disabled={isLocked}
+              variant="vertical"
+              unit="рулонов"
+            />
+          </div>
+
+          {/* Ветки, веники */}
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <div className="text-center select-none px-0.5">
+              <div className="text-xs font-black text-slate-800 tracking-tight truncate">Ветки</div>
+              <div className="text-[10px] text-slate-400 font-semibold truncate">Веники / бамбук</div>
+            </div>
+            <CounterButton
+              value={currentRation.coarse_branches || 0}
+              onChange={handleBranchesChange}
+              disabled={isLocked}
+              variant="vertical"
+              unit="веников"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* FEED CONTROL & DAILY RATION SECTION */}
-      <div className="space-y-6 pt-6">
+      {/* 4. РАЦИОН И КОНЦЕНТРАТЫ: <FeedControl ... /> (КАШИ, ШОУ-ДЕНЬ, ВЕЧЕРНИЙ РАЦИОН) */}
+      <div>
         <FeedControl
-          hayBalesDistributed={hayBalesDistributed}
-          hayBagsDistributed={hayBagsDistributed}
           ration={currentRation}
           isLocked={isLocked}
           dutyKeeperName={dutyKeeper?.name}
+          onPorridgeFieldChange={handlePorridgeFieldChange}
+          hayBalesDistributed={hayBalesDistributed}
+          hayBagsDistributed={hayBagsDistributed}
           onBalesChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
           onBagsChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
-          onPorridgeFieldChange={handlePorridgeFieldChange}
           onVegetableToggle={handleVegetableToggle}
           onSaladNotesChange={handleSaladNotesChange}
           onBranchesChange={handleBranchesChange}
@@ -840,18 +986,65 @@ export function DailyShiftPage() {
         />
       </div>
 
-      {/* FLOATING SUBMIT SHIFT BUTTON */}
+      {/* 5. ВЕТЕРИНАРНЫЕ НАЗНАЧЕНИЯ / ПРОЦЕДУРЫ (ЕСЛИ ЕСТЬ АКТИВНЫЕ) */}
+      {activeElephant && assignmentsForEle.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 px-1">
+            <span className="text-base leading-none">🩺</span> Вет. назначения
+          </div>
+          {assignmentsForEle.map(assignment => {
+            const relatedRecord = (shiftRecords || []).find(r => r.assignment_id === assignment.id);
+            const isCompletedToday = !!relatedRecord;
+            const keeperName = relatedRecord?.keeper?.name 
+              || staffList.find(s => s.id === relatedRecord?.keeper_id)?.name
+              || (relatedRecord?.keeper_id === profile?.id ? profile?.name : undefined);
+            const completedTime = relatedRecord?.performed_at
+              ? new Date(relatedRecord.performed_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+              : undefined;
+
+            return (
+              <VeterinaryAssignmentCard
+                key={assignment.id}
+                assignment={assignment}
+                isCompletedToday={isCompletedToday}
+                isLocked={isLocked}
+                completedAt={completedTime}
+                completedByKeeperName={keeperName}
+                onExecute={() => setSelectedTask({ assignment, elephant: activeElephant, existingRecord: relatedRecord })}
+                onQuickExecute={() => handleQuickExecuteTask(assignment)}
+                onUnmark={() => relatedRecord && handleUnmarkTask(relatedRecord.id, assignment.id)}
+                onEdit={() => setSelectedTask({ assignment, elephant: activeElephant, existingRecord: relatedRecord })}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* 6. ЖУРНАЛ НАБЛЮДЕНИЙ: <ObservationEditor ... /> (СВОБОДНЫЕ ЗАМЕТКИ, ПОЛЕ ВВОДА ТЕКСТА, ФОТО) */}
+      {activeElephant && m && (
+        <ObservationEditor
+          elephant={activeElephant}
+          elephants={elephants}
+          allMetrics={metrics}
+          metrics={m}
+          isLocked={isLocked}
+          onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
+          onAllMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
+          onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
+          onNotesBlur={() => shift && persistChanges(shift, metrics)}
+        />
+      )}
+
+      {/* 7. НИЖНЯЯ ПАНЕЛЬ: КНОПКА [ ЗАВЕРШИТЬ СМЕНУ ] */}
       {!isLocked && (
         <SubmitShiftButton
           isIdeal={Boolean(
-            currentRation.morning_porridge &&
-            currentRation.morning_porridge !== 'none' &&
-            (currentRation.salad_appetite || currentRation.salad_base_included)
+            (currentRation.morning_mash_fed || (currentRation.morning_porridge && currentRation.morning_porridge !== 'none')) &&
+            (currentRation.evening_diet_fed || currentRation.salad_base_included)
           )}
           hasMissingRequired={Boolean(
-            !currentRation.morning_porridge ||
-            currentRation.morning_porridge === 'none' ||
-            (!currentRation.salad_appetite && !currentRation.salad_base_included)
+            (!currentRation.morning_mash_fed && (!currentRation.morning_porridge || currentRation.morning_porridge === 'none')) ||
+            (!currentRation.evening_diet_fed && !currentRation.salad_base_included)
           )}
           onClick={() => {
             setIsEndMatchModalOpen(true);
@@ -868,12 +1061,14 @@ export function DailyShiftPage() {
         }}
         dutyKeeperName={dutyKeeper?.name}
         dateString={shift?.date || selectedDate}
-        porridgeIssued={!!currentRation.morning_porridge && currentRation.morning_porridge !== 'none'}
-        saladIssued={!!currentRation.salad_base_included}
+        porridgeIssued={!!currentRation.morning_mash_fed || (!!currentRation.morning_porridge && currentRation.morning_porridge !== 'none')}
+        saladIssued={!!currentRation.evening_diet_fed || !!currentRation.salad_base_included}
         hayBales={hayBalesDistributed}
         washedCount={countersStats.merits?.find(m => m.id === 'elephants_washed')?.count || 0}
         poopCount={countersStats.merits?.find(m => m.id === 'wheelbarrows_dumped')?.count || 0}
         damages={countersStats.damages}
+        isShowDay={Boolean(currentRation.is_show_day)}
+        noonMashStatus={currentRation.noon_mash_status}
       />
 
       {/* MODALS */}
@@ -961,6 +1156,11 @@ export function DailyShiftPage() {
         <ExecutionModal
           assignment={selectedTask.assignment}
           elephant={selectedTask.elephant}
+          initialData={selectedTask.existingRecord ? {
+            assessment: selectedTask.existingRecord.assessment,
+            medicineUsed: selectedTask.existingRecord.medicine_used,
+            comment: selectedTask.existingRecord.comment,
+          } : undefined}
           onClose={() => setSelectedTask(null)}
           onComplete={handleCompleteTask}
         />
