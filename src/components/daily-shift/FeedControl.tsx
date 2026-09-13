@@ -90,12 +90,12 @@ export function FeedControl({
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-md border border-white/40 p-5 sm:p-6 rounded-[28px] shadow-lg space-y-6">
+    <div className="bg-transparent p-0 rounded-none shadow-none space-y-4">
       
       {/* SECTION HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <span className="text-3xl drop-shadow-sm">🍽️</span>
+          <span className="text-3xl">🍽️</span>
           <div>
             <h3 className="font-black text-slate-800 text-lg sm:text-xl tracking-tight">Рацион</h3>
             <p className="text-[12px] font-medium text-slate-500">Запарка каши, вечерний салат и грубые корма</p>
@@ -112,9 +112,9 @@ export function FeedControl({
       />
 
       {/* 3. COARSE FEED (HAY STEPPERS) */}
-      <div className="bg-white/40 backdrop-blur-lg border border-white/40 rounded-[28px] p-5 shadow-sm space-y-5">
+      <div className="bg-white/60 backdrop-blur-2xl border border-white/80 rounded-[26px] p-4 shadow-[0_8px_24px_rgba(15,23,42,0.045)] space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-lime-500/10 flex items-center justify-center text-xl shadow-inner">
+          <div className="w-10 h-10 rounded-[14px] bg-lime-500/10 flex items-center justify-center text-xl">
             🌾
           </div>
           <div>
@@ -123,8 +123,8 @@ export function FeedControl({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white/60 backdrop-blur-md border border-white/50 p-5 rounded-[24px] flex flex-col items-center justify-between shadow-sm gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white/55 backdrop-blur-xl border border-white/75 p-4 rounded-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] flex flex-col items-center justify-between gap-4">
             <div className="text-center w-full">
               <div className="text-sm font-bold text-slate-800">Тюки сена</div>
               <div className="text-[11px] text-slate-500 font-medium mt-1">Основная раздача</div>
@@ -138,7 +138,7 @@ export function FeedControl({
             </div>
           </div>
 
-          <div className="bg-white/60 backdrop-blur-md border border-white/50 p-5 rounded-[24px] flex flex-col items-center justify-between shadow-sm gap-4">
+          <div className="bg-white/55 backdrop-blur-xl border border-white/75 p-4 rounded-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] flex flex-col items-center justify-between gap-4">
             <div className="text-center w-full">
               <div className="text-sm font-bold text-slate-800">Рулоны / Мешки</div>
               <div className="text-[11px] text-slate-500 font-medium mt-1">Доп. фураж</div>
@@ -152,7 +152,7 @@ export function FeedControl({
             </div>
           </div>
           
-          <div className="bg-white/60 backdrop-blur-md border border-white/50 p-5 rounded-[24px] flex flex-col items-center justify-between shadow-sm gap-4">
+          <div className="bg-white/55 backdrop-blur-xl border border-white/75 p-4 rounded-[20px] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] flex flex-col items-center justify-between gap-4">
             <div className="text-center w-full">
               <div className="text-sm font-bold text-slate-800">Ветки, веники...</div>
               <div className="text-[11px] text-slate-500 font-medium mt-1">Деревья / Бамбук</div>

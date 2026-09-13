@@ -58,7 +58,7 @@ export function ObservationEditor({
         <div className="flex items-center justify-end">
           <button 
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95 cursor-pointer"
+            className="w-10 h-10 rounded-full bg-white/80 border border-white/80 flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95 cursor-pointer"
             title="Закрыть"
           >
             <X size={18} />
@@ -95,7 +95,7 @@ export function ObservationEditor({
 
       {/* VETERINARY ASSIGNMENTS IF ANY */}
       {assignmentsContent && (
-        <div className="pt-4 mt-4 border-t border-white/40">
+        <div className="pt-2 mt-2 border-t border-slate-200/50">
           {assignmentsContent}
         </div>
       )}
@@ -104,7 +104,7 @@ export function ObservationEditor({
         <div className="pt-4">
           <button 
             onClick={onClose}
-            className="w-full py-4 bg-slate-800 text-white rounded-[20px] font-bold text-sm shadow-xl shadow-slate-800/20 active:scale-95 transition-all cursor-pointer"
+            className="w-full min-h-12 rounded-[18px] bg-slate-900 text-white font-bold text-[14px] shadow-[0_8px_20px_rgba(15,23,42,0.16)] active:scale-[0.985] transition-all cursor-pointer flex items-center justify-center"
           >
             Сохранить и закрыть
           </button>

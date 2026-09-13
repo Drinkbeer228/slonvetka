@@ -10,7 +10,7 @@ interface ElephantSelectorProps {
 
 export function ElephantSelector({ elephants, activeElephantId, onSelect, metrics }: ElephantSelectorProps) {
   return (
-    <div className="flex bg-white/40 p-1.5 rounded-2xl w-full backdrop-blur-xl border border-white/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)] relative overflow-hidden">
+    <div className="flex bg-slate-200/45 p-1 w-full rounded-[20px] backdrop-blur-2xl border border-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] relative overflow-hidden">
       {elephants.map((elephant) => {
         const isActive = elephant.id === activeElephantId;
         const m = metrics[elephant.id];
@@ -21,15 +21,12 @@ export function ElephantSelector({ elephants, activeElephantId, onSelect, metric
             key={elephant.id}
             type="button"
             onClick={() => onSelect(elephant.id)}
-            className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-xl text-sm transition-all relative z-10 ${
+            className={`min-h-11 flex-1 rounded-[16px] px-2 text-[13px] transition-[background-color,color,box-shadow,transform] active:scale-[0.98] flex items-center justify-center relative select-none cursor-pointer ${
               isActive 
-                ? 'text-slate-900 font-bold' 
-                : 'text-slate-500 hover:text-slate-700 font-semibold'
+                ? 'bg-white/95 shadow-[0_4px_14px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,1)] border border-white text-slate-900 font-bold' 
+                : 'text-slate-500 hover:text-slate-700 font-semibold border border-transparent'
             }`}
           >
-            {isActive && (
-              <div className="absolute inset-0 bg-white rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.06)] border border-slate-100/50 -z-10" />
-            )}
             <span className="truncate">{elephant.name}</span>
             {hasNotes && (
               <span className="absolute top-2 right-4 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.6)]" />

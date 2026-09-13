@@ -66,16 +66,14 @@ export function Header({ currentScreen, onOpenMenu }: HeaderProps) {
     }
   }, [isCalendarOpen, viewYear, viewMonth]);
 
-  // Format date compact: "13 сент."
+  // Format date: "13 сентября" (полное название месяца, не сокращать)
   const formatCompactDate = (dateStr: string): string => {
     if (!dateStr) return '';
     try {
       const [y, m, d] = dateStr.split('-').map(Number);
       if (y && m && d) {
         const dateObj = new Date(y, m - 1, d);
-        const day = dateObj.getDate();
-        const monthShort = dateObj.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
-        return `${day} ${monthShort}.`;
+        return dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
       }
     } catch {
       // fallback
@@ -139,11 +137,11 @@ export function Header({ currentScreen, onOpenMenu }: HeaderProps) {
           {title}
         </h1>
 
-        {/* ПО ЦЕНТРУ: Компактный выбор даты */}
+        {/* ПО ЦЕНТРУ: Выбор даты (не сокращать) */}
         <button
           type="button"
           onClick={() => setIsCalendarOpen(true)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-slate-700 active:scale-95 transition-all cursor-pointer select-none tap-target"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-slate-700 active:scale-95 transition-all cursor-pointer select-none tap-target whitespace-nowrap shrink-0"
           style={{
             background: 'rgba(255,255,255,0.85)',
             boxShadow: '0 1px 6px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
@@ -151,9 +149,9 @@ export function Header({ currentScreen, onOpenMenu }: HeaderProps) {
           }}
           title="Выбрать дату дежурства"
         >
-          <Calendar size={13} className="text-slate-500" />
-          <span>{formatCompactDate(selectedDate || todayStr)}</span>
-          <ChevronDown size={13} className="text-slate-400" />
+          <Calendar size={13} className="text-slate-500 shrink-0" />
+          <span className="whitespace-nowrap">{formatCompactDate(selectedDate || todayStr)}</span>
+          <ChevronDown size={13} className="text-slate-400 shrink-0" />
         </button>
 
         {/* СПРАВА: Кнопка меню */}
