@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Menu, X, LogOut } from 'lucide-react';
+import { X, LogOut } from 'lucide-react';
 import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
+import { Header } from './Header';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,10 +12,10 @@ interface LayoutProps {
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { profile, elephants, activeElephantId, setActiveElephantId, globalSaveStatus, logout } = useStore();
+  const { profile, logout } = useStore();
 
   const navItems = [
-    { id: 'daily_shift', label: 'Смена', role: 'all' },
+    { id: 'daily_shift', label: 'Слоновник', role: 'all' },
     { id: 'vet_dashboard', label: 'ВетПанель', role: 'all' },
     { id: 'elephants', label: 'Слоны', role: 'all' }
   ];
@@ -26,65 +27,14 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-slate-800 flex flex-col font-sans antialiased selection:bg-zinc-900 selection:text-white">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 pt-2 pb-2 px-3 sm:px-4 pointer-events-none">
-        <div className="max-w-6xl mx-auto h-14 bg-white/80 backdrop-blur-2xl border border-white/80 shadow-[0_8px_32px_rgba(0,0,0,0.05)] rounded-[24px] px-3.5 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 pointer-events-auto">
-          {/* LOGO - LEFT */}
-          <button 
-            type="button"
-            onClick={() => handleNav('daily_shift')}
-            className="flex items-center gap-2 select-none shrink-0 group text-left"
-          >
-            <div className="relative w-8 h-8 flex items-center justify-center perspective-[800px]">
-              <style>{`
-                @keyframes spin-y-gta-header {
-                  from { transform: rotateY(0deg); }
-                  to { transform: rotateY(360deg); }
-                }
-                .animate-gta-save-header {
-                  animation: spin-y-gta-header 2.5s linear infinite;
-                  display: block;
-                  transform-style: preserve-3d;
-                }
-              `}</style>
-              
-              {globalSaveStatus === 'saving' ? (
-                <span key="saving" className="text-[26px] leading-none animate-gta-save-header drop-shadow-md filter brightness-110">💾</span>
-              ) : globalSaveStatus === 'saved' ? (
-                <span key="saved" className="text-[26px] leading-none animate-in zoom-in duration-300 drop-shadow-md filter brightness-110">✅</span>
-              ) : globalSaveStatus === 'error' ? (
-                <span key="error" className="text-[26px] leading-none" title="Офлайн">⚠️</span>
-              ) : (
-                <span key="idle" className="text-[26px] leading-none transition-transform group-hover:scale-110">🐘</span>
-              )}
-            </div>
-            <span className="text-sm sm:text-base font-black tracking-tight text-slate-900 hidden xs:inline sm:inline">
-              {navItems.find(i => i.id === currentScreen)?.label || 
-                (currentScreen === 'elephant_details' ? 'Слоны' : 
-                 currentScreen === 'settings' ? 'Настройки' : 'СлоноВет')}
-            </span>
-          </button>
-
-          {/* RIGHT ACTIONS */}
-          <div className="flex items-center shrink-0 gap-2">
-            {profile && (
-              <div className="flex items-center bg-slate-100 rounded-full px-3 py-1.5 border border-slate-200">
-                <span className="text-xs sm:text-sm font-bold text-slate-700 whitespace-nowrap">👤 {profile.name}</span>
-              </div>
-            )}
-            <button
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Открыть меню"
-              className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 active:scale-95 text-slate-700 flex items-center justify-center transition shadow-sm border border-slate-200/70"
-            >
-              <Menu size={22} />
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* MONOLITHIC HEADER */}
+      <Header
+        currentScreen={currentScreen}
+        onOpenMenu={() => setDrawerOpen(true)}
+      />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:px-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pb-8">
         {children}
       </main>
 

@@ -6,6 +6,7 @@ import { cacheElephants, cacheAssignments, getCachedElephants, getCachedAssignme
 
 interface StoreState {
   profile: Profile | null;
+  isAdmin: boolean;
   elephants: Elephant[];
   assignments: Assignment[];
   loading: boolean;
@@ -112,9 +113,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const isAdmin = Boolean(
+    profile?.role === 'admin' ||
+    profile?.name === 'Тимофей' ||
+    (profile as any)?.is_admin === true
+  );
+
   return (
     <StoreContext.Provider value={{
-      profile, setProfile, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate, globalSaveStatus, setGlobalSaveStatus
+      profile, setProfile, isAdmin, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate, globalSaveStatus, setGlobalSaveStatus
     }}>
       {children}
     </StoreContext.Provider>

@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 import { shiftService } from '../services/shiftService';
 import { DailyShift, ElephantDailyMetrics, ShiftPhoto } from '../types/shift';
 import { DailyRationData } from '../components/daily-shift/FeedControl';
-import { formatDuration } from '../components/daily-shift/SleepSection';
+import { formatDuration } from '../components/daily-shift/ExcretionControl';
 
 interface PathologyAlert {
   id: string;

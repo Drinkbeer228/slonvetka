@@ -19,6 +19,7 @@ import { ObservationEditor } from '../components/daily-shift/ObservationEditor';
 import { SubmitShiftButton } from '../components/daily-shift/SubmitShiftButton';
 import { DynamicCounterSection, CounterItem } from '../components/daily-shift/DynamicCounterSection';
 import { ShiftSummaryModal } from '../components/daily-shift/ShiftSummaryModal';
+import { ArchiveBanner } from '../components/daily-shift/ArchiveBanner';
 
 export const ELEPHANT_MOODS = [
   { 
@@ -139,7 +140,7 @@ const serializeDailyRation = (ration: DailyRationData): string => {
 };
 
 export function DailyShiftPage() {
-  const { profile, elephants, assignments, selectedDate, setSelectedDate, activeElephantId, setActiveElephantId, setGlobalSaveStatus, logout } = useStore();
+  const { profile, isAdmin, elephants, assignments, selectedDate, setSelectedDate, activeElephantId, setActiveElephantId, setGlobalSaveStatus, logout } = useStore();
   
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -248,9 +249,9 @@ export function DailyShiftPage() {
   const isVet = profile?.role === 'vet' || profile?.role === 'director';
   const isToday = selectedDate === todayStr;
   const isFutureDate = selectedDate > todayStr;
-  const isArchiveMode = selectedDate < todayStr;
+  const isArchiveMode = selectedDate < todayStr || shift?.status === 'completed' || (shift?.status as string) === 'submitted';
   const [isEditOverride, setIsEditOverride] = useState(false);
-  const isLocked = !isEditOverride && (shift?.status === 'completed' || isArchiveMode || isFutureDate) && !isVet;
+  const isLocked = isFutureDate || (isArchiveMode && (!isAdmin || !isEditOverride));
 
   useEffect(() => {
     setIsEditOverride(false);
@@ -704,45 +705,26 @@ export function DailyShiftPage() {
     );
   }
   return (
-        <div className="pb-32 space-y-6 mt-2 relative">
+    <div className="pb-32 space-y-6 mt-3 relative">
       
-      {/* COMPLETED SHIFT BANNER */}
-      {isLocked && shift?.status === 'completed' && (
-        <div className="relative overflow-hidden bg-white/75 backdrop-blur-2xl border border-white/80 shadow-[0_8px_32px_rgba(16,185,129,0.10)] rounded-[28px] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 transition-all duration-300">
-          <div className="absolute -right-6 -top-6 w-32 h-32 bg-emerald-400/15 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-center gap-3.5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-              <Lock size={22} className="stroke-[2.2]" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="font-black text-sm sm:text-base text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
-                <span>Смена успешно завершена</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 rounded-full">
-                  Только чтение
-                </span>
-              </div>
-              <div className="text-[11px] sm:text-xs text-slate-600 font-medium leading-relaxed">
-                Данные зафиксированы. Нажмите кнопку, чтобы возобновить ввод и разблокировать все кнопки.
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleReopenShift}
-            className="relative z-10 min-h-[48px] px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-emerald-500/25 border border-emerald-400/40 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer shrink-0 touch-manipulation"
-          >
-            <Unlock size={17} strokeWidth={2.4} />
-            <span>Возобновить смену</span>
-          </button>
-        </div>
+      {/* ARCHIVE GUARD BANNER */}
+      {isArchiveMode && !isEditOverride && (
+        <ArchiveBanner
+          isAdmin={isAdmin}
+          onReturnToToday={() => setSelectedDate(todayStr)}
+          onUnlockAdmin={() => setIsEditOverride(true)}
+        />
       )}
 
-      {/* OVERRIDE EDIT MODE BANNER */}
-      {isEditOverride && (shift?.status === 'completed' || isArchiveMode) && (
-        <div className="relative overflow-hidden bg-amber-50/80 backdrop-blur-xl border border-amber-200/80 text-amber-900 px-4 py-3 rounded-[22px] flex items-center justify-between gap-3 shadow-sm">
+      {/* ADMIN ACTIVE EDIT BANNER */}
+      {isAdmin && isEditOverride && isArchiveMode && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-950 px-4 py-3 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2.5">
-            <Unlock className="text-amber-600 shrink-0" size={18} />
-            <span className="text-xs font-bold">Режим редактирования активен</span>
+            <Unlock className="text-amber-700 shrink-0" size={18} />
+            <div>
+              <div className="text-xs font-bold">Режим редактирования архива (Админ)</div>
+              <div className="text-[11px] text-amber-800/80">Внесение изменений разблокировано</div>
+            </div>
           </div>
           <button
             type="button"
@@ -752,7 +734,7 @@ export function DailyShiftPage() {
                 handleShiftFieldChange('status', 'completed', true);
               }
             }}
-            className="min-h-[44px] px-4 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0 touch-manipulation"
+            className="min-h-[40px] px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0 cursor-pointer touch-manipulation"
           >
             Завершить редактирование
           </button>
@@ -761,7 +743,7 @@ export function DailyShiftPage() {
 
       {/* FUTURE DATE BANNER */}
       {isFutureDate && (
-        <div className="bg-blue-50/80 backdrop-blur-xl border border-blue-200/80 text-blue-900 px-5 py-3.5 rounded-[24px] flex items-center justify-between shadow-sm">
+        <div className="bg-blue-50/80 backdrop-blur-xl border border-blue-200/80 text-blue-900 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-3">
             <CalendarIcon className="text-blue-600 shrink-0" size={20} />
             <div>
@@ -770,84 +752,14 @@ export function DailyShiftPage() {
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setSelectedDate(todayStr)}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold transition shadow-sm shrink-0"
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0 cursor-pointer"
           >
             К сегодня
           </button>
         </div>
       )}
-
-      {/* ARCHIVE BANNER */}
-      {isArchiveMode && !isEditOverride && (
-        <div className="relative overflow-hidden bg-white/75 backdrop-blur-2xl border border-white/80 shadow-[0_8px_32px_rgba(245,158,11,0.08)] rounded-[28px] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 transition-all duration-300">
-          <div className="absolute -right-6 -top-6 w-32 h-32 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-center gap-3.5 relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
-              <History size={22} className="stroke-[2.2]" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="font-black text-sm sm:text-base text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
-                <span>Архив смены</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-700 rounded-full">
-                  Режим чтения
-                </span>
-              </div>
-              <div className="text-[11px] sm:text-xs text-slate-600 font-medium leading-relaxed">
-                Просмотр архивного дежурства. При необходимости можно открыть смену для внесения правок.
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 relative z-10 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsEditOverride(true)}
-              className="min-h-[48px] px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 text-amber-900 border border-amber-500/30 rounded-2xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 touch-manipulation"
-            >
-              <Edit2 size={15} />
-              <span>Редактировать</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedDate(todayStr)}
-              className="min-h-[48px] px-4 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-2xl text-xs sm:text-sm font-bold transition shadow-sm touch-manipulation"
-            >
-              К сегодня
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* HEADER CARD */}
-      <div className="bg-white/80 backdrop-blur-md border border-white/40 p-3 sm:p-5 rounded-[28px] shadow-sm flex flex-row items-center justify-between gap-2 sm:gap-4">
-        <div className="flex items-center gap-2 pl-1 sm:pl-2">
-          <CalendarIcon size={18} className="text-slate-400" />
-          <span className="text-xs sm:text-sm font-extrabold text-slate-700">Смена кипера</span>
-        </div>
-
-        {/* RIGHT SIDE: DATE */}
-        <div className="flex items-center gap-2 shrink-0">
-          {selectedDate !== todayStr && (
-            <span className="px-2 py-1 rounded-full text-[9px] font-bold bg-slate-500/10 border border-slate-500/20 text-slate-600 hidden md:flex">
-              {isFutureDate ? 'План' : 'Архив'}
-            </span>
-          )}
-          
-          {selectedDate !== todayStr && (
-            <button
-              type="button"
-              onClick={() => setSelectedDate(todayStr)}
-              className="px-3 py-1.5 text-[10px] sm:text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-full transition-all shadow-md shadow-slate-900/20 active:scale-95 shrink-0"
-            >
-              Сегодня
-            </button>
-          )}
-          <button onClick={() => setIsDatePickerOpen(true)} className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight hover:opacity-80 transition-opacity flex items-center gap-1 shrink-0">
-            {formattedDateLabel} <span className="text-[10px] sm:text-sm opacity-50">▼</span>
-          </button>
-        </div>
-
-      </div>
 
       {/* ACTIVE ELEPHANT CONTENT */}
       <div className="space-y-6">

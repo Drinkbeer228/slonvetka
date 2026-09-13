@@ -346,7 +346,7 @@ export function DietSection({
                     type="button"
                     onClick={handleMorningReset}
                     disabled={isLocked}
-                    className="w-10 h-10 rounded-2xl bg-emerald-100/70 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition active:scale-95 cursor-pointer"
+                    className="w-10 h-10 rounded-2xl bg-emerald-100/70 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100"
                     title="Сбросить статус"
                     aria-label="Сбросить статус"
                   >
@@ -361,7 +361,7 @@ export function DietSection({
                   type="button"
                   onClick={() => setMorningConsumption('all')}
                   disabled={isLocked}
-                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer ${
+                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100 ${
                     morningConsumption === 'all'
                       ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
                       : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white'
@@ -373,7 +373,7 @@ export function DietSection({
                   type="button"
                   onClick={() => setMorningConsumption('partial')}
                   disabled={isLocked}
-                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer ${
+                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100 ${
                     morningConsumption === 'partial'
                       ? 'bg-amber-500 border-amber-500 text-white shadow-xs'
                       : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white'
@@ -385,7 +385,7 @@ export function DietSection({
                   type="button"
                   onClick={() => setMorningConsumption('refused')}
                   disabled={isLocked}
-                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1 select-none cursor-pointer ${
+                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1 select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100 ${
                     morningConsumption === 'refused'
                       ? 'bg-rose-500 border-rose-500 text-white shadow-xs'
                       : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white'
@@ -490,7 +490,7 @@ export function DietSection({
                     type="button"
                     onClick={handleEveningReset}
                     disabled={isLocked}
-                    className="w-10 h-10 rounded-2xl bg-emerald-100/70 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition active:scale-95 cursor-pointer"
+                    className="w-10 h-10 rounded-2xl bg-emerald-100/70 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100"
                     title="Сбросить статус"
                     aria-label="Сбросить статус"
                   >
@@ -505,7 +505,7 @@ export function DietSection({
                   type="button"
                   onClick={() => setEveningConsumption('all')}
                   disabled={isLocked}
-                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer ${
+                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100 ${
                     eveningConsumption === 'all'
                       ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
                       : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white'
@@ -517,7 +517,7 @@ export function DietSection({
                   type="button"
                   onClick={() => setEveningConsumption('partial')}
                   disabled={isLocked}
-                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer ${
+                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100 ${
                     eveningConsumption === 'partial'
                       ? 'bg-amber-500 border-amber-500 text-white shadow-xs'
                       : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white'
@@ -529,7 +529,7 @@ export function DietSection({
                   type="button"
                   onClick={() => setEveningConsumption('refused')}
                   disabled={isLocked}
-                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1 select-none cursor-pointer ${
+                  className={`flex-1 h-9 px-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1 select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none disabled:active:scale-100 ${
                     eveningConsumption === 'refused'
                       ? 'bg-rose-500 border-rose-500 text-white shadow-xs'
                       : 'bg-white/70 border-slate-200 text-slate-600 hover:bg-white'

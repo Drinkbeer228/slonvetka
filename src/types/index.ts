@@ -1,9 +1,10 @@
 export interface Profile {
   id: string;
   name: string;
-  role: 'keeper' | 'vet' | 'director';
+  role: 'keeper' | 'vet' | 'director' | 'admin' | string;
   active: boolean;
   created_at: string;
+  is_admin?: boolean;
 }
 
 export interface Elephant {

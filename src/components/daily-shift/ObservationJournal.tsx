@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Check, Mic, MicOff, RefreshCw, Trash2, X } from 'lucide-react';
+import { Camera, Check, RefreshCw, Trash2, X } from 'lucide-react';
 import { ShiftPhoto } from '../../types/shift';
 import { SectionPhotoTrigger } from './SectionPhotoTrigger';
 
@@ -33,7 +33,6 @@ export function ObservationJournal({
   // Local fallback states
   const [localValue, setLocalValue] = useState('');
   const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
 
@@ -42,7 +41,6 @@ export function ObservationJournal({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
 
   const handleHaptic = (ms = 15) => {
     if (typeof window !== 'undefined' && 'vibrate' in navigator) {
@@ -71,86 +69,6 @@ export function ObservationJournal({
     setLocalValue(newVal);
     onChange?.(newVal);
   };
-
-  // Speech-to-text / Voice Dictation toggle
-  const toggleVoiceRecording = () => {
-    if (isLocked) return;
-    handleHaptic(20);
-
-    if (isRecording) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {
-          // ignore
-        }
-      }
-      setIsRecording(false);
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.lang = 'ru-RU';
-
-        recognition.onstart = () => {
-          setIsRecording(true);
-        };
-
-        recognition.onresult = (event: any) => {
-          let recognizedText = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              recognizedText += event.results[i][0].transcript;
-            }
-          }
-          if (recognizedText) {
-            const separator = value ? (value.endsWith(' ') || value.endsWith('\n') ? '' : ' ') : '';
-            const updated = `${value}${separator}${recognizedText.trim()}`;
-            setLocalValue(updated);
-            onChange?.(updated);
-          }
-        };
-
-        recognition.onerror = () => {
-          setIsRecording(false);
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-        setIsRecording(true);
-        return;
-      } catch {
-        // Fallback to visual pulsing mode below
-      }
-    }
-
-    // Visual pulsing mode toggle (for browsers where native keyboard dictation is active)
-    setIsRecording((prev) => !prev);
-  };
-
-  // Stop recording on unmount
-  useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {
-          // ignore
-        }
-      }
-    };
-  }, []);
 
   // Standalone Photo Capture Logic
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -260,8 +178,8 @@ export function ObservationJournal({
         </div>
       </div>
 
-      {/* 2. TEXTAREA WITH EMBEDDED MICROPHONE BUTTON */}
-      <div className="relative group">
+      {/* 2. TEXTAREA */}
+      <div className="relative">
         <textarea
           ref={textareaRef}
           value={value}
@@ -269,35 +187,9 @@ export function ObservationJournal({
           onBlur={onBlur}
           disabled={isLocked}
           placeholder="Например: Марго и Прэтти конфликтовали из-за веток, Одри неохотно ела ужин..."
-          className="w-full min-h-[100px] pl-4 pr-14 py-3.5 bg-white/60 border border-slate-200/60 rounded-2xl text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400/90 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400/80 transition-all shadow-inner resize-none overflow-hidden"
+          className="w-full min-h-[100px] px-4 py-3.5 bg-white/60 border border-slate-200/60 rounded-2xl text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400/90 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400/80 transition-all shadow-inner resize-none overflow-hidden"
         />
-
-        {/* Microphone Button (Killer Feature for Keepers with dirty hands) */}
-        <div className="absolute right-2.5 bottom-3">
-          <button
-            type="button"
-            disabled={isLocked}
-            onClick={toggleVoiceRecording}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 shadow-md ${
-              isRecording
-                ? 'bg-rose-500 text-white ring-4 ring-rose-400/30 animate-pulse shadow-rose-500/40'
-                : 'bg-white/80 hover:bg-white text-slate-600 hover:text-slate-800 border border-slate-200/70'
-            }`}
-            title={isRecording ? 'Идёт голосовая запись (нажмите для остановки)' : 'Голосовой ввод'}
-            aria-label={isRecording ? 'Остановить запись' : 'Начать голосовой ввод'}
-          >
-            {isRecording ? <MicOff size={18} className="animate-bounce" /> : <Mic size={18} />}
-          </button>
-        </div>
       </div>
-
-      {/* Visual recording status caption */}
-      {isRecording && (
-        <div className="flex items-center gap-2 px-1 text-xs font-semibold text-rose-600 animate-pulse">
-          <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
-          <span>Слушаю... Говорите заметку, текст подставится автоматически</span>
-        </div>
-      )}
 
       {/* 3. LIGHTBOX PREVIEW */}
       {isLightboxOpen && photoUrl && (

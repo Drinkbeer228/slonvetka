@@ -79,12 +79,12 @@ export function CounterButton({
   return (
     <div className="flex flex-col gap-1">
       {label && <span className="text-xs font-bold text-zinc-500">{label}</span>}
-      <div className={`flex items-center bg-zinc-100/80 rounded-2xl p-1.5 border border-zinc-200 w-full max-w-[240px] transition-opacity ${disabled ? 'opacity-60' : ''}`}>
+      <div className={`flex items-center bg-zinc-100/80 rounded-2xl p-1.5 border border-zinc-200 w-full max-w-[240px] transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <button
           type="button"
           onClick={handleDecrement}
           disabled={disabled || effectiveValue <= min}
-          className="w-[52px] h-[52px] flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-zinc-50 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed text-zinc-800 font-bold shrink-0 touch-manipulation"
+          className="w-[52px] h-[52px] flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-zinc-50 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-zinc-800 font-bold shrink-0 touch-manipulation"
           aria-label="Decrease"
         >
           <Minus size={22} />
@@ -98,13 +98,13 @@ export function CounterButton({
           onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
           disabled={disabled}
-          className="flex-1 w-full text-center font-black text-2xl text-zinc-900 bg-transparent outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded-xl py-2 px-1 mx-1 min-w-[50px]"
+          className="flex-1 w-full text-center font-black text-2xl text-zinc-900 bg-transparent outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded-xl py-2 px-1 mx-1 min-w-[50px] disabled:opacity-60"
         />
         <button
           type="button"
           onClick={handleIncrement}
           disabled={disabled || effectiveValue >= max}
-          className="w-[52px] h-[52px] flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-zinc-50 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed text-zinc-800 font-bold shrink-0 touch-manipulation"
+          className="w-[52px] h-[52px] flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-zinc-50 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-zinc-800 font-bold shrink-0 touch-manipulation"
           aria-label="Increase"
         >
           <Plus size={22} />
