@@ -124,17 +124,31 @@ export function Header({ currentScreen, onOpenMenu }: HeaderProps) {
 
   return (
     <>
-      <header className="h-14 sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-4 flex items-center justify-between">
-        {/* СЛЕВА: Название активного раздела */}
-        <h1 className="text-lg font-black text-slate-900 tracking-tight">
+      <header
+        className="h-14 sticky top-0 z-40 px-4 flex items-center justify-between"
+        style={{
+          background: 'rgba(241,245,249,0.82)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderBottom: '1px solid rgba(255,255,255,0.7)',
+          boxShadow: '0 1px 0 rgba(148,163,184,0.15)',
+        }}
+      >
+        {/* СЛЕВА: Название раздела */}
+        <h1 className="text-lg font-black text-slate-900 tracking-tight select-none">
           {title}
         </h1>
 
-        {/* ПО ЦЕНТРУ: Компактный выбор даты в виде аккуратного чипса */}
+        {/* ПО ЦЕНТРУ: Компактный выбор даты */}
         <button
           type="button"
           onClick={() => setIsCalendarOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/70 border border-slate-200/80 text-xs font-bold text-slate-700 active:scale-95 transition-all cursor-pointer select-none"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-slate-700 active:scale-95 transition-all cursor-pointer select-none tap-target"
+          style={{
+            background: 'rgba(255,255,255,0.85)',
+            boxShadow: '0 1px 6px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
+            border: '1px solid rgba(255,255,255,0.7)',
+          }}
           title="Выбрать дату дежурства"
         >
           <Calendar size={13} className="text-slate-500" />
@@ -142,11 +156,16 @@ export function Header({ currentScreen, onOpenMenu }: HeaderProps) {
           <ChevronDown size={13} className="text-slate-400" />
         </button>
 
-        {/* СПРАВА: Единственная кнопка вызова навигации (меню) */}
+        {/* СПРАВА: Кнопка меню */}
         <button
           type="button"
           onClick={onOpenMenu}
-          className="w-10 h-10 rounded-2xl bg-slate-100/90 hover:bg-slate-200 border border-slate-200/70 flex items-center justify-center text-slate-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+          className="w-10 h-10 rounded-[14px] flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-95 transition-all cursor-pointer tap-target"
+          style={{
+            background: 'rgba(255,255,255,0.8)',
+            boxShadow: '0 1px 6px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
+            border: '1px solid rgba(255,255,255,0.6)',
+          }}
           aria-label="Меню навигации"
         >
           <Menu size={18} />
@@ -156,11 +175,18 @@ export function Header({ currentScreen, onOpenMenu }: HeaderProps) {
       {/* МОДАЛЬНЫЙ КАЛЕНДАРЬ ВЫБОРА ДАТЫ С GITHUB HEATMAP */}
       {isCalendarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(8px)' }}
           onClick={() => setIsCalendarOpen(false)}
         >
           <div
-            className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-sm border border-slate-100 animate-in zoom-in-95 duration-200"
+            className="w-full max-w-sm rounded-[28px] p-6"
+            style={{
+              background: 'rgba(255,255,255,0.96)',
+              backdropFilter: 'blur(32px)',
+              WebkitBackdropFilter: 'blur(32px)',
+              boxShadow: '0 32px 80px rgba(15,23,42,0.22), inset 0 1px 0 rgba(255,255,255,1)',
+            }}
             onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-5">

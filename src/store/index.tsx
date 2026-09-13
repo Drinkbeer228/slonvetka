@@ -115,7 +115,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const isAdmin = Boolean(
     profile?.role === 'admin' ||
-    profile?.name === 'Тимофей' ||
     (profile as any)?.is_admin === true
   );
 

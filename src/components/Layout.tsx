@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, LogOut } from 'lucide-react';
+import { X, LogOut, Home, Stethoscope, Rabbit } from 'lucide-react';
 import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
 import { Header } from './Header';
@@ -10,15 +10,22 @@ interface LayoutProps {
   onNavigate: (screen: string) => void;
 }
 
+const NAV_ITEMS = [
+  { id: 'daily_shift',   label: 'Слоновник', icon: Home,        role: 'all' },
+  { id: 'vet_dashboard', label: 'ВетПанель', icon: Stethoscope, role: 'all' },
+  { id: 'elephants',     label: 'Слоны',     icon: Rabbit,       role: 'all' },
+];
+
+const ROLE_LABEL: Record<string, string> = {
+  vet:      'Ветврач',
+  director: 'Дрессировщик',
+  admin:    'Администратор',
+  keeper:   'Кипер',
+};
+
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { profile, logout } = useStore();
-
-  const navItems = [
-    { id: 'daily_shift', label: 'Слоновник', role: 'all' },
-    { id: 'vet_dashboard', label: 'ВетПанель', role: 'all' },
-    { id: 'elephants', label: 'Слоны', role: 'all' }
-  ];
 
   const handleNav = (id: string) => {
     onNavigate(id);
@@ -26,91 +33,138 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] text-slate-800 flex flex-col font-sans antialiased selection:bg-zinc-900 selection:text-white">
-      {/* MONOLITHIC HEADER */}
-      <Header
-        currentScreen={currentScreen}
-        onOpenMenu={() => setDrawerOpen(true)}
-      />
+    <div
+      className="min-h-screen text-slate-800 flex flex-col font-sans antialiased"
+      style={{ background: 'linear-gradient(160deg, #f1f5f9 0%, #e9f0f8 60%, #eff6ff 100%)' }}
+    >
+      {/* STICKY HEADER */}
+      <Header currentScreen={currentScreen} onOpenMenu={() => setDrawerOpen(true)} />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pb-8">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-5 pb-12">
         {children}
       </main>
 
       <InstallPrompt />
 
       {/* DRAWER BACKDROP */}
-      {drawerOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity" 
-          onClick={() => setDrawerOpen(false)}
-        />
-      )}
+      <div
+        className={`fixed inset-0 z-50 transition-all duration-300 ${
+          drawerOpen
+            ? 'pointer-events-auto bg-slate-900/40 backdrop-blur-sm'
+            : 'pointer-events-none bg-transparent backdrop-blur-none'
+        }`}
+        onClick={() => setDrawerOpen(false)}
+      />
 
-      {/* DRAWER */}
-      <aside 
-        className={`fixed top-0 bottom-0 right-0 w-full max-w-xs bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300 ease-out border-l border-zinc-200 ${
+      {/* DRAWER — Liquid Glass */}
+      <aside
+        className={`fixed top-0 bottom-0 right-0 w-full max-w-[320px] z-[60] flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
           drawerOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
+        style={{
+          background: 'rgba(255,255,255,0.82)',
+          backdropFilter: 'blur(32px)',
+          WebkitBackdropFilter: 'blur(32px)',
+          boxShadow: '-4px 0 40px rgba(15,23,42,0.14)',
+          borderLeft: '1px solid rgba(255,255,255,0.6)',
+        }}
       >
-        <div className="p-4 bg-zinc-900 text-white flex items-center justify-between shrink-0">
+        {/* Шапка drawer */}
+        <div
+          className="px-5 py-4 flex items-center justify-between shrink-0"
+          style={{
+            borderBottom: '1px solid rgba(148,163,184,0.15)',
+            background: 'rgba(255,255,255,0.4)',
+          }}
+        >
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl leading-none">🐘</span>
-            <span className="text-base font-black tracking-tight text-white">СлоноВет</span>
+            <span className="text-2xl leading-none select-none">🐘</span>
+            <span className="text-base font-black tracking-tight text-slate-900">СлоноВет</span>
           </div>
-          <button 
-            onClick={() => setDrawerOpen(false)} 
-            className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center transition"
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+            className="w-9 h-9 rounded-[14px] flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors active:scale-95 cursor-pointer tap-target"
+            style={{
+              background: 'rgba(148,163,184,0.15)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7)',
+            }}
+            aria-label="Закрыть меню"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-4 space-y-2 overflow-y-auto flex-1">
-          {navItems.filter(i => i.role === 'all' || i.role === profile?.role).map(item => (
-            <button
-              key={item.id}
-              onClick={() => handleNav(item.id)}
-              className={`w-full text-left py-3 px-4 rounded-xl font-bold transition ${
-                currentScreen === item.id || (currentScreen === 'elephant_details' && item.id === 'elephants')
-                  ? 'bg-zinc-900 text-white shadow-md'
-                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        
+        {/* Навигация */}
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+          {NAV_ITEMS.filter(i => i.role === 'all' || i.role === profile?.role).map(item => {
+            const isActive = currentScreen === item.id ||
+              (currentScreen === 'elephant_details' && item.id === 'elephants');
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNav(item.id)}
+                className={`w-full flex items-center gap-3 py-3 px-4 rounded-[18px] font-bold text-sm text-left transition-all active:scale-95 cursor-pointer tap-target ${
+                  isActive
+                    ? 'text-slate-900'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                style={isActive ? {
+                  background: 'rgba(255,255,255,0.85)',
+                  boxShadow: '0 2px 12px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
+                } : {
+                  background: 'transparent',
+                }}
+              >
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Профиль + выход */}
         {profile && (
-          <div className="p-4 bg-zinc-50 border-t border-zinc-200">
-            <div className="text-xs text-zinc-500 font-bold mb-1 uppercase tracking-wider">
-              {profile.role === 'vet' ? 'Ветврач' : profile.role === 'director' ? 'Дрессировщик' : 'Текущий кипер'}
+          <div
+            className="p-4 shrink-0"
+            style={{ borderTop: '1px solid rgba(148,163,184,0.15)' }}
+          >
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+              {ROLE_LABEL[profile.role] ?? 'Сотрудник'}
             </div>
-            <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-zinc-200 shadow-sm">
-              <span className="font-bold text-slate-800">{profile.name} {profile.role === 'vet' ? '(Ветврач)' : profile.role === 'director' ? '(Дрессировщик)' : ''}</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+            <div
+              className="px-4 py-3 rounded-[18px] flex items-center justify-between mb-3"
+              style={{
+                background: 'rgba(255,255,255,0.7)',
+                boxShadow: '0 2px 8px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
+              }}
+            >
+              <span className="font-bold text-slate-900 text-sm truncate">{profile.name}</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)]" />
             </div>
-            <div className="flex items-center justify-between mt-3 gap-2">
-              <button 
-                onClick={() => handleNav('settings')}
-                className="flex-1 text-[11px] bg-slate-200 hover:bg-slate-300 text-slate-700 py-2.5 rounded-lg font-bold transition-all active:scale-95 text-center"
-              >
-                Настройки
-              </button>
-              <button 
-                onClick={() => { if(confirm('Сменить сотрудника?')) { logout(); setDrawerOpen(false); } }}
-                className="flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-lg text-[11px] font-bold transition-all active:scale-95"
-              >
-                <LogOut size={14} strokeWidth={2.5} />
-                Сменить
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Сменить сотрудника?')) {
+                  logout();
+                  setDrawerOpen(false);
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-[14px] font-bold text-sm text-rose-600 transition-all active:scale-95 cursor-pointer tap-target"
+              style={{
+                background: 'rgba(254,226,226,0.6)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7)',
+              }}
+            >
+              <LogOut size={15} strokeWidth={2.5} />
+              Сменить сотрудника
+            </button>
           </div>
         )}
       </aside>
     </div>
   );
 }
-

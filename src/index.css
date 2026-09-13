@@ -1,11 +1,113 @@
 @import "tailwindcss";
 
-input[type=number]::-webkit-inner-spin-button, 
-input[type=number]::-webkit-outer-spin-button { 
-  -webkit-appearance: none; 
-  margin: 0; 
+/* ============================================================
+   LIQUID GLASS DESIGN SYSTEM — SlonVet
+   ============================================================ */
+
+/* --- Спиннер числовых полей --- */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
-input[type=number] { 
-  -moz-appearance: textfield; 
+input[type=number] {
+  -moz-appearance: textfield;
 }
 
+/* --- Базовый шрифт --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  /* --- Радиусы скруглений (единая шкала) --- */
+  --r-control: 14px;   /* кнопки, инпуты */
+  --r-small:   18px;   /* маленькие плашки, чипсы */
+  --r-card:    26px;   /* основные карточки */
+  --r-sheet:   32px;   /* боттом-шторки */
+
+  /* --- Тени Liquid Glass --- */
+  --shadow-glass:   0 8px 30px rgba(15, 23, 42, 0.06);
+  --shadow-inset:   inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --shadow-card:    0 2px 12px rgba(15, 23, 42, 0.05), 0 8px 30px rgba(15, 23, 42, 0.06);
+  --shadow-float:   0 16px 48px rgba(15, 23, 42, 0.14);
+
+  /* --- Цветовые токены алертов --- */
+  --alert-ok-bg:      #f0fdf4;
+  --alert-ok-border:  rgba(34, 197, 94, 0.25);
+  --alert-ok-text:    #15803d;
+
+  --alert-warn-bg:    #fffbeb;
+  --alert-warn-border: rgba(245, 158, 11, 0.25);
+  --alert-warn-text:  #92400e;
+
+  --alert-crit-bg:    #fff1f2;
+  --alert-crit-border: rgba(239, 68, 68, 0.25);
+  --alert-crit-text:  #991b1b;
+}
+
+/* --- Базовый фон страницы --- */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f1f5f9; /* slate-100 */
+}
+
+/* --- Утилиты Liquid Glass --- */
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card), var(--shadow-inset);
+}
+
+.glass-surface {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--r-small);
+  box-shadow: var(--shadow-glass), var(--shadow-inset);
+}
+
+.glass-control {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: var(--r-control);
+  box-shadow: var(--shadow-inset);
+}
+
+/* --- Анимации --- */
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes fade-blur-in {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to   { opacity: 1; backdrop-filter: blur(8px); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-fade-blur {
+  animation: fade-blur-in 0.2s ease forwards;
+}
+
+/* --- touch-action для крупных кнопок --- */
+.tap-target {
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* --- Alert chip утилиты --- */
+.chip-ok   { background: var(--alert-ok-bg);   color: var(--alert-ok-text);   border: 1px solid var(--alert-ok-border);   }
+.chip-warn { background: var(--alert-warn-bg); color: var(--alert-warn-text); border: 1px solid var(--alert-warn-border); }
+.chip-crit { background: var(--alert-crit-bg); color: var(--alert-crit-text); border: 1px solid var(--alert-crit-border); }
+
+/* --- Скроллбар тонкий --- */
+.thin-scroll::-webkit-scrollbar { width: 3px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.5); border-radius: 99px; }

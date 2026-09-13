@@ -2,7 +2,6 @@ import { supabase } from '../lib/supabase';
 import { getOfflineDb, TreatmentRecordQueueItem, PhotoQueueItem } from './offlineDb';
 
 class SyncManagerClass {
-  private isSyncing = false;
   private backoffTimer: NodeJS.Timeout | null = null;
   private backoffMs = 2000;
 
@@ -13,7 +12,7 @@ class SyncManagerClass {
   ): Promise<string> {
     const temp_id = crypto.randomUUID();
     const db = await getOfflineDb();
-    
+
     const record: TreatmentRecordQueueItem = {
       temp_id,
       payload,
@@ -44,25 +43,42 @@ class SyncManagerClass {
     return temp_id;
   }
 
-  async triggerSync() {
-    if (this.isSyncing) return;
-    this.isSyncing = true;
-    
+  async triggerSync(): Promise<void> {
+    // Используем Web Locks API для предотвращения одновременной синхронизации
+    // из нескольких вкладок / вызовов
+    if (!('locks' in navigator)) {
+      // Fallback для браузеров без Web Locks — простой in-memory флаг
+      await this._doSync();
+      return;
+    }
+
+    try {
+      await navigator.locks.request('slonvet_sync_lock', { ifAvailable: true }, async (lock) => {
+        if (!lock) {
+          // Другая вкладка уже синхронизирует — пропускаем
+          return;
+        }
+        await this._doSync();
+      });
+    } catch (err) {
+      console.error('SyncManager lock error:', err);
+    }
+  }
+
+  private async _doSync(): Promise<void> {
     try {
       const db = await getOfflineDb();
       const records = await db.getAll('records_queue');
       const pendingRecords = records.filter(r => r.status === 'pending' || r.status === 'error');
 
       if (pendingRecords.length === 0) {
-        this.isSyncing = false;
         this.resetBackoff();
-        return; // Nothing to sync
+        return;
       }
 
       // Check auth status
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
-        this.isSyncing = false;
         return; // Stop if not authenticated
       }
 
@@ -70,16 +86,15 @@ class SyncManagerClass {
         // Mark as syncing
         await this.updateRecordStatus(record.temp_id, 'syncing');
 
-        try {
-          // Check for photos
-          const photos = await db.getAllFromIndex('photos_queue', 'by-recordId', record.temp_id);
-          
-          let uploadedPhotoPath: string | null = null;
+        let uploadedPhotoPath: string | null = null;
+        const photos = await db.getAllFromIndex('photos_queue', 'by-recordId', record.temp_id);
 
+        try {
+          // 1. Upload photo (if present)
           if (photos.length > 0) {
-            const photo = photos[0]; // Assuming one photo for simplicity based on our schema
+            const photo = photos[0];
             const filePath = `${sessionData.session.user.id}/${record.payload.elephant_id}/${record.temp_id}_${photo.photo_type}.jpg`;
-            
+
             const { error: uploadError } = await supabase.storage
               .from('elephant-treatments')
               .upload(filePath, photo.file_blob, {
@@ -87,11 +102,13 @@ class SyncManagerClass {
                 upsert: true
               });
 
-            if (uploadError) { uploadError.message = 'Storage Error: ' + uploadError.message; throw uploadError; }
+            if (uploadError) {
+              throw new Error('Storage Error: ' + uploadError.message);
+            }
             uploadedPhotoPath = filePath;
           }
 
-          // 3. Send record
+          // 2. Insert treatment record
           const { data: recordData, error: recordError } = await supabase
             .from('treatment_records')
             .insert({
@@ -101,10 +118,19 @@ class SyncManagerClass {
             .select('id')
             .single();
 
-          if (recordError) { recordError.message = 'Record Error: ' + recordError.message; throw recordError; }
+          if (recordError) {
+            // ROLLBACK: если запись не удалась, но фото уже загружено — удаляем фото
+            if (uploadedPhotoPath) {
+              await supabase.storage
+                .from('elephant-treatments')
+                .remove([uploadedPhotoPath])
+                .catch(e => console.warn('Rollback photo delete failed:', e));
+            }
+            throw new Error('Record Error: ' + recordError.message);
+          }
 
-          if (uploadedPhotoPath && photos.length > 0) {
-            // Send photo meta
+          // 3. Insert photo metadata (after successful record insert)
+          if (uploadedPhotoPath && photos.length > 0 && recordData) {
             const { error: photoMetaError } = await supabase
               .from('treatment_photos')
               .insert({
@@ -112,11 +138,14 @@ class SyncManagerClass {
                 storage_path: uploadedPhotoPath,
                 photo_type: photos[0].photo_type
               });
-              
-            if (photoMetaError) { photoMetaError.message = 'Photo Meta Error: ' + photoMetaError.message; throw photoMetaError; }
+
+            if (photoMetaError) {
+              console.warn('Photo metadata insert failed (non-fatal):', photoMetaError.message);
+              // Не бросаем ошибку — запись создана, фото просто не прикреплено
+            }
           }
 
-          // 4. Success, delete from DB
+          // 4. Success — delete from IDB
           const tx = db.transaction(['records_queue', 'photos_queue'], 'readwrite');
           await tx.objectStore('records_queue').delete(record.temp_id);
           for (const photo of photos) {
@@ -126,53 +155,55 @@ class SyncManagerClass {
 
           window.dispatchEvent(new CustomEvent('syncComplete', { detail: { tempId: record.temp_id } }));
 
-        } catch (err: any) {
-          console.error('Network or sync error for record', record.temp_id, err);
-          await this.updateRecordStatus(record.temp_id, 'error', err.message);
-          
-          // Schedule backoff
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error('Sync error for record', record.temp_id, message);
+          await this.updateRecordStatus(record.temp_id, 'error', message);
+
           this.scheduleBackoff();
-          break; // Stop syncing loop on first network error
+          break; // Stop syncing loop on first error
         }
       }
-      
+
       this.resetBackoff();
 
-    } finally {
-      this.isSyncing = false;
+    } catch (outerErr) {
+      console.error('SyncManager outer error:', outerErr);
     }
   }
 
-  private async updateRecordStatus(tempId: string, status: TreatmentRecordQueueItem['status'], errorMessage?: string) {
+  private async updateRecordStatus(
+    tempId: string,
+    status: TreatmentRecordQueueItem['status'],
+    errorMessage?: string
+  ): Promise<void> {
     const db = await getOfflineDb();
     const record = await db.get('records_queue', tempId);
     if (record) {
       record.status = status;
       if (errorMessage) record.errorMessage = errorMessage;
       await db.put('records_queue', record);
-      // Dispatch event to update UI
       window.dispatchEvent(new CustomEvent('syncStatusChange', { detail: { tempId, status } }));
     }
   }
 
-  private scheduleBackoff() {
-    if (this.backoffTimer) return; // Already scheduled
+  private scheduleBackoff(): void {
+    if (this.backoffTimer) return;
     this.backoffTimer = setTimeout(() => {
       this.backoffTimer = null;
-      this.backoffMs = Math.min(this.backoffMs * 2, 60000); // Max 1 minute backoff
+      this.backoffMs = Math.min(this.backoffMs * 2, 60000);
       this.triggerSync();
     }, this.backoffMs);
   }
 
-  private resetBackoff() {
+  private resetBackoff(): void {
     this.backoffMs = 2000;
   }
 }
 
 export const SyncManager = new SyncManagerClass();
 
-// Auto setup
-export function initSyncManager() {
+export function initSyncManager(): void {
   window.addEventListener('online', () => {
     SyncManager.triggerSync();
   });
@@ -181,7 +212,7 @@ export function initSyncManager() {
       SyncManager.triggerSync();
     }
   });
-  
+
   // Try on load
   SyncManager.triggerSync();
 }

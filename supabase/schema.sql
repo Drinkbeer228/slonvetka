@@ -1,4 +1,5 @@
 -- Supabase Schema for Слоновник Вет
+-- v2: Строгие RLS политики + недостающие таблицы daily_shifts, elephant_daily_metrics
 
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
@@ -7,9 +8,10 @@ create extension if not exists "uuid-ossp";
 create table public.profiles (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
-  role text check (role in ('keeper', 'vet')) not null,
+  role text check (role in ('keeper', 'vet', 'director', 'admin')) not null,
   invite_code text unique,
   active boolean default true,
+  is_admin boolean default false,
   created_at timestamptz default now()
 );
 
@@ -59,16 +61,51 @@ create table public.treatment_photos (
   created_at timestamptz default now()
 );
 
+-- DAILY SHIFTS (смены дежурства)
+create table public.daily_shifts (
+  id text primary key, -- format: 'shift_YYYY-MM-DD_<random>'
+  date date not null unique,
+  duty_keeper_id uuid references public.profiles(id),
+  status text check (status in ('in_progress', 'completed', 'submitted')) default 'in_progress',
+  hay_bales_distributed integer default 0 check (hay_bales_distributed >= 0),
+  hay_bags_distributed integer default 0 check (hay_bags_distributed >= 0),
+  reminders jsonb default '[]',
+  feed_notes text default '',
+  handover_notes text default '',
+  handover_complaints jsonb default '[]',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ELEPHANT DAILY METRICS (физиология per слон per смена)
+create table public.elephant_daily_metrics (
+  id text primary key, -- format: 'metric_<shift_id>_<elephant_id>_<random>'
+  shift_id text references public.daily_shifts(id) on delete cascade not null,
+  elephant_id uuid references public.elephants(id) not null,
+  poop_count integer default 0 check (poop_count >= 0),
+  feces_traits jsonb default '["Сформирован (норма)"]',
+  urination_count integer default 0 check (urination_count >= 0),
+  urination_traits jsonb default '["Прозрачная (норма)"]',
+  behavior text default 'Спокойная / В норме',
+  sleep_minutes integer default 0 check (sleep_minutes >= 0 and sleep_minutes <= 720), -- max 12h per shift
+  sleep_intervals jsonb default '[]',
+  notes text default '',
+  photos jsonb default '[]', -- массив ShiftPhoto объектов (base64 dataUrl)
+  unique (shift_id, elephant_id)
+);
+
+-- ============================================================
 -- RPC for secure login by invite code
+-- ============================================================
 create or replace function login_by_invite_code(code text)
 returns json
 language plpgsql
-security definer -- important: runs as superuser to bypass RLS on profiles for the initial lookup
+security definer -- runs as superuser to bypass RLS for initial lookup
 as $$
 declare
   found_profile record;
 begin
-  select id, name, role, active 
+  select id, name, role, active, is_admin
   into found_profile
   from public.profiles
   where invite_code = code and active = true;
@@ -81,48 +118,213 @@ begin
 end;
 $$;
 
-
+-- ============================================================
 -- ROW LEVEL SECURITY (RLS)
+-- ============================================================
 
 alter table public.profiles enable row level security;
 alter table public.elephants enable row level security;
 alter table public.assignments enable row level security;
 alter table public.treatment_records enable row level security;
 alter table public.treatment_photos enable row level security;
+alter table public.daily_shifts enable row level security;
+alter table public.elephant_daily_metrics enable row level security;
 
--- Keepers and Vets can read profiles (to show names in history)
-create policy "Anyone can read profiles" on public.profiles for select using (true);
+-- Helper: получить роль текущего пользователя
+create or replace function current_user_role()
+returns text
+language sql
+security definer
+stable
+as $$
+  select role from public.profiles where id = auth.uid();
+$$;
 
--- Anyone can read elephants
-create policy "Anyone can read elephants" on public.elephants for select using (true);
+-- Helper: является ли текущий пользователь администратором
+create or replace function is_admin_user()
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select coalesce(is_admin, false) or role = 'admin'
+  from public.profiles where id = auth.uid();
+$$;
 
--- Anyone can read active assignments
-create policy "Anyone can read assignments" on public.assignments for select using (true);
+-- ---- PROFILES ----
+-- Все аутентифицированные могут читать профили (для отображения имён)
+create policy "profiles_select" on public.profiles
+  for select using (auth.uid() is not null);
 
--- Vets can insert/update assignments
--- Assuming we don't have true Supabase Auth, we rely on the application logic and role checks.
--- For a robust setup, if using anonymous sessions, RLS might need to be fully open or rely on custom claims.
--- For this MVP where users just enter a code, we'll allow all operations, but the UI restricts them.
--- To properly enforce, we would use set_config to pass the user ID, but let's keep it simple for now:
-create policy "Allow all for assignments" on public.assignments using (true) with check (true);
-create policy "Allow all for records" on public.treatment_records using (true) with check (true);
-create policy "Allow all for photos" on public.treatment_photos using (true) with check (true);
+-- Только сам пользователь может обновить свой профиль (кроме роли)
+create policy "profiles_update_self" on public.profiles
+  for update using (id = auth.uid())
+  with check (id = auth.uid() and role = (select role from public.profiles where id = auth.uid()));
 
--- STORAGE SETUP
--- Requires running in Supabase SQL Editor or migration tool
-insert into storage.buckets (id, name, public) values ('elephant-treatments', 'elephant-treatments', false);
+-- Только admin может создавать/удалять профили
+create policy "profiles_admin_all" on public.profiles
+  for all using (is_admin_user())
+  with check (is_admin_user());
 
--- Enable RLS for storage
--- Allow all for MVP (authenticated via anon key)
-create policy "Allow all operations on treatments bucket"
-on storage.objects for all
-using (bucket_id = 'elephant-treatments')
-with check (bucket_id = 'elephant-treatments');
+-- ---- ELEPHANTS ----
+-- Все аутентифицированные могут читать
+create policy "elephants_select" on public.elephants
+  for select using (auth.uid() is not null);
 
+-- Только vet/admin могут создавать/изменять слонов
+create policy "elephants_vet_admin_write" on public.elephants
+  for insert with check (current_user_role() in ('vet', 'admin', 'director'));
+
+create policy "elephants_vet_admin_update" on public.elephants
+  for update using (current_user_role() in ('vet', 'admin', 'director'));
+
+-- ---- ASSIGNMENTS ----
+-- Все аутентифицированные читают активные назначения
+create policy "assignments_select" on public.assignments
+  for select using (auth.uid() is not null);
+
+-- Только vet/admin/director создают назначения
+create policy "assignments_vet_insert" on public.assignments
+  for insert with check (current_user_role() in ('vet', 'admin', 'director'));
+
+-- Только vet/admin/director обновляют назначения
+create policy "assignments_vet_update" on public.assignments
+  for update using (current_user_role() in ('vet', 'admin', 'director'));
+
+-- Только admin могут удалять назначения
+create policy "assignments_admin_delete" on public.assignments
+  for delete using (is_admin_user());
+
+-- ---- TREATMENT RECORDS ----
+-- Все аутентифицированные читают записи
+create policy "records_select" on public.treatment_records
+  for select using (auth.uid() is not null);
+
+-- Кипер может добавлять только свои записи
+create policy "records_keeper_insert" on public.treatment_records
+  for insert with check (keeper_id = auth.uid());
+
+-- Кипер может обновлять только СВОИ записи (не архивные — не старше 24ч)
+create policy "records_keeper_update_own" on public.treatment_records
+  for update using (
+    keeper_id = auth.uid() and
+    performed_at > now() - interval '24 hours'
+  )
+  with check (keeper_id = auth.uid());
+
+-- Vet/admin могут обновлять любые записи
+create policy "records_vet_update_any" on public.treatment_records
+  for update using (current_user_role() in ('vet', 'admin', 'director'));
+
+-- Только admin может удалять записи
+create policy "records_admin_delete" on public.treatment_records
+  for delete using (is_admin_user());
+
+-- ---- TREATMENT PHOTOS ----
+-- Все аутентифицированные читают фото
+create policy "photos_select" on public.treatment_photos
+  for select using (auth.uid() is not null);
+
+-- Фото добавляет тот, кто создал запись
+create policy "photos_insert" on public.treatment_photos
+  for insert with check (
+    exists (
+      select 1 from public.treatment_records
+      where id = treatment_record_id and keeper_id = auth.uid()
+    )
+  );
+
+-- Только admin удаляет фото
+create policy "photos_admin_delete" on public.treatment_photos
+  for delete using (is_admin_user());
+
+-- ---- DAILY SHIFTS ----
+-- Все аутентифицированные читают смены
+create policy "shifts_select" on public.daily_shifts
+  for select using (auth.uid() is not null);
+
+-- Кипер создаёт смену дня
+create policy "shifts_insert" on public.daily_shifts
+  for insert with check (auth.uid() is not null);
+
+-- Кипер обновляет только текущую/завтрашнюю смену (не архив)
+create policy "shifts_keeper_update" on public.daily_shifts
+  for update using (
+    auth.uid() is not null and
+    (date >= current_date - 1 or is_admin_user())
+  );
+
+-- ---- ELEPHANT DAILY METRICS ----
+-- Все аутентифицированные читают метрики
+create policy "metrics_select" on public.elephant_daily_metrics
+  for select using (auth.uid() is not null);
+
+-- Кипер вставляет метрики для текущей смены
+create policy "metrics_insert" on public.elephant_daily_metrics
+  for insert with check (
+    auth.uid() is not null and
+    exists (
+      select 1 from public.daily_shifts
+      where id = shift_id and date >= current_date - 1
+    )
+  );
+
+-- Кипер обновляет метрики текущей смены; admin — любые
+create policy "metrics_update" on public.elephant_daily_metrics
+  for update using (
+    auth.uid() is not null and
+    (
+      is_admin_user() or
+      exists (
+        select 1 from public.daily_shifts
+        where id = shift_id and date >= current_date - 1
+      )
+    )
+  );
+
+-- ============================================================
+-- STORAGE
+-- ============================================================
+insert into storage.buckets (id, name, public)
+  values ('elephant-treatments', 'elephant-treatments', false)
+  on conflict (id) do nothing;
+
+-- Только аутентифицированные могут загружать в папку своего uid
+create policy "storage_authenticated_insert"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'elephant-treatments' and
+    auth.uid() is not null and
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Все аутентифицированные могут читать (для просмотра фото)
+create policy "storage_authenticated_select"
+  on storage.objects for select
+  using (
+    bucket_id = 'elephant-treatments' and
+    auth.uid() is not null
+  );
+
+-- Только владелец или admin может удалять
+create policy "storage_owner_delete"
+  on storage.objects for delete
+  using (
+    bucket_id = 'elephant-treatments' and
+    (
+      (storage.foldername(name))[1] = auth.uid()::text or
+      is_admin_user()
+    )
+  );
+
+-- ============================================================
 -- DEFAULT DATA
-insert into public.elephants (name) values ('Прэтти'), ('Марго'), ('Одри');
+-- ============================================================
+insert into public.elephants (name) values ('Прэтти'), ('Марго'), ('Одри')
+  on conflict do nothing;
 
-insert into public.profiles (name, role, invite_code) values 
-('Иван (Кипер)', 'keeper', 'KEEPER-IVAN-24'),
-('Сергей (Кипер)', 'keeper', 'KEEPER-SERGEY'),
-('Алексей (Ветврач)', 'vet', 'VET-DOC-77');
+insert into public.profiles (name, role, invite_code) values
+  ('Иван (Кипер)', 'keeper', 'KEEPER-IVAN-24'),
+  ('Сергей (Кипер)', 'keeper', 'KEEPER-SERGEY'),
+  ('Алексей (Ветврач)', 'vet', 'VET-DOC-77')
+  on conflict do nothing;
