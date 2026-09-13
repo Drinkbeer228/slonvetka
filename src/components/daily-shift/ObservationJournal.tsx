@@ -205,7 +205,7 @@ export function ObservationJournal({
   };
 
   return (
-    <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl p-4 sm:p-5 shadow-sm space-y-4">
+    <div className="bg-white/90 backdrop-blur-xl border border-slate-100 rounded-[28px] p-4 sm:p-5 shadow-xs space-y-4">
       {/* 1. HEADER */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">

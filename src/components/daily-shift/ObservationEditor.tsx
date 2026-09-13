@@ -110,13 +110,13 @@ export function ObservationEditor({
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-md border border-white/40 p-3.5 sm:p-5 rounded-[28px] sm:rounded-[32px] shadow-lg space-y-5 sm:space-y-6 relative">
+    <div className="space-y-4 relative">
       
       {onClose && (
-        <div className="flex items-center justify-end mb-[-12px]">
+        <div className="flex items-center justify-end">
           <button 
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-white/50 backdrop-blur-md border border-white/40 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95 hover:bg-white/80"
+            className="w-10 h-10 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95"
             title="Закрыть"
           >
             <X size={18} />
