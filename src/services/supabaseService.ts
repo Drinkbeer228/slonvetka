@@ -158,9 +158,12 @@ export const supabaseService = {
   async createTreatmentRecord(
     record: Omit<TreatmentRecord, 'id' | 'created_at' | 'performed_at'>
   ): Promise<TreatmentRecord> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const keeper_id = sessionData?.session?.user?.id || record.keeper_id;
+
     const { data, error } = await supabase
       .from('treatment_records')
-      .insert({ ...record, performed_at: new Date().toISOString() })
+      .insert({ ...record, keeper_id, performed_at: new Date().toISOString() })
       .select()
       .single();
     if (error) throw error;
@@ -199,8 +202,10 @@ export const supabaseService = {
   },
 
   async uploadTreatmentPhoto(file: Blob, recordId: string, elephantId: string, photoType: 'single' | 'before' | 'after'): Promise<TreatmentPhoto> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id || 'unknown';
     const timestamp = Date.now();
-    const filePath = `${elephantId}/${recordId}_${timestamp}.jpg`;
+    const filePath = `${userId}/${elephantId}/${recordId}_${timestamp}.jpg`;
     
     const { error: uploadError } = await supabase.storage
       .from('elephant-treatments')

@@ -122,9 +122,17 @@ export const shiftService = {
 
     // 2. Try pushing to Supabase
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const realUserId = sessionData?.session?.user?.id;
+      
+      const payloadShift = { ...shift };
+      if (realUserId && payloadShift.duty_keeper_id) {
+        payloadShift.duty_keeper_id = realUserId;
+      }
+
       const { error: shiftError } = await supabase
         .from('daily_shifts')
-        .upsert(shift, { onConflict: 'date' });
+        .upsert(payloadShift, { onConflict: 'date' });
 
       if (shiftError) throw shiftError;
 

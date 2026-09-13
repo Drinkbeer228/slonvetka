@@ -124,7 +124,7 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
                   const isFailed = draftRecord?.status === 'error';
 
                   return (
-                    <div key={assignment.id} className={`p-4 rounded-2xl border-2 transition ${isDoneOnServer ? 'border-emerald-100 bg-emerald-50' : isPending ? 'border-amber-100 bg-amber-50' : isFailed ? 'border-red-100 bg-red-50' : 'border-zinc-200 bg-zinc-50 hover:border-zinc-400'}`}>
+                    <div key={assignment.id} className={`p-4 rounded-2xl border-2 transition ${isDoneOnServer ? 'border-emerald-100 bg-emerald-50' : isPending ? 'border-slate-100 bg-slate-50' : isFailed ? 'border-slate-100 bg-slate-50' : 'border-zinc-200 bg-zinc-50 hover:border-zinc-400'}`}>
                       <div className="font-bold text-lg leading-tight mb-1">{assignment.title}</div>
                       
                       {assignment.medicine && !isDoneOnServer && !isPending && !isFailed && (
@@ -139,17 +139,14 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
                           <span>ВЫПОЛНЕНО ({doneRecord.keeper?.name} &middot; {formatTime(new Date(doneRecord.performed_at).getTime())})</span>
                         </div>
                       ) : isPending ? (
-                         <div className="flex items-center gap-2 mt-3 text-sm font-bold text-amber-700">
-                            <RefreshCw size={16} className="animate-spin" />
-                            <span>ВЫПОЛНЕНО (Синхронизация...)</span>
+                         <div className="flex items-center gap-2 mt-3 text-sm font-bold text-slate-500">
+                            <span>⏳ Сохранено локально (ожидает сети...)</span>
                          </div>
                       ) : isFailed ? (
-                         <div className="flex items-center justify-between mt-3 text-sm font-bold text-red-700">
+                         <div className="flex items-center justify-between mt-3 text-sm font-bold text-slate-500">
                             <div className="flex items-center gap-1.5">
-                               <AlertCircle size={16} />
-                               <span>Ошибка отправки</span>
+                               <span>⏳ Сохранено локально (синхронизация...)</span>
                             </div>
-                            <button onClick={handleRetrySync} className="underline hover:text-red-900">Повторить</button>
                          </div>
                       ) : (
                         <button

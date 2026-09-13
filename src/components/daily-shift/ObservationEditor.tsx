@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { ElephantDailyMetrics, SleepInterval } from '../../types/shift';
 import { Elephant } from '../../types';
 import { Check, X, Trash2 } from 'lucide-react';
-import { CounterButton } from '../common/CounterButton';
-import { SectionPhotoTrigger } from './SectionPhotoTrigger';
+import { DefecationSection } from './DefecationSection';
+import { UrinationSection } from './UrinationSection';
 import { NightSleepSection } from './NightSleepSection';
+import { ObservationJournal } from './ObservationJournal';
 import { ShiftPhoto } from '../../types/shift';
 import { ELEPHANT_MOODS } from '../../screens/DailyShiftPage';
 
@@ -22,22 +23,6 @@ const calculateDuration = (start: string, end: string) => {
   
   return endMins - startMins;
 };
-
-const FECES_OPTIONS = [
-  'Сформирован (норма)',
-  'Рассыпчатый / Сухой',
-  'Жидкий / Понос ⚠️',
-  'Со слизью ⚠️',
-  'Плохо переварен ⚠️'
-];
-
-const URINATION_OPTIONS = [
-  'Светлая / Прозрачная',
-  'Темная / Концентрированная',
-  'Мутная / С осадком ⚠️',
-  'Бурая / Красноватая ⚠️',
-  'Малыми порциями ⚠️'
-];
 
 const MOOD_GLASS_STYLES: Record<string, { selected: string; unselected: string }> = {
   'Грустная / Вялая': {
@@ -64,9 +49,12 @@ const MOOD_GLASS_STYLES: Record<string, { selected: string; unselected: string }
 
 interface Props {
   elephant: Elephant;
+  elephants?: Elephant[];
+  allMetrics?: Record<string, ElephantDailyMetrics>;
   metrics: ElephantDailyMetrics;
   isLocked: boolean;
   onMetricChange: (field: string, value: any) => void;
+  onAllMetricChange?: (elephantId: string, field: keyof ElephantDailyMetrics, value: any) => void;
   onTraitToggle: (field: 'feces_traits' | 'urination_traits', trait: string) => void;
   onNotesBlur: () => void;
   onClose?: () => void;
@@ -75,9 +63,12 @@ interface Props {
 
 export function ObservationEditor({
   elephant,
+  elephants,
+  allMetrics,
   metrics,
   isLocked,
   onMetricChange,
+  onAllMetricChange,
   onTraitToggle,
   onNotesBlur,
   onClose,
@@ -100,6 +91,13 @@ export function ObservationEditor({
     onMetricChange('photos', photos.filter(p => p.id !== id));
   };
 
+  const handleDefecationUrinationMetricChange = (elephantId: string, field: keyof ElephantDailyMetrics, value: any) => {
+    if (onAllMetricChange) {
+      onAllMetricChange(elephantId, field, value);
+    } else if (elephantId === elephant.id) {
+      onMetricChange(field as string, value);
+    }
+  };
 
   const handleIntervalsChange = (newIntervals: SleepInterval[]) => {
     onMetricChange('sleep_intervals', newIntervals);
@@ -112,7 +110,7 @@ export function ObservationEditor({
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-md border border-white/40 p-5 rounded-[32px] shadow-lg space-y-6 relative">
+    <div className="bg-white/80 backdrop-blur-md border border-white/40 p-3.5 sm:p-5 rounded-[28px] sm:rounded-[32px] shadow-lg space-y-5 sm:space-y-6 relative">
       
       {onClose && (
         <div className="flex items-center justify-end mb-[-12px]">
@@ -126,102 +124,29 @@ export function ObservationEditor({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        
-        {/* DEFECATION */}
-        <div className="bg-white/40 backdrop-blur-lg border border-white/40 rounded-[28px] p-5 space-y-4 shadow-sm">
-          <div className="flex items-end justify-between gap-4">
-            <CounterButton
-              label="💩 Дефекация (раз)"
-              value={metrics.poop_count}
-              onChange={(val) => onMetricChange('poop_count', val)}
-            />
-            <div className="pb-1 shrink-0">
-              <SectionPhotoTrigger 
-                section="stool" 
-                photos={photos} 
-                onAddPhoto={handleAddPhoto} 
-                onRemovePhoto={handleRemovePhoto} 
-                totalElephantPhotos={photos.length} 
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 pt-2">
-            {FECES_OPTIONS.map(trait => {
-              const isSelected = fecesTraits.includes(trait);
-              const isWarning = trait.includes('⚠️');
-              const isNormal = trait.includes('норма');
-              
-              let btnStyle = 'bg-white/60 text-slate-600 border border-white/40 hover:bg-white/90';
-              if (isSelected) {
-                if (isWarning) btnStyle = 'bg-amber-500 text-white shadow-lg shadow-amber-500/30 border-transparent';
-                else if (isNormal) btnStyle = 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 border-transparent';
-                else btnStyle = 'bg-slate-700 text-white shadow-lg shadow-slate-900/20 border-transparent';
-              }
-              
-              return (
-                <button
-                  key={trait}
-                  type="button"
-                  disabled={isLocked}
-                  onClick={() => onTraitToggle('feces_traits', trait)}
-                  className={`px-4 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 ${btnStyle}`}
-                >
-                  <span>{trait.replace(' ⚠️', '')}</span>
-                  {isSelected && <Check size={12} />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      {/* DEFECATION & URINATION 3-COLUMN SECTIONS */}
+      {(() => {
+        const effectiveMetrics = (allMetrics && Object.keys(allMetrics).length > 0)
+          ? { ...allMetrics, [elephant.id]: { ...(allMetrics[elephant.id] || {}), ...metrics } }
+          : { [elephant.id]: metrics };
 
-        {/* URINATION */}
-        <div className="bg-white/40 backdrop-blur-lg border border-white/40 rounded-[28px] p-5 space-y-4 shadow-sm">
-          <div className="flex items-end justify-between gap-4">
-            <CounterButton
-              label="💧 Мочеиспускание (раз)"
-              value={metrics.urination_count}
-              onChange={(val) => onMetricChange('urination_count', val)}
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+            <DefecationSection
+              elephants={elephants}
+              metrics={effectiveMetrics}
+              onMetricChange={handleDefecationUrinationMetricChange}
+              isLocked={isLocked}
             />
-            <div className="pb-1 shrink-0">
-              <SectionPhotoTrigger 
-                section="urine" 
-                photos={photos} 
-                onAddPhoto={handleAddPhoto} 
-                onRemovePhoto={handleRemovePhoto} 
-                totalElephantPhotos={photos.length} 
-              />
-            </div>
+            <UrinationSection
+              elephants={elephants}
+              metrics={effectiveMetrics}
+              onMetricChange={handleDefecationUrinationMetricChange}
+              isLocked={isLocked}
+            />
           </div>
-          <div className="flex flex-wrap gap-2 pt-2">
-            {URINATION_OPTIONS.map(trait => {
-              const isSelected = urinationTraits.includes(trait);
-              const isWarning = trait.includes('⚠️') || trait.includes('Темная') || trait.includes('Мутная') || trait.includes('Бурая');
-              const isNormal = trait.includes('Светлая / Прозрачная');
-              
-              let btnStyle = 'bg-white/60 text-slate-600 border border-white/40 hover:bg-white/90';
-              if (isSelected) {
-                if (isNormal) btnStyle = 'bg-blue-500 text-white shadow-lg shadow-blue-500/30 border-transparent';
-                else if (isWarning) btnStyle = 'bg-amber-500 text-white shadow-lg shadow-amber-500/30 border-transparent';
-                else btnStyle = 'bg-slate-700 text-white shadow-lg shadow-slate-900/20 border-transparent';
-              }
-              
-              return (
-                <button
-                  key={trait}
-                  type="button"
-                  disabled={isLocked}
-                  onClick={() => onTraitToggle('urination_traits', trait)}
-                  className={`px-4 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 ${btnStyle}`}
-                >
-                  <span>{trait.replace(' ⚠️', '')}</span>
-                  {isSelected && <Check size={12} />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       <NightSleepSection 
         metrics={metrics} 
@@ -233,35 +158,15 @@ export function ObservationEditor({
       />
 
       {/* NOTES SECTION */}
-      <div className="bg-white/40 backdrop-blur-lg border border-white/40 rounded-[28px] p-5 shadow-sm space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-slate-500/10 flex items-center justify-center text-xl shadow-inner">
-            📝
-          </div>
-          <div>
-            <div className="font-bold text-slate-800 text-sm tracking-wide">Журнал наблюдений</div>
-            <div className="text-[11px] text-slate-500 font-medium">Подробные заметки за смену</div>
-          </div>
-        </div>
-        <div className="absolute top-5 right-5">
-          <SectionPhotoTrigger 
-            section="general" 
-            photos={photos} 
-            onAddPhoto={handleAddPhoto} 
-            onRemovePhoto={handleRemovePhoto} 
-            totalElephantPhotos={photos.length} 
-          />
-        </div>
-        <textarea
-          disabled={isLocked}
-          value={metrics.notes || ''}
-          onChange={(e) => onMetricChange('notes', e.target.value)}
-          onBlur={onNotesBlur}
-          placeholder="например: марго\претти\одри плохо хавала овощи на ужин, потом дристала утром сразу как проснулась"
-          rows={4}
-          className="w-full px-5 py-4 bg-white/60 backdrop-blur-md border border-white/40 rounded-[20px] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400/50 transition-all shadow-inner placeholder:text-slate-400/80 text-slate-800 resize-none"
-        />
-      </div>
+      <ObservationJournal
+        value={metrics.notes || ''}
+        onChange={(val) => onMetricChange('notes', val)}
+        onBlur={onNotesBlur}
+        isLocked={isLocked}
+        photos={photos}
+        onAddPhoto={handleAddPhoto}
+        onRemovePhoto={handleRemovePhoto}
+      />
 
       {/* VETERINARY ASSIGNMENTS IF ANY */}
       {assignmentsContent && (

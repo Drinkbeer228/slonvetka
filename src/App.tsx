@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { useStore } from './store';
-import { KeeperSelectionScreen } from './screens/KeeperSelectionScreen';
+import { SimpleKeeperGate } from './components/auth/SimpleKeeperGate';
 import { DailyShiftPage } from './screens/DailyShiftPage';
 import { TodayScreen } from './screens/TodayScreen';
 import { JournalScreen } from './screens/JournalScreen';
@@ -9,21 +9,18 @@ import { ElephantsScreen } from './screens/ElephantsScreen';
 import { ElephantDetailsScreen } from './screens/ElephantDetailsScreen';
 import { AssignmentsScreen } from './screens/AssignmentsScreen';
 import { StaffScreen } from './screens/StaffScreen';
+import { VetDashboard } from './screens/VetDashboard';
 
 export default function App() {
-  const { profile, loading } = useStore();
+  const { profile } = useStore();
   const [currentScreen, setCurrentScreen] = useState<string>('daily_shift');
   const [selectedElephantId, setSelectedElephantId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !profile && currentScreen !== 'settings') {
-      setCurrentScreen('settings');
+    if (!profile && currentScreen !== 'settings') {
+      setCurrentScreen('daily_shift');
     }
-  }, [profile, loading, currentScreen]);
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center font-bold text-zinc-500">Загрузка...</div>;
-  }
+  }, [profile, currentScreen]);
 
   const handleNavigate = (screen: string) => {
     setCurrentScreen(screen);
@@ -35,15 +32,13 @@ export default function App() {
   };
 
   const renderScreen = () => {
-    if (!profile) {
-      return <KeeperSelectionScreen onComplete={() => setCurrentScreen('daily_shift')} />;
-    }
-
     switch (currentScreen) {
       case 'settings':
-        return <KeeperSelectionScreen onComplete={() => setCurrentScreen('daily_shift')} />;
+        return <DailyShiftPage />;
       case 'daily_shift':
         return <DailyShiftPage />;
+      case 'vet_dashboard':
+        return <VetDashboard />;
       case 'today':
         return <TodayScreen onElephantClick={openElephantDetails} />;
       case 'journal':
@@ -63,14 +58,12 @@ export default function App() {
     }
   };
 
-  if (!profile) {
-    return renderScreen();
-  }
-
   return (
-    <Layout currentScreen={currentScreen} onNavigate={handleNavigate}>
-      {renderScreen()}
-    </Layout>
+    <SimpleKeeperGate>
+      <Layout currentScreen={currentScreen} onNavigate={handleNavigate}>
+        {renderScreen()}
+      </Layout>
+    </SimpleKeeperGate>
   );
 }
 

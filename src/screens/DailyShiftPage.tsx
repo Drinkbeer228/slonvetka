@@ -10,28 +10,15 @@ import { Elephant, Assignment, TreatmentRecordWithPhotos } from '../types';
 import { CounterButton } from '../components/common/CounterButton';
 import { 
   Calendar as CalendarIcon, CheckCircle2, Loader2, Save, UserCheck, 
-  Check, Camera, PackagePlus, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2
-, LogOut } from 'lucide-react';
+  Check, Camera, PackagePlus, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2,
+  Lock, Unlock, LogOut } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
 import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
 import { FeedControl, DailyRationData } from '../components/daily-shift/FeedControl';
 import { ObservationEditor } from '../components/daily-shift/ObservationEditor';
-
-const FECES_OPTIONS = [
-  'Сформирован (норма)',
-  'Рассыпчатый / Сухой',
-  'Жидкий / Понос ⚠️',
-  'Со слизью ⚠️',
-  'Плохо переварен / цельные куски ⚠️'
-];
-
-const URINATION_OPTIONS = [
-  'Светлая / Прозрачная',
-  'Темная / Концентрированная',
-  'Мутная / С осадком ⚠️',
-  'Бурая / Красноватая ⚠️',
-  'Натуживание / Малыми порциями ⚠️'
-];
+import { SubmitShiftButton } from '../components/daily-shift/SubmitShiftButton';
+import { DynamicCounterSection, CounterItem } from '../components/daily-shift/DynamicCounterSection';
+import { ShiftSummaryModal } from '../components/daily-shift/ShiftSummaryModal';
 
 export const ELEPHANT_MOODS = [
   { 
@@ -110,24 +97,34 @@ const getFirstDayOfWeek = (year: number, month: number) => {
 const parseDailyRation = (feedNotes?: string | null): DailyRationData => {
   const defaultRation: DailyRationData = {
     morning_porridge: 'none',
+    morning_porridge_time: null,
+    morning_porridge_keeper: null,
+    morning_porridge_photo: null,
     evening_salad_chips: [],
     salad_notes: '',
     coarse_branches: 0,
-    salad_base_included: true,
-    salad_photo_url: ''
+    salad_base_included: false,
+    salad_photo_url: '',
+    salad_appetite: null,
+    salad_base_time: null
   };
   if (!feedNotes) return defaultRation;
   try {
     const parsed = JSON.parse(feedNotes);
     return {
       morning_porridge: parsed.morning_porridge || 'none',
+      morning_porridge_time: parsed.morning_porridge_time || null,
+      morning_porridge_keeper: parsed.morning_porridge_keeper || null,
+      morning_porridge_photo: parsed.morning_porridge_photo || null,
       evening_salad_chips: Array.isArray(parsed.evening_salad_chips) 
         ? parsed.evening_salad_chips 
         : defaultRation.evening_salad_chips,
       salad_notes: parsed.salad_notes || '',
       coarse_branches: parsed.coarse_branches || 0,
-      salad_base_included: parsed.salad_base_included !== false,
-      salad_photo_url: parsed.salad_photo_url || ''
+      salad_base_included: Boolean(parsed.salad_base_included),
+      salad_photo_url: parsed.salad_photo_url || '',
+      salad_appetite: parsed.salad_appetite || null,
+      salad_base_time: parsed.salad_base_time || null
     };
   } catch {
     return {
@@ -232,6 +229,14 @@ export function DailyShiftPage() {
   // Full-size photo preview modal
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
+  // End Match Summary Modal
+  const [isEndMatchModalOpen, setIsEndMatchModalOpen] = useState(false);
+  const [countersStats, setCountersStats] = useState<{ meritsTotal: number; damageTotal: number; merits: CounterItem[]; damages: CounterItem[] }>({ meritsTotal: 0, damageTotal: 0, merits: [], damages: [] });
+
+  const handleStatsChange = useCallback(({ meritsTotal, damageTotal, merits, damages }: { meritsTotal: number, damageTotal: number, merits: CounterItem[], damages: CounterItem[] }) => {
+    setCountersStats({ meritsTotal, damageTotal, merits, damages });
+  }, []);
+
   const [loading, setLoading] = useState<boolean>(true);
   const statusTimerRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -241,11 +246,14 @@ export function DailyShiftPage() {
   const [selectedTask, setSelectedTask] = useState<{ assignment: Assignment; elephant: Elephant; existingRecord?: TreatmentRecordWithPhotos } | null>(null);
 
   const isVet = profile?.role === 'vet' || profile?.role === 'director';
+  const isToday = selectedDate === todayStr;
   const isFutureDate = selectedDate > todayStr;
   const isArchiveMode = selectedDate < todayStr;
-  const isLocked = (shift?.status === 'completed' || isArchiveMode || isFutureDate) && !isVet;
+  const [isEditOverride, setIsEditOverride] = useState(false);
+  const isLocked = !isEditOverride && (shift?.status === 'completed' || isArchiveMode || isFutureDate) && !isVet;
 
   useEffect(() => {
+    setIsEditOverride(false);
     loadData();
   }, [selectedDate]);
 
@@ -449,9 +457,21 @@ export function DailyShiftPage() {
     handleMetricChange(elephantId, traitType, traits);
   };
 
+  const handleReopenShift = () => {
+    setIsEditOverride(true);
+    if (shift) {
+      const updatedShift: DailyShift = {
+        ...shift,
+        status: 'in_progress'
+      };
+      setShift(updatedShift);
+      persistChanges(updatedShift, metrics);
+    }
+  };
+
   const handleShiftFieldChange = (field: keyof DailyShift, value: any, immediate = true) => {
-    if (isFutureDate && field !== 'duty_keeper_id' && field !== 'reminders') return;
-    if (isLocked) return;
+    if (isFutureDate && field !== 'duty_keeper_id' && field !== 'reminders' && !isEditOverride) return;
+    if (isLocked && field !== 'status' && !isEditOverride) return;
     if (!shift) return;
     
     const updatedShift = {
@@ -485,11 +505,12 @@ export function DailyShiftPage() {
     return parseDailyRation(shift?.feed_notes);
   }, [shift?.feed_notes]);
 
-  const handlePorridgeFieldChange = (field: keyof DailyRationData, value: any) => {
+  const handlePorridgeFieldChange = (field: keyof DailyRationData | Partial<DailyRationData>, value?: any) => {
     if (isLocked || !shift) return;
+    const patch = typeof field === 'object' ? field : { [field]: value };
     const updatedRation: DailyRationData = {
       ...currentRation,
-      [field]: value
+      ...patch
     };
     handleShiftFieldChange('feed_notes', serializeDailyRation(updatedRation), true);
   };
@@ -685,6 +706,59 @@ export function DailyShiftPage() {
   return (
         <div className="pb-32 space-y-6 mt-2 relative">
       
+      {/* COMPLETED SHIFT BANNER */}
+      {isLocked && shift?.status === 'completed' && (
+        <div className="relative overflow-hidden bg-white/75 backdrop-blur-2xl border border-white/80 shadow-[0_8px_32px_rgba(16,185,129,0.10)] rounded-[28px] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 transition-all duration-300">
+          <div className="absolute -right-6 -top-6 w-32 h-32 bg-emerald-400/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center gap-3.5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+              <Lock size={22} className="stroke-[2.2]" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="font-black text-sm sm:text-base text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
+                <span>Смена успешно завершена</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 rounded-full">
+                  Только чтение
+                </span>
+              </div>
+              <div className="text-[11px] sm:text-xs text-slate-600 font-medium leading-relaxed">
+                Данные зафиксированы. Нажмите кнопку, чтобы возобновить ввод и разблокировать все кнопки.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleReopenShift}
+            className="relative z-10 min-h-[48px] px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-emerald-500/25 border border-emerald-400/40 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer shrink-0 touch-manipulation"
+          >
+            <Unlock size={17} strokeWidth={2.4} />
+            <span>Возобновить смену</span>
+          </button>
+        </div>
+      )}
+
+      {/* OVERRIDE EDIT MODE BANNER */}
+      {isEditOverride && (shift?.status === 'completed' || isArchiveMode) && (
+        <div className="relative overflow-hidden bg-amber-50/80 backdrop-blur-xl border border-amber-200/80 text-amber-900 px-4 py-3 rounded-[22px] flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <Unlock className="text-amber-600 shrink-0" size={18} />
+            <span className="text-xs font-bold">Режим редактирования активен</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditOverride(false);
+              if (shift?.status === 'completed') {
+                handleShiftFieldChange('status', 'completed', true);
+              }
+            }}
+            className="min-h-[44px] px-4 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs shrink-0 touch-manipulation"
+          >
+            Завершить редактирование
+          </button>
+        </div>
+      )}
+
       {/* FUTURE DATE BANNER */}
       {isFutureDate && (
         <div className="bg-blue-50/80 backdrop-blur-xl border border-blue-200/80 text-blue-900 px-5 py-3.5 rounded-[24px] flex items-center justify-between shadow-sm">
@@ -705,38 +779,50 @@ export function DailyShiftPage() {
       )}
 
       {/* ARCHIVE BANNER */}
-      {isArchiveMode && (
-        <div className="bg-amber-50/80 backdrop-blur-xl border border-amber-200/80 text-amber-900 px-5 py-3.5 rounded-[24px] flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <History className="text-amber-600 shrink-0" size={20} />
-            <div>
-              <div className="font-bold text-xs sm:text-sm">Архив смены • Режим чтения</div>
-              <div className="text-[11px] text-amber-700/80 mt-0.5">Редактирование закрыто (просмотр исторических записей).</div>
+      {isArchiveMode && !isEditOverride && (
+        <div className="relative overflow-hidden bg-white/75 backdrop-blur-2xl border border-white/80 shadow-[0_8px_32px_rgba(245,158,11,0.08)] rounded-[28px] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 transition-all duration-300">
+          <div className="absolute -right-6 -top-6 w-32 h-32 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center gap-3.5 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center shrink-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+              <History size={22} className="stroke-[2.2]" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="font-black text-sm sm:text-base text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
+                <span>Архив смены</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-amber-700 rounded-full">
+                  Режим чтения
+                </span>
+              </div>
+              <div className="text-[11px] sm:text-xs text-slate-600 font-medium leading-relaxed">
+                Просмотр архивного дежурства. При необходимости можно открыть смену для внесения правок.
+              </div>
             </div>
           </div>
-          <button
-            onClick={() => setSelectedDate(todayStr)}
-            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-xs font-bold transition shadow-sm shrink-0"
-          >
-            К сегодня
-          </button>
+          <div className="flex items-center gap-2 relative z-10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsEditOverride(true)}
+              className="min-h-[48px] px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 text-amber-900 border border-amber-500/30 rounded-2xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 touch-manipulation"
+            >
+              <Edit2 size={15} />
+              <span>Редактировать</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr)}
+              className="min-h-[48px] px-4 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-2xl text-xs sm:text-sm font-bold transition shadow-sm touch-manipulation"
+            >
+              К сегодня
+            </button>
+          </div>
         </div>
       )}
 
       {/* HEADER CARD */}
-      <div className="bg-white/80 backdrop-blur-md border border-white/40 p-3 sm:p-5 rounded-[28px] shadow-lg flex flex-row items-center justify-between gap-2 sm:gap-4">
-        
-        {/* LEFT SIDE: MINI PROFILE */}
-        <div className="flex items-center bg-white/60 backdrop-blur-md border border-white/80 px-2 sm:px-3 py-1 sm:py-1.5 rounded-2xl shadow-sm transition-all shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center text-[12px] font-black shrink-0 shadow-inner ring-2 ring-white">
-              {profile?.name?.charAt(0) || '?'}
-            </div>
-            <div className="flex flex-col pr-1">
-              <span className="text-[10px] sm:text-[11px] font-black text-slate-800 leading-tight tracking-tight truncate max-w-[75px] sm:max-w-full">{profile?.name || 'Гость'}</span>
-              <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase leading-tight truncate">{profile?.role === 'vet' ? 'Ветврач' : 'Кипер'} {isLocked ? '(Чтение)' : ''}</span>
-            </div>
-          </div>
+      <div className="bg-white/80 backdrop-blur-md border border-white/40 p-3 sm:p-5 rounded-[28px] shadow-sm flex flex-row items-center justify-between gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 pl-1 sm:pl-2">
+          <CalendarIcon size={18} className="text-slate-400" />
+          <span className="text-xs sm:text-sm font-extrabold text-slate-700">Смена кипера</span>
         </div>
 
         {/* RIGHT SIDE: DATE */}
@@ -809,9 +895,12 @@ export function DailyShiftPage() {
           return (
             <ObservationEditor
               elephant={activeElephant}
+              elephants={elephants}
+              allMetrics={metrics}
               metrics={m}
               isLocked={isLocked}
               onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
+              onAllMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
               onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
               onNotesBlur={() => shift && persistChanges(shift, metrics)}
               assignmentsContent={assignmentsContent}
@@ -827,6 +916,7 @@ export function DailyShiftPage() {
           hayBagsDistributed={hayBagsDistributed}
           ration={currentRation}
           isLocked={isLocked}
+          dutyKeeperName={dutyKeeper?.name}
           onBalesChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
           onBagsChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
           onPorridgeFieldChange={handlePorridgeFieldChange}
@@ -837,6 +927,42 @@ export function DailyShiftPage() {
           onSaladPhotoChange={handleSaladPhotoChange}
         />
       </div>
+
+      {/* FLOATING SUBMIT SHIFT BUTTON */}
+      {!isLocked && (
+        <SubmitShiftButton
+          isIdeal={Boolean(
+            currentRation.morning_porridge &&
+            currentRation.morning_porridge !== 'none' &&
+            (currentRation.salad_appetite || currentRation.salad_base_included)
+          )}
+          hasMissingRequired={Boolean(
+            !currentRation.morning_porridge ||
+            currentRation.morning_porridge === 'none' ||
+            (!currentRation.salad_appetite && !currentRation.salad_base_included)
+          )}
+          onClick={() => {
+            setIsEndMatchModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* END MATCH SUMMARY MODAL */}
+      <ShiftSummaryModal
+        isOpen={isEndMatchModalOpen}
+        onClose={() => setIsEndMatchModalOpen(false)}
+        onConfirmCompleteShift={() => {
+          handleShiftFieldChange('status', 'completed', true);
+        }}
+        dutyKeeperName={dutyKeeper?.name}
+        dateString={shift?.date || selectedDate}
+        porridgeIssued={!!currentRation.morning_porridge && currentRation.morning_porridge !== 'none'}
+        saladIssued={!!currentRation.salad_base_included}
+        hayBales={hayBalesDistributed}
+        washedCount={countersStats.merits?.find(m => m.id === 'elephants_washed')?.count || 0}
+        poopCount={countersStats.merits?.find(m => m.id === 'wheelbarrows_dumped')?.count || 0}
+        damages={countersStats.damages}
+      />
 
       {/* MODALS */}
 

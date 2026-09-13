@@ -15,6 +15,7 @@ interface StoreState {
 }
 
 interface StoreContextType extends StoreState {
+  setProfile: (profile: Profile | null) => void;
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAssignments: () => Promise<void>;
@@ -30,7 +31,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [elephants, setElephants] = useState<Elephant[]>([]);
   const [activeElephantId, setActiveElephantId] = useState<string>('');
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Init to false, SafeGate handles its own loading
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [globalSaveStatus, setGlobalSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
@@ -39,53 +40,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setActiveElephantId(elephants[0].id);
     }
   }, [elephants, activeElephantId]);
-
-  // Initial session check and auth state listener
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.user) {
-          loadProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const loadProfile = async (userId: string) => {
-    try {
-      let p = await supabaseService.getProfile(userId);
-      let attempts = 0;
-      // Retry fetching profile up to 3 times to allow database trigger to complete
-      while (!p && attempts < 3) {
-        attempts++;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        p = await supabaseService.getProfile(userId);
-      }
-      
-      if (!p) {
-        console.warn('Профиль не найден. Возможно, отсутствует SQL-триггер в базе данных.');
-      }
-      
-      setProfile(p);
-    } catch (err) {
-      console.error('Failed to load profile:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     async function initData() {
@@ -116,7 +70,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         console.error('Failed to load data, relying on cache if available:', err);
       }
     }
-
     initData();
   }, [profile?.id]);
 
@@ -145,7 +98,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem('slon_keeper');
     setProfile(null);
   };
 
@@ -161,7 +114,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      profile, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate, globalSaveStatus, setGlobalSaveStatus
+      profile, setProfile, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate, globalSaveStatus, setGlobalSaveStatus
     }}>
       {children}
     </StoreContext.Provider>

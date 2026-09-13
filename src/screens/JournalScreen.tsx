@@ -142,7 +142,7 @@ export function JournalScreen() {
               const isSyncing = draft.status === 'syncing';
 
               return (
-                <div key={draft.temp_id} className={`rounded-2xl p-4 shadow-sm border-2 ${isError ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                <div key={draft.temp_id} className={`rounded-2xl p-4 shadow-sm border-2 ${isError ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-bold text-lg leading-tight text-zinc-900">{title}</div>
                     <div className="text-xs font-bold text-zinc-500 text-right whitespace-nowrap ml-3">
@@ -178,13 +178,13 @@ export function JournalScreen() {
                     )}
                   </div>
 
-                  <div className={`text-xs font-bold flex items-center justify-center gap-2 py-2 rounded-xl ${isError ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <div className={`text-xs font-bold flex items-center justify-center gap-2 py-2 rounded-xl ${isError ? 'bg-slate-100 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
                     {isError ? (
-                      <>Ошибка отправки. Ждем сеть...</>
+                      <>⏳ Сохранено локально (синхронизация...)</>
                     ) : isSyncing ? (
                       <><Loader2 size={14} className="animate-spin" />Синхронизация...</>
                     ) : (
-                      <>Ожидает отправки...</>
+                      <>⏳ Сохранено локально (ожидает сети...)</>
                     )}
                   </div>
                 </div>

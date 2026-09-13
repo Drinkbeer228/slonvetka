@@ -78,7 +78,7 @@ class SyncManagerClass {
 
           if (photos.length > 0) {
             const photo = photos[0]; // Assuming one photo for simplicity based on our schema
-            const filePath = `${record.payload.elephant_id}/${record.temp_id}_${photo.photo_type}.jpg`;
+            const filePath = `${sessionData.session.user.id}/${record.payload.elephant_id}/${record.temp_id}_${photo.photo_type}.jpg`;
             
             const { error: uploadError } = await supabase.storage
               .from('elephant-treatments')
@@ -87,7 +87,7 @@ class SyncManagerClass {
                 upsert: true
               });
 
-            if (uploadError) throw uploadError;
+            if (uploadError) { uploadError.message = 'Storage Error: ' + uploadError.message; throw uploadError; }
             uploadedPhotoPath = filePath;
           }
 
@@ -95,12 +95,13 @@ class SyncManagerClass {
           const { data: recordData, error: recordError } = await supabase
             .from('treatment_records')
             .insert({
-              ...record.payload
+              ...record.payload,
+              keeper_id: sessionData.session.user.id
             })
             .select('id')
             .single();
 
-          if (recordError) throw recordError;
+          if (recordError) { recordError.message = 'Record Error: ' + recordError.message; throw recordError; }
 
           if (uploadedPhotoPath && photos.length > 0) {
             // Send photo meta
@@ -112,7 +113,7 @@ class SyncManagerClass {
                 photo_type: photos[0].photo_type
               });
               
-            if (photoMetaError) throw photoMetaError;
+            if (photoMetaError) { photoMetaError.message = 'Photo Meta Error: ' + photoMetaError.message; throw photoMetaError; }
           }
 
           // 4. Success, delete from DB

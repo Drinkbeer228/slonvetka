@@ -1,30 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Camera, Check, RefreshCw, Trash2, ImageIcon } from 'lucide-react';
-
-export interface SaladExtraItem {
-  id: string;
-  label: string;
-  emoji: string;
-}
-
-export const SALAD_EXTRAS: SaladExtraItem[] = [
-  { id: 'Тыква', label: 'Тыква', emoji: '🎃' },
-  { id: 'Яблоки', label: 'Яблоки', emoji: '🍏' },
-  { id: 'Кабачки', label: 'Кабачки', emoji: '🥒' },
-  { id: 'Баклажаны', label: 'Баклажаны', emoji: '🍆' },
-  { id: 'Перец', label: 'Перец', emoji: '🫑' },
-  { id: 'Кукуруза', label: 'Кукуруза', emoji: '🌽' },
-  { id: 'Арбуз', label: 'Арбуз', emoji: '🍉' },
-  { id: 'Дыня', label: 'Дыня', emoji: '🍈' },
-  { id: 'Сельдерей', label: 'Сельдерей', emoji: '🌿' },
-  { id: 'Соль', label: 'Соль', emoji: '🧂' },
-  { id: 'Мел', label: 'Мел', emoji: '⚪' }
-];
+import React, { useRef, useState } from 'react';
+import { Camera, Check, RefreshCw, Trash2 } from 'lucide-react';
+import { SaladTechModal } from './SaladTechModal';
 
 export interface EveningSaladState {
   isBaseIssued: boolean;
   baseIssuedTime: string | null;
-  selectedAdditives: string[];
+  selectedAdditives?: string[];
   appetite: 'all' | 'partial' | 'refused' | null;
   photoUrl?: string | null;
 }
@@ -41,6 +22,7 @@ export function EveningSaladSection({
   onChange
 }: EveningSaladSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isTechModalOpen, setIsTechModalOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
 
@@ -50,38 +32,34 @@ export function EveningSaladSection({
     }
   };
 
-  const toggleBase = () => {
+  const handleMarkIssued = () => {
     if (isLocked) return;
     handleHaptic(15);
     const now = new Date();
     const timeString = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    
     onChange({
       ...state,
-      isBaseIssued: !state.isBaseIssued,
-      baseIssuedTime: !state.isBaseIssued ? timeString : null
+      isBaseIssued: true,
+      baseIssuedTime: timeString,
+      appetite: state.appetite || 'all'
     });
   };
 
-  const toggleAdditive = (id: string) => {
+  const handleReset = () => {
     if (isLocked) return;
     handleHaptic(10);
-    
-    const isSelected = state.selectedAdditives.includes(id);
-    const newAdditives = isSelected
-      ? state.selectedAdditives.filter(a => a !== id)
-      : [...state.selectedAdditives, id];
-      
     onChange({
       ...state,
-      selectedAdditives: newAdditives
+      isBaseIssued: false,
+      baseIssuedTime: null,
+      appetite: null
     });
   };
 
-  const setAppetite = (appetite: 'all' | 'partial' | 'refused' | null) => {
+  const setAppetite = (appetite: 'all' | 'partial' | 'refused') => {
     if (isLocked) return;
     handleHaptic(15);
-    onChange({ ...state, appetite: state.appetite === appetite ? null : appetite });
+    onChange({ ...state, appetite });
   };
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,40 +111,48 @@ export function EveningSaladSection({
 
   return (
     <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-[32px] p-5 sm:p-6 shadow-lg space-y-5">
-      {/* 1. HEADER */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-[20px] bg-amber-500/10 flex items-center justify-center text-2xl shadow-inner shrink-0">
+      {/* 1. Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[20px] bg-slate-100 flex items-center justify-center text-xl sm:text-2xl shadow-inner shrink-0">
             🥗
           </div>
           <div>
-            <h2 className="font-extrabold text-slate-800 text-base leading-tight">Вечерний салат</h2>
-            <div className="text-xs text-slate-500 font-medium mt-0.5">таз ~120 л</div>
+            <h2 className="font-extrabold text-slate-800 text-sm sm:text-base leading-tight">Ужин (19:00)</h2>
+            <div className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">Таз ~120 л</div>
           </div>
         </div>
 
-        {/* PHOTO TRIGGER */}
-        <div className="shrink-0">
+        {/* Action Buttons: Рецепт ℹ️ and 📷 Фото */}
+        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 sm:gap-2 shrink-0">
+          <button 
+            type="button"
+            onClick={() => setIsTechModalOpen(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-slate-600 hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-wide">Рецепт ℹ️</span>
+          </button>
           {state.photoUrl ? (
             <button
               type="button"
               onClick={() => setIsLightboxOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] uppercase tracking-wide font-bold transition-all active:scale-95 shadow-sm"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] uppercase tracking-wide font-bold transition-all active:scale-95 shadow-sm"
             >
               <Check size={14} strokeWidth={3} />
-              <span>Фото прикреплено</span>
+              <span>✓ Фото</span>
             </button>
           ) : (
             <button
               type="button"
               disabled={isLocked || isProcessingPhoto}
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/50 text-slate-600 border border-white/60 hover:bg-slate-50 text-[11px] uppercase tracking-wide font-bold transition-all active:scale-95 shadow-sm"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-slate-600 hover:bg-slate-50 text-[11px] uppercase tracking-wide font-bold transition-all active:scale-95 shadow-sm"
             >
               {isProcessingPhoto ? <RefreshCw size={14} className="animate-spin" /> : <Camera size={14} />}
-              <span>Фото</span>
+              <span>📷 Фото</span>
             </button>
           )}
+
           <input
             type="file"
             accept="image/*"
@@ -178,110 +164,98 @@ export function EveningSaladSection({
         </div>
       </div>
 
-      {/* 2. BASE STATUS TOGGLE */}
+      {/* 2. Main Status Toggle & Appetite Row */}
       <div>
-        <button
-          type="button"
-          disabled={isLocked}
-          onClick={toggleBase}
-          className={`w-full min-h-[52px] rounded-2xl border transition-all flex items-center justify-center gap-2 px-3 active:scale-[0.98] ${
-            state.isBaseIssued
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-sm'
-              : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
-          }`}
-        >
-          {state.isBaseIssued ? (
-            <div className="flex items-center gap-2 font-bold text-sm text-center flex-wrap justify-center">
-              <div className="w-5 h-5 rounded-full bg-emerald-200/50 flex items-center justify-center shrink-0">
-                <Check size={12} strokeWidth={3} className="text-emerald-700" />
+        {!state.isBaseIssued ? (
+          <button
+            type="button"
+            onClick={handleMarkIssued}
+            disabled={isLocked}
+            className={`w-full h-12 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              isLocked 
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                : 'bg-white/60 hover:bg-white/90 border border-white/80 text-slate-800 shadow-sm backdrop-blur-md active:scale-[0.98]'
+            }`}
+          >
+            <span className="text-base">🥗</span>
+            <span>Отметить выдачу ужина</span>
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <div className="w-full h-12 rounded-2xl bg-emerald-600 text-white font-bold text-sm flex items-center justify-between px-4 sm:px-5 shadow-md shadow-emerald-600/20">
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <Check size={14} strokeWidth={3} />
+                </div>
+                <span>Ужин выдан {state.baseIssuedTime ? `в ${state.baseIssuedTime}` : 'в 19:00'}</span>
               </div>
-              <span>База выдана (Морковь + Свёкла + Картофель) • {state.baseIssuedTime}</span>
-            </div>
-          ) : (
-            <div className="font-bold text-sm">
-              Базовый замес не выдавался
-            </div>
-          )}
-        </button>
-      </div>
-
-      {/* 3. ADDITIVES CHIPS */}
-      <div className="space-y-3">
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
-          Добавлено сегодня
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {SALAD_EXTRAS.map((item) => {
-            const isSelected = state.selectedAdditives.includes(item.id) || state.selectedAdditives.includes(item.label);
-            return (
-              <button
-                key={item.id}
+              <button 
                 type="button"
+                onClick={handleReset}
                 disabled={isLocked}
-                onClick={() => toggleAdditive(item.id)}
-                className={`h-8 sm:h-9 px-3 py-1 rounded-full text-xs transition-all flex items-center gap-1.5 active:scale-95 whitespace-nowrap ${
-                  isSelected
-                    ? 'bg-amber-500/15 border border-amber-500/40 text-amber-950 font-semibold shadow-sm'
-                    : 'bg-white/60 border border-slate-200/60 text-slate-700 font-medium hover:bg-white/80'
+                className="h-8 px-3 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors active:scale-95 shrink-0 text-xs font-bold bg-white/20"
+                aria-label="Сброс"
+              >
+                Сброс
+              </button>
+            </div>
+
+            {/* Appetite Row (only appears after issuance) */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAppetite('all')}
+                disabled={isLocked}
+                className={`flex-1 h-10 px-2 rounded-xl text-xs font-bold transition-all border ${
+                  state.appetite === 'all'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm'
+                    : 'bg-white/60 border-slate-200 text-slate-500 hover:bg-white/90'
                 }`}
               >
-                <span className="text-sm leading-none drop-shadow-sm">{item.emoji}</span>
-                <span>{item.label}</span>
+                Съедено 100%
               </button>
-            );
-          })}
-        </div>
+              <button
+                type="button"
+                onClick={() => setAppetite('partial')}
+                disabled={isLocked}
+                className={`flex-1 h-10 px-2 rounded-xl text-xs font-bold transition-all border ${
+                  state.appetite === 'partial'
+                    ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-sm'
+                    : 'bg-white/60 border-slate-200 text-slate-500 hover:bg-white/90'
+                }`}
+              >
+                Остаток
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppetite('refused')}
+                disabled={isLocked}
+                className={`flex-1 h-10 px-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 ${
+                  state.appetite === 'refused'
+                    ? 'bg-rose-50 border-rose-200 text-rose-700 shadow-sm'
+                    : 'bg-white/60 border-slate-200 text-slate-500 hover:bg-white/90'
+                }`}
+              >
+                Отказ ⚠️
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 4. APPETITE */}
-      <div className={`space-y-3 pt-1 transition-all ${!state.isBaseIssued ? 'opacity-40 pointer-events-none grayscale-[0.5]' : ''}`}>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setAppetite('all')}
-            disabled={isLocked}
-            className={`flex-1 h-10 px-2 rounded-xl text-xs font-bold transition-all border ${
-              state.appetite === 'all'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm'
-                : 'bg-white/60 border-slate-200 text-slate-500 hover:bg-white/90'
-            }`}
-          >
-            Съедено 100%
-          </button>
-          <button
-            type="button"
-            onClick={() => setAppetite('partial')}
-            disabled={isLocked}
-            className={`flex-1 h-10 px-2 rounded-xl text-xs font-bold transition-all border ${
-              state.appetite === 'partial'
-                ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-sm'
-                : 'bg-white/60 border-slate-200 text-slate-500 hover:bg-white/90'
-            }`}
-          >
-            Остаток
-          </button>
-          <button
-            type="button"
-            onClick={() => setAppetite('refused')}
-            disabled={isLocked}
-            className={`flex-1 h-10 px-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 ${
-              state.appetite === 'refused'
-                ? 'bg-rose-50 border-rose-200 text-rose-700 shadow-sm'
-                : 'bg-white/60 border-slate-200 text-slate-500 hover:bg-white/90'
-            }`}
-          >
-            Отказ ⚠️
-          </button>
-        </div>
-      </div>
+      {/* 3. Tech Card Regulation Bottom Sheet */}
+      <SaladTechModal 
+        isOpen={isTechModalOpen} 
+        onClose={() => setIsTechModalOpen(false)} 
+      />
 
-      {/* 5. LIGHTBOX FULLSCREEN PREVIEW */}
+      {/* 4. Lightbox Fullscreen Preview */}
       {isLightboxOpen && state.photoUrl && (
         <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/90 backdrop-blur-xl animate-in fade-in duration-200">
           <div className="flex-1 w-full h-full p-4 flex items-center justify-center relative">
             <img
               src={state.photoUrl}
-              alt="Фото замеса салата"
+              alt="Фото вечернего салата"
               className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl drop-shadow-2xl animate-in zoom-in-95 duration-200"
             />
           </div>
@@ -323,5 +297,6 @@ export function EveningSaladSection({
     </div>
   );
 }
+
 
 

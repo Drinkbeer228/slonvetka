@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { CounterButton } from '../common/CounterButton';
 import { BookOpen, Check, ChevronDown, ChevronUp, Sparkles, Utensils, Wheat } from 'lucide-react';
 import { EveningSaladSection, EveningSaladState } from './EveningSaladSection';
-import { MorningPorridgeSection } from './MorningPorridgeSection';
+import { BreakfastSection } from './BreakfastSection';
+import { DietSection } from './DietSection';
 
 export interface DailyRationData {
   morning_porridge?: 'none' | 'all' | 'partial' | 'refused';
+  morning_porridge_time?: string | null;
+  morning_porridge_keeper?: string | null;
+  morning_porridge_photo?: string | null;
   evening_salad_chips: string[];
   salad_notes: string;
   coarse_branches?: number;
@@ -31,9 +35,10 @@ interface FeedControlProps {
   hayBagsDistributed: number;
   ration: DailyRationData;
   isLocked?: boolean;
+  dutyKeeperName?: string;
   onBalesChange: (val: number) => void;
   onBagsChange: (val: number) => void;
-  onPorridgeFieldChange: (field: keyof DailyRationData, value: any) => void;
+  onPorridgeFieldChange: (field: keyof DailyRationData | Partial<DailyRationData>, value?: any) => void;
   onVegetableToggle: (chip: string) => void;
   onSaladNotesChange: (notes: string) => void;
   onBranchesChange: (val: number) => void;
@@ -46,6 +51,7 @@ export function FeedControl({
   hayBagsDistributed,
   ration,
   isLocked = false,
+  dutyKeeperName,
   onBalesChange,
   onBagsChange,
   onPorridgeFieldChange,
@@ -60,8 +66,8 @@ export function FeedControl({
   const eveningChips = ration.evening_salad_chips || [];
 
   const saladState: EveningSaladState = {
-    isBaseIssued: ration.salad_base_included !== false,
-    baseIssuedTime: ration.salad_base_time || (ration.salad_base_included !== false ? '18:30' : null),
+    isBaseIssued: Boolean(ration.salad_base_included),
+    baseIssuedTime: ration.salad_base_time || (ration.salad_base_included ? '18:30' : null),
     selectedAdditives: eveningChips,
     appetite: ration.salad_appetite || null,
     photoUrl: ration.salad_photo_url || null
@@ -97,14 +103,12 @@ export function FeedControl({
         </div>
       </div>
 
-      {/* 1. MORNING PORRIDGE (Запарка) */}
-      <MorningPorridgeSection ration={ration} isLocked={isLocked} onChange={onPorridgeFieldChange} />
-
-      {/* 2. EVENING VEGETABLE SALAD */}
-      <EveningSaladSection
-        state={saladState}
+      {/* DIET SECTION (Morning Porridge & Evening Salad) */}
+      <DietSection
+        ration={ration}
         isLocked={isLocked}
-        onChange={handleSaladChange}
+        dutyKeeperName={dutyKeeperName}
+        onChange={onPorridgeFieldChange}
       />
 
       {/* 3. COARSE FEED (HAY STEPPERS) */}
@@ -129,6 +133,7 @@ export function FeedControl({
               <CounterButton
                 value={hayBalesDistributed}
                 onChange={onBalesChange}
+                disabled={isLocked}
               />
             </div>
           </div>
@@ -142,6 +147,7 @@ export function FeedControl({
               <CounterButton
                 value={hayBagsDistributed}
                 onChange={onBagsChange}
+                disabled={isLocked}
               />
             </div>
           </div>
@@ -155,6 +161,7 @@ export function FeedControl({
               <CounterButton
                 value={ration.coarse_branches || 0}
                 onChange={onBranchesChange}
+                disabled={isLocked}
               />
             </div>
           </div>

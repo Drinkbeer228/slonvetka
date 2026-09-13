@@ -14,13 +14,9 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const { profile, elephants, activeElephantId, setActiveElephantId, globalSaveStatus, logout } = useStore();
 
   const navItems = [
-    { id: 'daily_shift', label: 'Дежурство', role: 'all' },
-    { id: 'today', label: 'Сегодня', role: 'all' },
-    { id: 'journal', label: 'Журнал', role: 'all' },
-    { id: 'elephants', label: 'Слоны', role: 'all' },
-    { id: 'assignments', label: 'Назначения', role: 'vet' },
-    { id: 'staff', label: 'Сотрудники', role: 'vet' },
-    { id: 'settings', label: 'Настройки', role: 'all' }
+    { id: 'daily_shift', label: 'Смена', role: 'all' },
+    { id: 'vet_dashboard', label: 'ВетПанель', role: 'all' },
+    { id: 'elephants', label: 'Слоны', role: 'all' }
   ];
 
   const handleNav = (id: string) => {
@@ -62,42 +58,20 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
                 <span key="idle" className="text-[26px] leading-none transition-transform group-hover:scale-110">🐘</span>
               )}
             </div>
-            <span className="text-sm sm:text-base font-black tracking-tight text-slate-900 hidden xs:inline sm:inline">СлоноВет</span>
+            <span className="text-sm sm:text-base font-black tracking-tight text-slate-900 hidden xs:inline sm:inline">
+              {navItems.find(i => i.id === currentScreen)?.label || 
+                (currentScreen === 'elephant_details' ? 'Слоны' : 
+                 currentScreen === 'settings' ? 'Настройки' : 'СлоноВет')}
+            </span>
           </button>
 
-          {/* ELEPHANTS SELECTOR IN HEADER - CENTER */}
-          {elephants && elephants.length > 0 && (
-            <div className="flex-1 max-w-md mx-auto flex items-center justify-center overflow-x-auto no-scrollbar py-1">
-              <div className="flex bg-slate-100/80 p-1 rounded-2xl w-full max-w-sm border border-slate-200/50 shadow-inner">
-                {elephants.map((elephant) => {
-                  const isActive = elephant.id === activeElephantId;
-                  return (
-                    <button
-                      key={elephant.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveElephantId(elephant.id);
-                        if (currentScreen !== 'daily_shift') {
-                          onNavigate('daily_shift');
-                        }
-                      }}
-                      className={`flex-1 py-1.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all relative truncate text-center ${
-                        isActive
-                          ? 'text-slate-900 bg-white shadow-sm border border-slate-100 font-extrabold'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                      title={elephant.name}
-                    >
-                      <span className="truncate block">{elephant.name}</span>
-                    </button>
-                  );
-                })}
+          {/* RIGHT ACTIONS */}
+          <div className="flex items-center shrink-0 gap-2">
+            {profile && (
+              <div className="flex items-center bg-slate-100 rounded-full px-3 py-1.5 border border-slate-200">
+                <span className="text-xs sm:text-sm font-bold text-slate-700 whitespace-nowrap">👤 {profile.name}</span>
               </div>
-            </div>
-          )}
-
-          {/* MENU BUTTON - RIGHT */}
-          <div className="flex items-center shrink-0">
+            )}
             <button
               onClick={() => setDrawerOpen(true)}
               aria-label="Открыть меню"
@@ -176,11 +150,11 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
                 Настройки
               </button>
               <button 
-                onClick={() => { if(confirm('Выйти из аккаунта?')) logout(); }}
+                onClick={() => { if(confirm('Сменить сотрудника?')) { logout(); setDrawerOpen(false); } }}
                 className="flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-600 rounded-lg text-[11px] font-bold transition-all active:scale-95"
               >
                 <LogOut size={14} strokeWidth={2.5} />
-                Выйти
+                Сменить
               </button>
             </div>
           </div>
