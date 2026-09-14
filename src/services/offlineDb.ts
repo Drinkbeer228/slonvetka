@@ -1,6 +1,6 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Elephant, Assignment } from '../types';
-import { DailyShift, ElephantDailyMetrics } from '../types/shift';
+import { DailyShift, ElephantDailyMetrics, FeedInventoryItem } from '../types/shift';
 
 export interface TreatmentRecordQueueItem {
   temp_id: string; // UUID/nanoid
@@ -55,13 +55,17 @@ interface SlonovetDB extends DBSchema {
     value: ElephantDailyMetrics;
     indexes: { 'by-shiftId': string };
   };
+  feed_inventory: {
+    key: string; // feed_type
+    value: FeedInventoryItem;
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<SlonovetDB>> | null = null;
 
 export function getOfflineDb() {
   if (!dbPromise) {
-    dbPromise = openDB<SlonovetDB>('slonvet_db', 2, {
+    dbPromise = openDB<SlonovetDB>('slonvet_db', 3, {
       upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains('records_queue')) {
           db.createObjectStore('records_queue', { keyPath: 'temp_id' });
@@ -84,10 +88,27 @@ export function getOfflineDb() {
           const metricsStore = db.createObjectStore('elephant_daily_metrics', { keyPath: 'id' });
           metricsStore.createIndex('by-shiftId', 'shift_id');
         }
+        if (!db.objectStoreNames.contains('feed_inventory')) {
+          db.createObjectStore('feed_inventory', { keyPath: 'feed_type' });
+        }
       },
     });
   }
   return dbPromise;
+}
+
+export async function cacheFeedInventory(items: FeedInventoryItem[]) {
+  const db = await getOfflineDb();
+  const tx = db.transaction('feed_inventory', 'readwrite');
+  for (const item of items) {
+    await tx.objectStore('feed_inventory').put(item);
+  }
+  await tx.done;
+}
+
+export async function getCachedFeedInventory(): Promise<FeedInventoryItem[]> {
+  const db = await getOfflineDb();
+  return db.getAll('feed_inventory');
 }
 
 export async function cacheElephants(elephants: Elephant[]) {

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { X, LogOut, Home, Stethoscope, Rabbit } from 'lucide-react';
+import { 
+  X, LogOut, Home, Stethoscope, HeartPulse, 
+  CheckCircle2, BookOpen, ClipboardList, Users 
+} from 'lucide-react';
 import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
 import { Header } from './Header';
@@ -11,9 +14,13 @@ interface LayoutProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'daily_shift',   label: 'Слоновник', icon: Home,        role: 'all' },
-  { id: 'vet_dashboard', label: 'ВетПанель', icon: Stethoscope, role: 'all' },
-  { id: 'elephants',     label: 'Слоны',     icon: Rabbit,       role: 'all' },
+  { id: 'daily_shift',   label: 'Слоновник (Смена)', icon: Home,          role: 'all' },
+  { id: 'vet_dashboard', label: 'ВетПанель',         icon: Stethoscope,   role: 'all' },
+  { id: 'elephants',     label: 'Слоны',             icon: HeartPulse,    role: 'all' },
+  { id: 'today',         label: 'Задачи на сегодня', icon: CheckCircle2,  role: 'all' },
+  { id: 'journal',       label: 'Журнал дежурств',   icon: BookOpen,      role: 'all' },
+  { id: 'assignments',   label: 'Вет-назначения',    icon: ClipboardList, role: 'all' },
+  { id: 'staff',         label: 'Сотрудники',        icon: Users,         role: 'admin' },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -32,20 +39,30 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
     setDrawerOpen(false);
   };
 
+  const isVetDashboard = currentScreen === 'vet_dashboard';
+  const contentWidthClass = isVetDashboard 
+    ? 'max-w-7xl px-2 sm:px-6' 
+    : 'max-w-3xl lg:max-w-4xl px-3 sm:px-6';
+
   return (
     <div
       className="min-h-screen text-slate-800 flex flex-col font-sans antialiased"
       style={{ background: 'linear-gradient(160deg, #f1f5f9 0%, #e9f0f8 60%, #eff6ff 100%)' }}
     >
       {/* STICKY HEADER */}
-      <Header currentScreen={currentScreen} onOpenMenu={() => setDrawerOpen(true)} />
+      <Header 
+        currentScreen={currentScreen} 
+        onOpenMenu={() => setDrawerOpen(true)} 
+        onNavigate={onNavigate}
+      />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-5 pb-12">
+      <main className={`flex-1 w-full mx-auto pb-16 transition-all ${contentWidthClass}`}>
         {children}
       </main>
 
       <InstallPrompt />
+
 
       {/* DRAWER BACKDROP */}
       <div

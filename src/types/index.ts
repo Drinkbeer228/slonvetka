@@ -5,6 +5,7 @@ export interface Profile {
   active: boolean;
   created_at: string;
   is_admin?: boolean;
+  invite_code?: string;
 }
 
 export interface Elephant {

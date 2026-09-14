@@ -1,32 +1,237 @@
 import { supabase } from '../lib/supabase';
-import { DailyShift, ElephantDailyMetrics, clampCount, clampSleepMinutes } from '../types/shift';
-import { getOfflineDb } from './offlineDb';
+import { 
+  DailyShift, 
+  ElephantDailyMetrics, 
+  FeedInventoryItem, 
+  FeedInventoryType, 
+  clampCount, 
+  clampSleepMinutes 
+} from '../types/shift';
+import { 
+  getOfflineDb, 
+  cacheFeedInventory, 
+  getCachedFeedInventory 
+} from './offlineDb';
+
+export const DEFAULT_FEED_INVENTORY: Record<FeedInventoryType, FeedInventoryItem> = {
+  hay_bales: {
+    feed_type: 'hay_bales',
+    name: 'Тюки сена',
+    quantity_in_stock: 200,
+    unit: 'тюков',
+  },
+  hay_rolls: {
+    feed_type: 'hay_rolls',
+    name: 'Рулоны сена',
+    quantity_in_stock: 15,
+    unit: 'рулонов',
+  },
+  branches: {
+    feed_type: 'branches',
+    name: 'Ветки / веники',
+    quantity_in_stock: 50,
+    unit: 'веников',
+  },
+};
+
+function parseBranchesFromNotes(feedNotes?: string | null): number {
+  if (!feedNotes) return 0;
+  try {
+    const parsed = JSON.parse(feedNotes);
+    return Math.max(0, Number(parsed.coarse_branches || 0));
+  } catch {
+    return 0;
+  }
+}
 
 export const shiftService = {
-  async getHayStock(type: 'bales' | 'rolls' = 'bales'): Promise<number> {
+  /**
+   * Получение актуальных остатков кормов со склада (feed_inventory).
+   * 1. Запрос в Supabase
+   * 2. Если оффлайн — чтение из кэша IndexedDB
+   * 3. Если кэш пуст — возврат дефолтных значений и инициализация кэша
+   */
+  async getFeedInventory(): Promise<Record<FeedInventoryType, FeedInventoryItem>> {
+    // 1. Попытка чтения из Supabase
     try {
-      const val = localStorage.getItem(`slonovet_hay_stock_${type}`);
-      if (val !== null) return Math.max(0, Number(val));
+      const { data, error } = await supabase
+        .from('feed_inventory')
+        .select('*');
+
+      if (!error && data && data.length > 0) {
+        const result: Record<FeedInventoryType, FeedInventoryItem> = {
+          ...DEFAULT_FEED_INVENTORY
+        };
+        for (const row of data) {
+          const type = row.feed_type as FeedInventoryType;
+          if (type in result) {
+            result[type] = {
+              feed_type: type,
+              name: row.name || DEFAULT_FEED_INVENTORY[type].name,
+              quantity_in_stock: Math.max(0, Number(row.quantity_in_stock ?? 0)),
+              unit: row.unit || DEFAULT_FEED_INVENTORY[type].unit,
+              updated_at: row.updated_at
+            };
+          }
+        }
+        // Кэшируем в IndexedDB для оффлайн-доступа
+        await cacheFeedInventory(Object.values(result));
+        return result;
+      }
+    } catch (err) {
+      console.warn('Network error reading feed_inventory from Supabase, falling back to IDB cache:', err);
+    }
+
+    // 2. Оффлайн-фоллбэк: чтение из IndexedDB
+    try {
+      const cached = await getCachedFeedInventory();
+      if (cached && cached.length > 0) {
+        const result: Record<FeedInventoryType, FeedInventoryItem> = {
+          ...DEFAULT_FEED_INVENTORY
+        };
+        for (const item of cached) {
+          if (item.feed_type in result) {
+            result[item.feed_type] = {
+              ...item,
+              quantity_in_stock: Math.max(0, Number(item.quantity_in_stock ?? 0))
+            };
+          }
+        }
+        return result;
+      }
+    } catch (idbErr) {
+      console.warn('IDB feed_inventory read error:', idbErr);
+    }
+
+    // 3. Если и база, и кэш пусты: сохраняем дефолтные остатки
+    try {
+      await cacheFeedInventory(Object.values(DEFAULT_FEED_INVENTORY));
+      await supabase
+        .from('feed_inventory')
+        .upsert(Object.values(DEFAULT_FEED_INVENTORY), { onConflict: 'feed_type' });
     } catch {}
-    return type === 'bales' ? 200 : 15;
+
+    return { ...DEFAULT_FEED_INVENTORY };
   },
 
-  async replenishHayStock(type: 'bales' | 'rolls', amount: number): Promise<number> {
-    const current = await this.getHayStock(type);
-    const updated = Math.max(0, current + amount);
+  /**
+   * Установка абсолютного количества остатка на складе feed_inventory.
+   */
+  async setFeedInventoryStock(feedType: FeedInventoryType, total: number): Promise<FeedInventoryItem> {
+    const safeQty = Math.max(0, Math.round(total));
+    const inv = await this.getFeedInventory();
+    const current = inv[feedType] || DEFAULT_FEED_INVENTORY[feedType];
+
+    const updatedItem: FeedInventoryItem = {
+      ...current,
+      quantity_in_stock: safeQty,
+      updated_at: new Date().toISOString()
+    };
+
+    // 1. Оптимистичная запись в IndexedDB
+    await cacheFeedInventory([updatedItem]);
+
+    // 2. Запись в Supabase
     try {
-      localStorage.setItem(`slonovet_hay_stock_${type}`, String(updated));
-    } catch {}
-    return updated;
+      const { error } = await supabase
+        .from('feed_inventory')
+        .upsert(updatedItem, { onConflict: 'feed_type' });
+      if (error) {
+        console.warn('Could not update feed_inventory in Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('Network error updating feed_inventory in Supabase, saved in IDB:', err);
+    }
+
+    return updatedItem;
   },
 
-  async setHayStock(type: 'bales' | 'rolls', total: number): Promise<number> {
-    const safe = Math.max(0, Math.round(total));
-    try {
-      localStorage.setItem(`slonovet_hay_stock_${type}`, String(safe));
-    } catch {}
-    return safe;
+  /**
+   * Пополнение склада на заданное количество.
+   */
+  async replenishFeedInventory(feedType: FeedInventoryType, amount: number): Promise<FeedInventoryItem> {
+    const inv = await this.getFeedInventory();
+    const current = inv[feedType]?.quantity_in_stock ?? 0;
+    const newQty = Math.max(0, current + Math.round(amount));
+    return this.setFeedInventoryStock(feedType, newQty);
   },
+
+  /**
+   * Списание выданного корма из остатков на складе.
+   */
+  async deductShiftFeed(deltas: { bales?: number; rolls?: number; branches?: number }): Promise<void> {
+    const inv = await this.getFeedInventory();
+    const updates: FeedInventoryItem[] = [];
+
+    if (deltas.bales && deltas.bales !== 0) {
+      const item = inv.hay_bales;
+      const updatedQty = Math.max(0, item.quantity_in_stock - deltas.bales);
+      updates.push({
+        ...item,
+        quantity_in_stock: updatedQty,
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    if (deltas.rolls && deltas.rolls !== 0) {
+      const item = inv.hay_rolls;
+      const updatedQty = Math.max(0, item.quantity_in_stock - deltas.rolls);
+      updates.push({
+        ...item,
+        quantity_in_stock: updatedQty,
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    if (deltas.branches && deltas.branches !== 0) {
+      const item = inv.branches;
+      const updatedQty = Math.max(0, item.quantity_in_stock - deltas.branches);
+      updates.push({
+        ...item,
+        quantity_in_stock: updatedQty,
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    if (updates.length === 0) return;
+
+    // 1. Обновляем в IndexedDB
+    await cacheFeedInventory(updates);
+
+    // 2. Синхронизируем с Supabase
+    try {
+      const { error } = await supabase
+        .from('feed_inventory')
+        .upsert(updates, { onConflict: 'feed_type' });
+      if (error) {
+        console.warn('Error syncing feed deductions to Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('Network error syncing feed deductions to Supabase:', err);
+    }
+  },
+
+  /**
+   * Обратная совместимость для существующих вызовов без localStorage.
+   */
+  async getHayStock(type: 'bales' | 'rolls' | 'branches' = 'bales'): Promise<number> {
+    const feedType: FeedInventoryType = type === 'bales' ? 'hay_bales' : type === 'rolls' ? 'hay_rolls' : 'branches';
+    const inv = await this.getFeedInventory();
+    return inv[feedType]?.quantity_in_stock ?? (type === 'bales' ? 200 : type === 'rolls' ? 15 : 50);
+  },
+
+  async replenishHayStock(type: 'bales' | 'rolls' | 'branches', amount: number): Promise<number> {
+    const feedType: FeedInventoryType = type === 'bales' ? 'hay_bales' : type === 'rolls' ? 'hay_rolls' : 'branches';
+    const updated = await this.replenishFeedInventory(feedType, amount);
+    return updated.quantity_in_stock;
+  },
+
+  async setHayStock(type: 'bales' | 'rolls' | 'branches', total: number): Promise<number> {
+    const feedType: FeedInventoryType = type === 'bales' ? 'hay_bales' : type === 'rolls' ? 'hay_rolls' : 'branches';
+    const updated = await this.setFeedInventoryStock(feedType, total);
+    return updated.quantity_in_stock;
+  },
+
 
   async getShiftData(date: string): Promise<{ shift: DailyShift; metrics: Record<string, ElephantDailyMetrics> }> {
     const db = await getOfflineDb();
@@ -56,13 +261,7 @@ export const shiftService = {
         const metricsMap: Record<string, ElephantDailyMetrics> = {};
         if (!metricsError && metricsData) {
           for (const m of metricsData) {
-            // Безопасное чтение: behavior_score использовался для sleep_minutes в старых данных
-            const legacySleepMinutes =
-              m.sleep_minutes != null
-                ? m.sleep_minutes
-                : m.behavior_score != null && m.behavior_score > 10
-                  ? m.behavior_score
-                  : 0;
+            const sleepMinutes = m.sleep_minutes != null ? m.sleep_minutes : 0;
 
             metricsMap[m.elephant_id] = {
               id: m.id,
@@ -77,7 +276,7 @@ export const shiftService = {
                 ? m.urination_traits
                 : ['Прозрачная (норма)'],
               behavior: m.behavior || 'Спокойная / В норме',
-              sleep_minutes: clampSleepMinutes(legacySleepMinutes),
+              sleep_minutes: clampSleepMinutes(sleepMinutes),
               sleep_intervals: Array.isArray(m.sleep_intervals) ? m.sleep_intervals : [],
               notes: m.notes ?? '',
               photos: Array.isArray(m.photos) ? m.photos : [],
@@ -134,6 +333,32 @@ export const shiftService = {
 
   async saveShiftData(shift: DailyShift, metricsMap: Record<string, ElephantDailyMetrics>): Promise<void> {
     const db = await getOfflineDb();
+
+    // 0. Списание расхода кормов из feed_inventory (по дельте от предыдущего сохраненного состояния)
+    try {
+      const existingShift = await db.get('daily_shifts', shift.id);
+      const prevBales = existingShift?.hay_bales_distributed ?? 0;
+      const prevBags = existingShift?.hay_bags_distributed ?? 0;
+      const prevBranches = parseBranchesFromNotes(existingShift?.feed_notes);
+
+      const currentBales = shift.hay_bales_distributed ?? 0;
+      const currentBags = shift.hay_bags_distributed ?? 0;
+      const currentBranches = parseBranchesFromNotes(shift.feed_notes);
+
+      const deltaBales = currentBales - prevBales;
+      const deltaBags = currentBags - prevBags;
+      const deltaBranches = currentBranches - prevBranches;
+
+      if (deltaBales !== 0 || deltaBags !== 0 || deltaBranches !== 0) {
+        await this.deductShiftFeed({
+          bales: deltaBales,
+          rolls: deltaBags,
+          branches: deltaBranches
+        });
+      }
+    } catch (invErr) {
+      console.warn('Feed inventory deduction error:', invErr);
+    }
 
     // 1. Optimistic save to IDB
     await db.put('daily_shifts', shift);

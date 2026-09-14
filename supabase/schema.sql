@@ -94,6 +94,15 @@ create table public.elephant_daily_metrics (
   unique (shift_id, elephant_id)
 );
 
+-- FEED INVENTORY (учет остатков кормов на складе: сено, рулоны, ветки)
+create table public.feed_inventory (
+  feed_type text primary key, -- 'hay_bales', 'hay_rolls', 'branches'
+  name text not null,
+  quantity_in_stock integer not null default 0 check (quantity_in_stock >= 0),
+  unit text default 'шт',
+  updated_at timestamptz default now()
+);
+
 -- ============================================================
 -- RPC for secure login by invite code
 -- ============================================================
@@ -129,6 +138,7 @@ alter table public.treatment_records enable row level security;
 alter table public.treatment_photos enable row level security;
 alter table public.daily_shifts enable row level security;
 alter table public.elephant_daily_metrics enable row level security;
+alter table public.feed_inventory enable row level security;
 
 -- Helper: получить роль текущего пользователя
 create or replace function current_user_role()
@@ -282,6 +292,18 @@ create policy "metrics_update" on public.elephant_daily_metrics
     )
   );
 
+-- ---- FEED INVENTORY ----
+-- Все аутентифицированные читают остатки кормов
+create policy "feed_inventory_select" on public.feed_inventory
+  for select using (auth.uid() is not null);
+
+-- Киперы, ветврачи и админы могут обновлять остатки / списывать
+create policy "feed_inventory_update" on public.feed_inventory
+  for update using (auth.uid() is not null);
+
+create policy "feed_inventory_insert" on public.feed_inventory
+  for insert with check (auth.uid() is not null);
+
 -- ============================================================
 -- STORAGE
 -- ============================================================
@@ -328,3 +350,9 @@ insert into public.profiles (name, role, invite_code) values
   ('Сергей (Кипер)', 'keeper', 'KEEPER-SERGEY'),
   ('Алексей (Ветврач)', 'vet', 'VET-DOC-77')
   on conflict do nothing;
+
+insert into public.feed_inventory (feed_type, name, quantity_in_stock, unit) values
+  ('hay_bales', 'Тюки сена', 200, 'тюков'),
+  ('hay_rolls', 'Рулоны сена', 15, 'рулонов'),
+  ('branches', 'Ветки / веники', 50, 'веников')
+  on conflict (feed_type) do nothing;

@@ -5,12 +5,12 @@ import { supabaseService } from '../services/supabaseService';
 import { shiftService } from '../services/shiftService';
 import { SyncManager } from '../services/SyncManager';
 import { getOfflineDb } from '../services/offlineDb';
-import { DailyShift, ElephantDailyMetrics } from '../types/shift';
+import { DailyShift, ElephantDailyMetrics, FeedInventoryItem, FeedInventoryType } from '../types/shift';
 import { Elephant, Assignment, TreatmentRecordWithPhotos } from '../types';
 import { CounterButton } from '../components/common/CounterButton';
 import { 
   Calendar as CalendarIcon, CheckCircle2, Loader2, Save, UserCheck, 
-  Check, Camera, PackagePlus, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2,
+  Check, Camera, PackagePlus, Package, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2,
   Lock, Unlock, LogOut } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
 import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
@@ -203,12 +203,19 @@ export function DailyShiftPage() {
   const [prevShift, setPrevShift] = useState<DailyShift | null>(null);
   const [prevKeeperName, setPrevKeeperName] = useState<string>('Не указан');
     
+  const [feedInventory, setFeedInventory] = useState<Record<FeedInventoryType, FeedInventoryItem>>({
+    hay_bales: { feed_type: 'hay_bales', name: 'Тюки сена', quantity_in_stock: 200, unit: 'тюков' },
+    hay_rolls: { feed_type: 'hay_rolls', name: 'Рулоны сена', quantity_in_stock: 15, unit: 'рулонов' },
+    branches:  { feed_type: 'branches',  name: 'Ветки / веники', quantity_in_stock: 50, unit: 'веников' },
+  });
   const [hayStockBales, setHayStockBales] = useState<number>(200);
   const [hayStockRolls, setHayStockRolls] = useState<number>(15);
   
   const [replenishModalOpen, setReplenishModalOpen] = useState(false);
   const [modalBales, setModalBales] = useState<number>(200);
   const [modalRolls, setModalRolls] = useState<number>(15);
+  const [modalBranches, setModalBranches] = useState<number>(50);
+  const [savingInventory, setSavingInventory] = useState(false);
 
   const [newReminderText, setNewReminderText] = useState<string>('');
 
@@ -342,10 +349,10 @@ export function DailyShiftPage() {
       setShift(loadedShift);
       setMetrics(data.metrics || {});
 
-      const bales = await shiftService.getHayStock('bales');
-      const rolls = await shiftService.getHayStock('rolls');
-      setHayStockBales(bales);
-      setHayStockRolls(rolls);
+      const inv = await shiftService.getFeedInventory();
+      setFeedInventory(inv);
+      setHayStockBales(inv.hay_bales.quantity_in_stock);
+      setHayStockRolls(inv.hay_rolls.quantity_in_stock);
 
       const { data: staffData } = await supabase.from('profiles').select('id, name, role');
       const staff = staffData || [];
@@ -523,7 +530,24 @@ export function DailyShiftPage() {
     handleShiftFieldChange('reminders', reminders, true);
   };
 
-  
+  const handleSaveInventory = async () => {
+    try {
+      setSavingInventory(true);
+      await shiftService.setFeedInventoryStock('hay_bales', modalBales);
+      await shiftService.setFeedInventoryStock('hay_rolls', modalRolls);
+      await shiftService.setFeedInventoryStock('branches', modalBranches);
+      const updated = await shiftService.getFeedInventory();
+      setFeedInventory(updated);
+      setHayStockBales(updated.hay_bales.quantity_in_stock);
+      setHayStockRolls(updated.hay_rolls.quantity_in_stock);
+      setReplenishModalOpen(false);
+    } catch (err) {
+      console.error('Failed to save feed inventory:', err);
+    } finally {
+      setSavingInventory(false);
+    }
+  };
+
   const currentRation = useMemo<DailyRationData>(() => {
     return parseDailyRation(shift?.feed_notes);
   }, [shift?.feed_notes]);
@@ -914,9 +938,25 @@ export function DailyShiftPage() {
               <span className="text-[11px] text-slate-400 font-medium ml-2">Основной фураж и клетчатка</span>
             </div>
           </div>
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-lime-700 bg-lime-100/70 border border-lime-200/80 px-2 py-0.5 rounded-full">
-            Без ограничений
-          </span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setModalBales(feedInventory.hay_bales.quantity_in_stock);
+                setModalRolls(feedInventory.hay_rolls.quantity_in_stock);
+                setModalBranches(feedInventory.branches.quantity_in_stock);
+                setReplenishModalOpen(true);
+              }}
+              className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              title="Управление остатками на складе feed_inventory"
+            >
+              <Package size={13} className="text-amber-600" />
+              <span>Склад</span>
+            </button>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-lime-700 bg-lime-100/70 border border-lime-200/80 px-2 py-0.5 rounded-full">
+              Без ограничений
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
@@ -933,6 +973,13 @@ export function DailyShiftPage() {
               variant="vertical"
               unit="тюков"
             />
+            <div className="text-[11px] text-center pt-0.5 select-none truncate">
+              <span className="text-slate-400 font-medium">Склад: </span>
+              <span className={`font-bold ${feedInventory.hay_bales.quantity_in_stock < 30 ? 'text-amber-600 font-black' : 'text-slate-700'}`}>
+                {feedInventory.hay_bales.quantity_in_stock}
+              </span>
+              <span className="text-slate-400 font-medium"> тюк.</span>
+            </div>
           </div>
 
           {/* Рулоны / Мешки */}
@@ -948,6 +995,13 @@ export function DailyShiftPage() {
               variant="vertical"
               unit="рулонов"
             />
+            <div className="text-[11px] text-center pt-0.5 select-none truncate">
+              <span className="text-slate-400 font-medium">Склад: </span>
+              <span className={`font-bold ${feedInventory.hay_rolls.quantity_in_stock < 5 ? 'text-amber-600 font-black' : 'text-slate-700'}`}>
+                {feedInventory.hay_rolls.quantity_in_stock}
+              </span>
+              <span className="text-slate-400 font-medium"> рул.</span>
+            </div>
           </div>
 
           {/* Ветки, веники */}
@@ -963,6 +1017,13 @@ export function DailyShiftPage() {
               variant="vertical"
               unit="веников"
             />
+            <div className="text-[11px] text-center pt-0.5 select-none truncate">
+              <span className="text-slate-400 font-medium">Склад: </span>
+              <span className={`font-bold ${feedInventory.branches.quantity_in_stock < 10 ? 'text-amber-600 font-black' : 'text-slate-700'}`}>
+                {feedInventory.branches.quantity_in_stock}
+              </span>
+              <span className="text-slate-400 font-medium"> шт.</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1177,6 +1238,191 @@ export function DailyShiftPage() {
               <X size={24} />
             </button>
             <img src={previewPhotoUrl} alt="Полноразмерное фото" className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" />
+          </div>
+        </div>
+      )}
+
+      {/* WAREHOUSE FEED INVENTORY MODAL */}
+      {replenishModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-2xl rounded-[28px] border border-white/80 p-5 sm:p-6 shadow-2xl max-w-md w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-xl shadow-xs">
+                  🌾
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">Склад грубых кормов</h3>
+                  <p className="text-xs text-slate-400 font-medium">Таблица базы feed_inventory</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplenishModalOpen(false)}
+                className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              {/* Тюки сена */}
+              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-black text-slate-800">Тюки сена</div>
+                  <div className="text-[11px] text-slate-400 font-medium">Основной фураж</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setModalBales(prev => Math.max(0, prev - 10))}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    -10
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalBales(prev => Math.max(0, prev - 1))}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    -1
+                  </button>
+                  <input
+                    type="number"
+                    min={0}
+                    value={modalBales}
+                    onChange={(e) => setModalBales(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-16 min-h-[44px] text-center font-black text-slate-900 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setModalBales(prev => prev + 1)}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    +1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalBales(prev => prev + 10)}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    +10
+                  </button>
+                </div>
+              </div>
+
+              {/* Рулоны сена */}
+              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-black text-slate-800">Рулоны сена</div>
+                  <div className="text-[11px] text-slate-400 font-medium">Дополнительный фураж</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setModalRolls(prev => Math.max(0, prev - 1))}
+                    className="min-h-[44px] min-w-[36px] px-2.5 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    -1
+                  </button>
+                  <input
+                    type="number"
+                    min={0}
+                    value={modalRolls}
+                    onChange={(e) => setModalRolls(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-16 min-h-[44px] text-center font-black text-slate-900 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setModalRolls(prev => prev + 1)}
+                    className="min-h-[44px] min-w-[36px] px-2.5 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    +1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalRolls(prev => prev + 5)}
+                    className="min-h-[44px] min-w-[36px] px-2.5 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    +5
+                  </button>
+                </div>
+              </div>
+
+              {/* Ветки и веники */}
+              <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-black text-slate-800">Ветки и веники</div>
+                  <div className="text-[11px] text-slate-400 font-medium">Связки / бамбук</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setModalBranches(prev => Math.max(0, prev - 5))}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    -5
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalBranches(prev => Math.max(0, prev - 1))}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    -1
+                  </button>
+                  <input
+                    type="number"
+                    min={0}
+                    value={modalBranches}
+                    onChange={(e) => setModalBranches(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-16 min-h-[44px] text-center font-black text-slate-900 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setModalBranches(prev => prev + 1)}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    +1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalBranches(prev => prev + 5)}
+                    className="min-h-[44px] min-w-[36px] px-2 rounded-xl bg-white border border-slate-200/80 font-bold text-xs text-slate-600 active:scale-95 transition"
+                  >
+                    +5
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setReplenishModalOpen(false)}
+                disabled={savingInventory}
+                className="flex-1 min-h-[44px] rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm transition active:scale-98 cursor-pointer"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveInventory}
+                disabled={savingInventory}
+                className="flex-1 min-h-[44px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition active:scale-98 shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                {savingInventory ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={16} />
+                    <span>Сохранить на складе</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
