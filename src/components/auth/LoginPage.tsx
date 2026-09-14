@@ -109,47 +109,45 @@ export function LoginPage({ children }: LoginPageProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setAuthLoading(true);
+    setError(null);
 
     const cleanLogin = login.trim().toLowerCase();
-    if (!cleanLogin || !password) {
-      setError('Введите логин и пароль');
+    // Если введен короткий логин (adk, dima), приклеиваем домен:
+    const email = cleanLogin.includes('@') ? cleanLogin : `${cleanLogin}@slonovet.local`;
+    const cleanPassword = password.trim();
+
+    console.log('Попытка входа с email:', email);
+
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password: cleanPassword,
+    });
+
+    if (signInError) {
+      console.error('Ошибка входа:', signInError.message);
+      setError(signInError.message);
       setAuthLoading(false);
       return;
     }
 
-    const fullEmail = cleanLogin.includes('@') ? cleanLogin : `${cleanLogin}@slonovet.local`;
+    // Успешный вход — Supabase сам сохранит сессию
+    if (data.user) {
+      const sessionToken = crypto.randomUUID();
+      localStorage.setItem('slonovet_session_token', sessionToken);
+      await authService.registerDeviceSession(data.user.id, sessionToken);
 
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: fullEmail,
-        password: password.trim()
-      });
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
 
-      if (signInError) throw signInError;
-      
-      if (data.user) {
-        const sessionToken = crypto.randomUUID();
-        localStorage.setItem('slonovet_session_token', sessionToken);
-        await authService.registerDeviceSession(data.user.id, sessionToken);
-
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError) throw profileError;
-
+      if (profileData) {
         setProfile(profileData);
       }
-    } catch (err: any) {
-      console.error(err);
-      setError('Неверный логин или пароль');
-    } finally {
-      setAuthLoading(false);
     }
+    setAuthLoading(false);
   };
 
   if (loading) {
