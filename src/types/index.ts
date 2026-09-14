@@ -6,6 +6,9 @@ export interface Profile {
   created_at: string;
   is_admin?: boolean;
   invite_code?: string;
+  birth_date?: string;
+  avatar_url?: string;
+  current_session_id?: string;
 }
 
 export interface Elephant {

@@ -1,7 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Trash2, X, Plus } from 'lucide-react';
+import { Camera, Trash2, X, Plus, Loader2 } from 'lucide-react';
 import { ShiftPhoto } from '../../types/shift';
-import { compressImage } from '../../utils/imageCompression';
+import { compressImage } from '../../utils/imageCompressor';
+import { supabaseService } from '../../services/supabaseService';
+import { supabase } from '../../lib/supabase';
 
 interface Props {
   isOpen: boolean;
@@ -34,13 +36,15 @@ export function PhotoGallerySheet({ isOpen, onClose, section, photos, onAddPhoto
 
     try {
       setIsCompressing(true);
-      const dataUrl = await compressImage(file);
+      const blob = await compressImage(file);
+      const shiftDate = new Date().toISOString().split('T')[0];
+      const storagePath = await supabaseService.uploadShiftMedia(blob, shiftDate, section);
       
       const newPhoto: ShiftPhoto = {
         id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         timestamp: new Date().toISOString(),
         section,
-        dataUrl
+        storage_path: storagePath
       };
       
       onAddPhoto(newPhoto);
@@ -125,9 +129,10 @@ export function PhotoGallerySheet({ isOpen, onClose, section, photos, onAddPhoto
             {/* Grid of photos */}
             {sectionPhotos.map(photo => {
               const timeStr = new Date(photo.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+              const imgUrl = photo.storage_path ? supabaseService.getPublicUrl(photo.storage_path) : photo.dataUrl;
               return (
                 <div key={photo.id} className="aspect-square relative rounded-[24px] overflow-hidden group shadow-sm bg-slate-100">
-                  <img src={photo.dataUrl} alt="Photo" className="w-full h-full object-cover" />
+                  <img src={imgUrl} alt="Photo" className="w-full h-full object-cover" />
                   
                   {/* Overlay gradient */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-100" />

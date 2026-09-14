@@ -229,6 +229,22 @@ export const supabaseService = {
     return photoData;
   },
 
+  async uploadShiftMedia(file: Blob, shiftDate: string, section: string): Promise<string> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id || 'unknown';
+    const timestamp = Date.now();
+    const filePath = `shifts/${shiftDate}/${section}_${timestamp}.jpg`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('elephant-treatments')
+      .upload(filePath, file, {
+        contentType: 'image/jpeg',
+      });
+      
+    if (uploadError) throw uploadError;
+    return filePath;
+  },
+
   getPublicUrl(storagePath: string): string {
     const { data } = supabase.storage
       .from('elephant-treatments')

@@ -21,6 +21,8 @@ import { SubmitShiftButton } from '../components/daily-shift/SubmitShiftButton';
 import { DynamicCounterSection, CounterItem } from '../components/daily-shift/DynamicCounterSection';
 import { ShiftSummaryModal } from '../components/daily-shift/ShiftSummaryModal';
 import { ArchiveBanner } from '../components/daily-shift/ArchiveBanner';
+import { ShiftHandoverModal } from '../components/daily-shift/ShiftHandoverModal';
+import { HandoverAcceptBanner } from '../components/daily-shift/HandoverAcceptBanner';
 
 export const ELEPHANT_MOODS = [
   { 
@@ -210,6 +212,7 @@ export function DailyShiftPage() {
   });
   const [hayStockBales, setHayStockBales] = useState<number>(200);
   const [hayStockRolls, setHayStockRolls] = useState<number>(15);
+  const [initialAvailable, setInitialAvailable] = useState<{ bales: number, rolls: number, branches: number }>({ bales: 0, rolls: 0, branches: 0 });
   
   const [replenishModalOpen, setReplenishModalOpen] = useState(false);
   const [modalBales, setModalBales] = useState<number>(200);
@@ -280,7 +283,18 @@ export function DailyShiftPage() {
   const isFutureDate = selectedDate > todayStr;
   const isArchiveMode = selectedDate < todayStr || shift?.status === 'completed' || (shift?.status as string) === 'submitted';
   const [isEditOverride, setIsEditOverride] = useState(false);
+  const [pendingHandover, setPendingHandover] = useState<DailyShift | null>(null);
+  const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+  const [dutyKeeperName, setDutyKeeperName] = useState<string>('');
   const isLocked = isFutureDate || (isArchiveMode && (!isAdmin || !isEditOverride));
+  
+  // Режим только чтения: если смена в прогрессе, но назначена ДРУГОМУ киперу
+  const isReadOnlyMode = shift?.status === 'in_progress' && 
+                         shift.duty_keeper_id && 
+                         shift.duty_keeper_id !== profile?.id && 
+                         !isAdmin && profile?.role !== 'vet';
+                         
+  const isEditingDisabled = isLocked || isReadOnlyMode;
 
   useEffect(() => {
     setIsEditOverride(false);
@@ -338,12 +352,23 @@ export function DailyShiftPage() {
     try {
       const data = await shiftService.getShiftData(selectedDate);
       let loadedShift = data.shift || null;
+      
+      if (profile?.id) {
+        const pending = await shiftService.checkPendingHandover(profile.id);
+        setPendingHandover(pending);
+      }
+
       if (loadedShift && (!loadedShift.duty_keeper_id || loadedShift.duty_keeper_id !== profile?.id)) {
         const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && profile?.role !== 'vet';
-        if (!isThisShiftLocked && profile?.id) {
+        // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null)
+        if (!isThisShiftLocked && profile?.id && !loadedShift.duty_keeper_id) {
            loadedShift = { ...loadedShift, duty_keeper_id: profile.id };
            // Trigger immediate save in background so it's locked to this user
            shiftService.saveShiftData(loadedShift, data.metrics || {}).catch(console.error);
+        } else if (loadedShift.duty_keeper_id) {
+           supabaseService.getProfile(loadedShift.duty_keeper_id).then(p => {
+             if (p) setDutyKeeperName(p.name);
+           });
         }
       }
       setShift(loadedShift);
@@ -353,6 +378,16 @@ export function DailyShiftPage() {
       setFeedInventory(inv);
       setHayStockBales(inv.hay_bales.quantity_in_stock);
       setHayStockRolls(inv.hay_rolls.quantity_in_stock);
+
+      const currentBales = loadedShift?.hay_bales_distributed ?? 0;
+      const currentRolls = loadedShift?.hay_bags_distributed ?? 0;
+      const currentBranches = parseDailyRation(loadedShift?.feed_notes).coarse_branches || 0;
+      
+      setInitialAvailable({
+        bales: inv.hay_bales.quantity_in_stock + currentBales,
+        rolls: inv.hay_rolls.quantity_in_stock + currentRolls,
+        branches: inv.branches.quantity_in_stock + currentBranches
+      });
 
       const { data: staffData } = await supabase.from('profiles').select('id, name, role');
       const staff = staffData || [];
@@ -540,6 +575,13 @@ export function DailyShiftPage() {
       setFeedInventory(updated);
       setHayStockBales(updated.hay_bales.quantity_in_stock);
       setHayStockRolls(updated.hay_rolls.quantity_in_stock);
+      
+      setInitialAvailable({
+        bales: updated.hay_bales.quantity_in_stock + (shift?.hay_bales_distributed ?? 0),
+        rolls: updated.hay_rolls.quantity_in_stock + (shift?.hay_bags_distributed ?? 0),
+        branches: updated.branches.quantity_in_stock + (parseDailyRation(shift?.feed_notes).coarse_branches || 0)
+      });
+
       setReplenishModalOpen(false);
     } catch (err) {
       console.error('Failed to save feed inventory:', err);
@@ -866,8 +908,18 @@ export function DailyShiftPage() {
   return (
     <div className="pb-32 space-y-6 mt-3 relative">
       
+      {/* TOP NOTIFICATION BANNERS */}
+      {isReadOnlyMode && (
+        <div className="mb-4 bg-amber-50 border border-amber-200/60 rounded-[24px] p-3 shadow-sm mx-4 sm:mx-0">
+          <p className="text-amber-800 font-bold text-sm flex items-center gap-2">
+            <Lock size={16} className="shrink-0" />
+            Дежурит {dutyKeeperName || 'другой кипер'}. Вы в режиме просмотра.
+          </p>
+        </div>
+      )}
+
       {/* ARCHIVE GUARD BANNER */}
-      {isArchiveMode && !isEditOverride && (
+      {isArchiveMode && !isEditOverride && !isReadOnlyMode && (
         <ArchiveBanner
           isAdmin={isAdmin}
           onReturnToToday={() => setSelectedDate(todayStr)}
@@ -969,17 +1021,25 @@ export function DailyShiftPage() {
             <CounterButton
               value={hayBalesDistributed}
               onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
-              disabled={isLocked}
+              disabled={isEditingDisabled}
               variant="vertical"
               unit="тюков"
             />
-            <div className="text-[11px] text-center pt-0.5 select-none truncate">
-              <span className="text-slate-400 font-medium">Склад: </span>
-              <span className={`font-bold ${feedInventory.hay_bales.quantity_in_stock < 30 ? 'text-amber-600 font-black' : 'text-slate-700'}`}>
-                {feedInventory.hay_bales.quantity_in_stock}
-              </span>
-              <span className="text-slate-400 font-medium"> тюк.</span>
-            </div>
+            {(() => {
+              const dist = hayBalesDistributed || 0;
+              const remaining = initialAvailable.bales - dist;
+              const isOver = remaining < 0;
+              return (
+                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-500'}`}>
+                  <span className="font-medium">Остаток: </span>
+                  <span className={`font-bold ${remaining < 30 && !isOver ? 'text-amber-600 font-black' : (isOver ? 'font-black' : '')}`}>
+                    {Math.max(0, remaining)}
+                  </span>
+                  <span className="font-medium"> тюк.</span>
+                  {isOver && <div className="text-[9.5px] leading-tight mt-0.5 font-bold">Нехватка: {Math.abs(remaining)}</div>}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Рулоны / Мешки */}
@@ -991,17 +1051,25 @@ export function DailyShiftPage() {
             <CounterButton
               value={hayBagsDistributed}
               onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
-              disabled={isLocked}
+              disabled={isEditingDisabled}
               variant="vertical"
               unit="рулонов"
             />
-            <div className="text-[11px] text-center pt-0.5 select-none truncate">
-              <span className="text-slate-400 font-medium">Склад: </span>
-              <span className={`font-bold ${feedInventory.hay_rolls.quantity_in_stock < 5 ? 'text-amber-600 font-black' : 'text-slate-700'}`}>
-                {feedInventory.hay_rolls.quantity_in_stock}
-              </span>
-              <span className="text-slate-400 font-medium"> рул.</span>
-            </div>
+            {(() => {
+              const dist = hayBagsDistributed || 0;
+              const remaining = initialAvailable.rolls - dist;
+              const isOver = remaining < 0;
+              return (
+                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-500'}`}>
+                  <span className="font-medium">Остаток: </span>
+                  <span className={`font-bold ${remaining < 5 && !isOver ? 'text-amber-600 font-black' : (isOver ? 'font-black' : '')}`}>
+                    {Math.max(0, remaining)}
+                  </span>
+                  <span className="font-medium"> рул.</span>
+                  {isOver && <div className="text-[9.5px] leading-tight mt-0.5 font-bold">Нехватка: {Math.abs(remaining)}</div>}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Ветки, веники */}
@@ -1013,17 +1081,25 @@ export function DailyShiftPage() {
             <CounterButton
               value={currentRation.coarse_branches || 0}
               onChange={handleBranchesChange}
-              disabled={isLocked}
+              disabled={isEditingDisabled}
               variant="vertical"
               unit="веников"
             />
-            <div className="text-[11px] text-center pt-0.5 select-none truncate">
-              <span className="text-slate-400 font-medium">Склад: </span>
-              <span className={`font-bold ${feedInventory.branches.quantity_in_stock < 10 ? 'text-amber-600 font-black' : 'text-slate-700'}`}>
-                {feedInventory.branches.quantity_in_stock}
-              </span>
-              <span className="text-slate-400 font-medium"> шт.</span>
-            </div>
+            {(() => {
+              const dist = currentRation.coarse_branches || 0;
+              const remaining = initialAvailable.branches - dist;
+              const isOver = remaining < 0;
+              return (
+                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-500'}`}>
+                  <span className="font-medium">Остаток: </span>
+                  <span className={`font-bold ${remaining < 10 && !isOver ? 'text-amber-600 font-black' : (isOver ? 'font-black' : '')}`}>
+                    {Math.max(0, remaining)}
+                  </span>
+                  <span className="font-medium"> шт.</span>
+                  {isOver && <div className="text-[9.5px] leading-tight mt-0.5 font-bold">Нехватка: {Math.abs(remaining)}</div>}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -1097,8 +1173,19 @@ export function DailyShiftPage() {
       )}
 
       {/* 7. НИЖНЯЯ ПАНЕЛЬ: КНОПКА [ ЗАВЕРШИТЬ СМЕНУ ] */}
-      {!isLocked && (
-        <SubmitShiftButton
+      {!isEditingDisabled && (
+        <div className="flex flex-col gap-3">
+          {profile?.role === 'keeper' && selectedDate === todayStr && (
+            <button
+              onClick={() => setIsHandoverModalOpen(true)}
+              className="w-full min-h-[56px] flex items-center justify-center gap-2 rounded-[24px] bg-sky-100 hover:bg-sky-200 text-sky-700 font-black active:scale-95 transition-all text-sm shadow-sm border-2 border-white tap-target"
+            >
+              <UserCheck size={20} strokeWidth={2.5} />
+              Сдать дежурство (передача смены)
+            </button>
+          )}
+
+          <SubmitShiftButton
           isIdeal={Boolean(
             (currentRation.morning_mash_fed || (currentRation.morning_porridge && currentRation.morning_porridge !== 'none')) &&
             (currentRation.evening_diet_fed || currentRation.salad_base_included)
@@ -1111,6 +1198,7 @@ export function DailyShiftPage() {
             setIsEndMatchModalOpen(true);
           }}
         />
+        </div>
       )}
 
       {/* END MATCH SUMMARY MODAL */}
@@ -1427,7 +1515,35 @@ export function DailyShiftPage() {
         </div>
       )}
 
-      {/* SHIFT COMPLETED CONFIRMATION MODAL */}
+      {/* RENDERING PENDING HANDOVER BANNER */}
+      {pendingHandover && profile && (
+        <HandoverAcceptBanner
+          pendingShift={pendingHandover}
+          currentUserId={profile.id}
+          onAccept={() => {
+            setPendingHandover(null);
+            setSelectedDate(todayStr);
+            // Refresh to see the newly claimed shift
+            loadData();
+          }}
+          onReject={() => {
+            setPendingHandover(null);
+          }}
+        />
+      )}
+
+      {/* SHIFT HANDOVER MODAL */}
+      {isHandoverModalOpen && shift && profile && (
+        <ShiftHandoverModal
+          shiftId={shift.id}
+          currentUserId={profile.id}
+          onClose={() => setIsHandoverModalOpen(false)}
+          onSuccess={() => {
+            setIsHandoverModalOpen(false);
+            loadData();
+          }}
+        />
+      )}
     </div>
-    );
+  );
 }

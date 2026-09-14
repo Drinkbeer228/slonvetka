@@ -100,6 +100,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     localStorage.removeItem('slon_keeper');
+    localStorage.removeItem('slonovet_session_token');
+    await supabase.auth.signOut();
     setProfile(null);
   };
 

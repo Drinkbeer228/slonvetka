@@ -4,20 +4,24 @@ import { DailyRationData } from './FeedControl';
 import { RecipeBottomSheet } from './RecipeBottomSheet';
 import { SaladTechModal } from './SaladTechModal';
 import { PhotoActionThumbnail } from './PhotoActionThumbnail';
+import { compressImage } from '../../utils/imageCompressor';
+import { supabaseService } from '../../services/supabaseService';
 
 export interface DietSectionProps {
   ration: DailyRationData;
   isLocked?: boolean;
   dutyKeeperName?: string;
+  shiftDate?: string;
   onChange?: (field: keyof DailyRationData | Partial<DailyRationData>, value?: any) => void;
   onPorridgeFieldChange?: (field: keyof DailyRationData | Partial<DailyRationData>, value?: any) => void;
-  onPhotoAdd?: (photo: { id: string; timestamp: string; section: string; dataUrl: string }) => void;
+  onPhotoAdd?: (photo: { id: string; timestamp: string; section: string; dataUrl?: string; storage_path?: string }) => void;
 }
 
 export function DietSection({
   ration,
   isLocked = false,
   dutyKeeperName,
+  shiftDate,
   onChange,
   onPorridgeFieldChange,
   onPhotoAdd
@@ -55,45 +59,24 @@ export function DietSection({
   };
 
   // --- Image Compressor ---
-  const processImageFile = (
+  const processImageFile = async (
     file: File,
-    onSuccess: (dataUrl: string) => void,
+    section: string,
+    onSuccess: (storagePath: string) => void,
     setLoading: (val: boolean) => void
   ) => {
     setLoading(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        const maxSize = 1200;
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = Math.round((height * maxSize) / width);
-            width = maxSize;
-          } else {
-            width = Math.round((width * maxSize) / height);
-            height = maxSize;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/webp', 0.75);
-          onSuccess(compressed);
-        }
-        setLoading(false);
-      };
-      img.onerror = () => setLoading(false);
-      if (event.target?.result) {
-        img.src = event.target.result as string;
-      }
-    };
-    reader.onerror = () => setLoading(false);
-    reader.readAsDataURL(file);
+    try {
+      const blob = await compressImage(file);
+      const sDate = shiftDate || new Date().toISOString().split('T')[0];
+      const storagePath = await supabaseService.uploadShiftMedia(blob, sDate, section);
+      onSuccess(storagePath);
+    } catch (err) {
+      console.error('Failed to process and upload image:', err);
+      alert('Ошибка загрузки фото');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ==========================================
@@ -117,6 +100,7 @@ export function DietSection({
 
     processImageFile(
       file,
+      'morning_porridge',
       (compressed) => {
         const now = new Date();
         const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -134,7 +118,7 @@ export function DietSection({
           id: crypto.randomUUID(),
           timestamp: now.toISOString(),
           section: 'breakfast',
-          dataUrl: compressed
+          storage_path: compressed
         });
       },
       setIsProcessingMorningPhoto
@@ -186,6 +170,7 @@ export function DietSection({
 
     processImageFile(
       file,
+      'evening_salad',
       (compressed) => {
         const now = new Date();
         const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -202,7 +187,7 @@ export function DietSection({
           id: crypto.randomUUID(),
           timestamp: now.toISOString(),
           section: 'dinner',
-          dataUrl: compressed
+          storage_path: compressed
         });
       },
       setIsProcessingEveningPhoto

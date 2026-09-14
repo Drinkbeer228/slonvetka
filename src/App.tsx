@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { useStore } from './store';
-import { SimpleKeeperGate } from './components/auth/SimpleKeeperGate';
+import { LoginPage } from './components/auth/LoginPage';
 import { DailyShiftPage } from './screens/DailyShiftPage';
 import { TodayScreen } from './screens/TodayScreen';
 import { JournalScreen } from './screens/JournalScreen';
@@ -59,11 +59,11 @@ export default function App() {
   };
 
   return (
-    <SimpleKeeperGate>
+    <LoginPage>
       <Layout currentScreen={currentScreen} onNavigate={handleNavigate}>
         {renderScreen()}
       </Layout>
-    </SimpleKeeperGate>
+    </LoginPage>
   );
 }
 

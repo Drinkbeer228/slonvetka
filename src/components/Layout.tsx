@@ -6,6 +6,7 @@ import {
 import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
 import { Header } from './Header';
+import { ProfileSettingsModal } from './ProfileSettingsModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -32,6 +33,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
   const { profile, logout } = useStore();
 
   const handleNav = (id: string) => {
@@ -165,6 +167,21 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
             <button
               type="button"
               onClick={() => {
+                setProfileSettingsOpen(true);
+                setDrawerOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 mb-2 rounded-[14px] font-bold text-sm text-slate-700 transition-all active:scale-95 cursor-pointer tap-target"
+              style={{
+                background: 'rgba(255,255,255,0.8)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,1)',
+              }}
+            >
+              Настройки профиля
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
                 if (confirm('Сменить сотрудника?')) {
                   logout();
                   setDrawerOpen(false);
@@ -182,6 +199,10 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
           </div>
         )}
       </aside>
+
+      {profileSettingsOpen && (
+        <ProfileSettingsModal onClose={() => setProfileSettingsOpen(false)} />
+      )}
     </div>
   );
 }

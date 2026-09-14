@@ -12,6 +12,9 @@ create table public.profiles (
   invite_code text unique,
   active boolean default true,
   is_admin boolean default false,
+  birth_date date,
+  avatar_url text,
+  current_session_id text,
   created_at timestamptz default now()
 );
 
@@ -66,13 +69,16 @@ create table public.daily_shifts (
   id text primary key, -- format: 'shift_YYYY-MM-DD_<random>'
   date date not null unique,
   duty_keeper_id uuid references public.profiles(id),
-  status text check (status in ('in_progress', 'completed', 'submitted')) default 'in_progress',
+  status text check (status in ('in_progress', 'completed', 'submitted', 'handover_pending')) default 'in_progress',
   hay_bales_distributed integer default 0 check (hay_bales_distributed >= 0),
   hay_bags_distributed integer default 0 check (hay_bags_distributed >= 0),
   reminders jsonb default '[]',
   feed_notes text default '',
   handover_notes text default '',
+  handover_to_keeper_id uuid references public.profiles(id),
   handover_complaints jsonb default '[]',
+  started_at timestamptz default now(),
+  ended_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -96,8 +102,7 @@ create table public.elephant_daily_metrics (
 
 -- FEED INVENTORY (учет остатков кормов на складе: сено, рулоны, ветки)
 create table public.feed_inventory (
-  feed_type text primary key, -- 'hay_bales', 'hay_rolls', 'branches'
-  name text not null,
+  item_type text primary key, -- 'hay_bales', 'hay_rolls', 'branches'
   quantity_in_stock integer not null default 0 check (quantity_in_stock >= 0),
   unit text default 'шт',
   updated_at timestamptz default now()
@@ -125,6 +130,17 @@ begin
 
   return row_to_json(found_profile);
 end;
+$$;
+
+-- ============================================================
+-- RPC to register device session (single active session)
+-- ============================================================
+create or replace function register_device_session(user_id uuid, session_token text)
+returns void
+language sql
+security definer
+as $$
+  update public.profiles set current_session_id = session_token where id = user_id;
 $$;
 
 -- ============================================================
@@ -351,8 +367,8 @@ insert into public.profiles (name, role, invite_code) values
   ('Алексей (Ветврач)', 'vet', 'VET-DOC-77')
   on conflict do nothing;
 
-insert into public.feed_inventory (feed_type, name, quantity_in_stock, unit) values
-  ('hay_bales', 'Тюки сена', 200, 'тюков'),
-  ('hay_rolls', 'Рулоны сена', 15, 'рулонов'),
-  ('branches', 'Ветки / веники', 50, 'веников')
-  on conflict (feed_type) do nothing;
+insert into public.feed_inventory (item_type, quantity_in_stock, unit) values
+  ('hay_bales', 200, 'тюков'),
+  ('hay_rolls', 15, 'рулонов'),
+  ('branches', 50, 'веников')
+  on conflict (item_type) do nothing;

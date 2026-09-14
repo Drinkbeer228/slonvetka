@@ -3,19 +3,23 @@ import { Check, Camera, RotateCcw, X, Loader2 } from 'lucide-react';
 import { DailyRationData } from './FeedControl';
 import { RecipeBottomSheet } from './RecipeBottomSheet';
 import { PhotoActionThumbnail } from './PhotoActionThumbnail';
+import { compressImage } from '../../utils/imageCompressor';
+import { supabaseService } from '../../services/supabaseService';
 
 export interface BreakfastSectionProps {
   ration: DailyRationData;
   isLocked?: boolean;
   dutyKeeperName?: string;
+  shiftDate?: string;
   onChange: (field: keyof DailyRationData | Partial<DailyRationData>, value?: any) => void;
-  onPhotoAdd?: (photo: { id: string; timestamp: string; section: string; dataUrl: string }) => void;
+  onPhotoAdd?: (photo: { id: string; timestamp: string; section: string; dataUrl?: string; storage_path?: string }) => void;
 }
 
 export function BreakfastSection({
   ration,
   isLocked = false,
   dutyKeeperName,
+  shiftDate,
   onChange,
   onPhotoAdd
 }: BreakfastSectionProps) {
@@ -44,69 +48,48 @@ export function BreakfastSection({
   };
 
   // Compress & save photo proof, then mark issued
-  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessingPhoto(true);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        const maxSize = 1200;
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = Math.round((height * maxSize) / width);
-            width = maxSize;
-          } else {
-            width = Math.round((width * maxSize) / height);
-            height = maxSize;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/webp', 0.75);
+    try {
+      const blob = await compressImage(file);
+      const sDate = shiftDate || new Date().toISOString().split('T')[0];
+      const storagePath = await supabaseService.uploadShiftMedia(blob, sDate, 'morning_porridge');
+      
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      const keeper = keeperName || 'Дежурный кипер';
 
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-          const keeper = keeperName || 'Дежурный кипер';
+      handleHaptic(25);
 
-          handleHaptic(25);
+      // Update ration atomically
+      onChange({
+        morning_porridge: 'all',
+        morning_porridge_photo: storagePath,
+        morning_porridge_time: timeStr,
+        morning_porridge_keeper: keeper
+      });
 
-          // Update ration atomically
-          onChange({
-            morning_porridge: 'all',
-            morning_porridge_photo: compressed,
-            morning_porridge_time: timeStr,
-            morning_porridge_keeper: keeper
-          });
-
-          // Also trigger general photo callback if passed
-          onPhotoAdd?.({
-            id: crypto.randomUUID(),
-            timestamp: now.toISOString(),
-            section: 'breakfast',
-            dataUrl: compressed
-          });
-        }
-        setIsProcessingPhoto(false);
-      };
-      img.onerror = () => setIsProcessingPhoto(false);
-      if (event.target?.result) {
-        img.src = event.target.result as string;
+      // Also trigger general photo callback if passed
+      onPhotoAdd?.({
+        id: crypto.randomUUID(),
+        timestamp: now.toISOString(),
+        section: 'breakfast',
+        storage_path: storagePath
+      });
+    } catch (err) {
+      console.error('Photo upload failed', err);
+      alert('Ошибка загрузки фото');
+    } finally {
+      setIsProcessingPhoto(false);
+      // Reset input so re-selection fires onChange
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-    };
-    reader.onerror = () => setIsProcessingPhoto(false);
-    reader.readAsDataURL(file);
-
-    // Reset input so re-selection fires onChange
-    e.target.value = '';
+    }
   };
 
   const handleReset = () => {

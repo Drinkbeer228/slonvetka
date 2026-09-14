@@ -1,5 +1,6 @@
 import React from 'react';
 import { Camera, RefreshCw } from 'lucide-react';
+import { supabaseService } from '../../services/supabaseService';
 
 export interface PhotoActionThumbnailProps {
   photoUrl?: string | null;
@@ -24,6 +25,9 @@ export function PhotoActionThumbnail({
   onPreviewClick
 }: PhotoActionThumbnailProps) {
   if (photoUrl) {
+    const isBase64 = photoUrl.startsWith('data:image') || photoUrl.startsWith('blob:') || photoUrl.startsWith('http');
+    const finalUrl = isBase64 ? photoUrl : supabaseService.getPublicUrl(photoUrl);
+
     return (
       <button
         type="button"
@@ -33,7 +37,7 @@ export function PhotoActionThumbnail({
         aria-label={title || 'Просмотреть / удалить фото'}
       >
         <img
-          src={photoUrl}
+          src={finalUrl}
           alt="Фото-пруф"
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover"

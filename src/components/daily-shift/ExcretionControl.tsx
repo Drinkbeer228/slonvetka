@@ -4,6 +4,8 @@ import { Elephant } from '../../types';
 import { ElephantDailyMetrics, ShiftPhoto, clampCount } from '../../types/shift';
 import { createPortal } from 'react-dom';
 import { PhotoActionThumbnail } from './PhotoActionThumbnail';
+import { compressImage } from '../../utils/imageCompressor';
+import { supabaseService } from '../../services/supabaseService';
 
 const DEFAULT_ELEPHANTS: { id: string; name: string }[] = [
   { id: 'margo',  name: 'Марго'  },
@@ -245,40 +247,26 @@ export function ExcretionControl({
     }
   };
 
-  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsProcessingPhoto(true);
     handleHaptic(20);
 
-    const reader = new FileReader();
-    reader.onload = event => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        const maxSize = 1200;
-        if (width > maxSize || height > maxSize) {
-          if (width > height) { height = Math.round((height * maxSize) / width); width = maxSize; }
-          else { width = Math.round((width * maxSize) / height); height = maxSize; }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/webp', 0.75);
-          setPendingPhotoUrl(compressed);
-          setIsPhotoAttribOpen(true);
-        }
-        setIsProcessingPhoto(false);
-      };
-      img.onerror = () => setIsProcessingPhoto(false);
-      if (event.target?.result) img.src = event.target.result as string;
-    };
-    reader.onerror = () => setIsProcessingPhoto(false);
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      const blob = await compressImage(file);
+      const sDate = new Date().toISOString().split('T')[0]; // Adjust if shiftDate can be passed
+      const storagePath = await supabaseService.uploadShiftMedia(blob, sDate, activeTab);
+      
+      setPendingPhotoUrl(storagePath);
+      setIsPhotoAttribOpen(true);
+    } catch (err) {
+      console.error('Failed to process and upload image:', err);
+      alert('Ошибка загрузки фото');
+    } finally {
+      setIsProcessingPhoto(false);
+      e.target.value = '';
+    }
   };
 
   const handleAssignPhoto = (elephantId: string) => {
@@ -287,7 +275,7 @@ export function ExcretionControl({
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
       section: activeTab,
-      dataUrl: pendingPhotoUrl,
+      storage_path: pendingPhotoUrl,
     };
     const currentPhotos = metrics?.[elephantId]?.photos ?? [];
     onMetricChange?.(elephantId, 'photos', [...currentPhotos, newPhoto]);

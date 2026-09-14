@@ -2,12 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Check, RefreshCw, Trash2, X } from 'lucide-react';
 import { ShiftPhoto } from '../../types/shift';
 import { SectionPhotoTrigger } from './SectionPhotoTrigger';
+import { compressImage } from '../../utils/imageCompressor';
+import { supabaseService } from '../../services/supabaseService';
 
 export interface ObservationJournalProps {
   value?: string;
   onChange?: (value: string) => void;
   onBlur?: () => void;
   isLocked?: boolean;
+  shiftDate?: string;
   // Photo integration options
   photos?: ShiftPhoto[];
   onAddPhoto?: (photo: ShiftPhoto) => void;
@@ -23,6 +26,7 @@ export function ObservationJournal({
   onChange,
   onBlur,
   isLocked = false,
+  shiftDate,
   photos,
   onAddPhoto,
   onRemovePhoto,
@@ -71,48 +75,27 @@ export function ObservationJournal({
   };
 
   // Standalone Photo Capture Logic
-  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessingPhoto(true);
     handleHaptic(20);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        const maxSize = 1200;
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = Math.round((height * maxSize) / width);
-            width = maxSize;
-          } else {
-            width = Math.round((width * maxSize) / height);
-            height = maxSize;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/webp', 0.75);
-          onPhotoChange?.(compressed);
-          setLocalPhotoUrl(compressed);
-        }
-        setIsProcessingPhoto(false);
-      };
-      img.onerror = () => setIsProcessingPhoto(false);
-      if (event.target?.result) {
-        img.src = event.target.result as string;
-      }
-    };
-    reader.onerror = () => setIsProcessingPhoto(false);
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      const blob = await compressImage(file);
+      const sDate = shiftDate || new Date().toISOString().split('T')[0];
+      const storagePath = await supabaseService.uploadShiftMedia(blob, sDate, 'general_observation');
+      
+      onPhotoChange?.(storagePath);
+      setLocalPhotoUrl(storagePath);
+    } catch (err) {
+      console.error('Failed to upload observation photo', err);
+      alert('Ошибка загрузки фото');
+    } finally {
+      setIsProcessingPhoto(false);
+      e.target.value = '';
+    }
   };
 
   const handleRemovePhoto = () => {
@@ -196,7 +179,7 @@ export function ObservationJournal({
         <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/90 backdrop-blur-xl animate-in fade-in duration-200">
           <div className="flex-1 w-full h-full p-4 flex items-center justify-center relative">
             <img
-              src={photoUrl}
+              src={photoUrl.startsWith('data:image') || photoUrl.startsWith('blob:') || photoUrl.startsWith('http') ? photoUrl : supabaseService.getPublicUrl(photoUrl)}
               alt="Фото к заметкам"
               className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl drop-shadow-2xl animate-in zoom-in-95 duration-200"
             />

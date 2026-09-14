@@ -52,6 +52,8 @@ export const shiftService = {
    * 3. Если кэш пуст — возврат дефолтных значений и инициализация кэша
    */
   async getFeedInventory(): Promise<Record<FeedInventoryType, FeedInventoryItem>> {
+    await supabase.auth.getSession();
+    
     // 1. Попытка чтения из Supabase
     try {
       const { data, error } = await supabase
@@ -63,11 +65,11 @@ export const shiftService = {
           ...DEFAULT_FEED_INVENTORY
         };
         for (const row of data) {
-          const type = row.feed_type as FeedInventoryType;
+          const type = row.item_type as FeedInventoryType;
           if (type in result) {
             result[type] = {
               feed_type: type,
-              name: row.name || DEFAULT_FEED_INVENTORY[type].name,
+              name: DEFAULT_FEED_INVENTORY[type].name,
               quantity_in_stock: Math.max(0, Number(row.quantity_in_stock ?? 0)),
               unit: row.unit || DEFAULT_FEED_INVENTORY[type].unit,
               updated_at: row.updated_at
@@ -106,9 +108,14 @@ export const shiftService = {
     // 3. Если и база, и кэш пусты: сохраняем дефолтные остатки
     try {
       await cacheFeedInventory(Object.values(DEFAULT_FEED_INVENTORY));
+      const dbPayload = Object.values(DEFAULT_FEED_INVENTORY).map(item => ({
+        item_type: item.feed_type,
+        quantity_in_stock: item.quantity_in_stock,
+        unit: item.unit
+      }));
       await supabase
         .from('feed_inventory')
-        .upsert(Object.values(DEFAULT_FEED_INVENTORY), { onConflict: 'feed_type' });
+        .upsert(dbPayload, { onConflict: 'item_type' });
     } catch {}
 
     return { ...DEFAULT_FEED_INVENTORY };
@@ -133,9 +140,15 @@ export const shiftService = {
 
     // 2. Запись в Supabase
     try {
+      const payload = {
+        item_type: updatedItem.feed_type,
+        quantity_in_stock: updatedItem.quantity_in_stock,
+        unit: updatedItem.unit,
+        updated_at: updatedItem.updated_at
+      };
       const { error } = await supabase
         .from('feed_inventory')
-        .upsert(updatedItem, { onConflict: 'feed_type' });
+        .upsert(payload, { onConflict: 'item_type' });
       if (error) {
         console.warn('Could not update feed_inventory in Supabase:', error);
       }
@@ -200,14 +213,20 @@ export const shiftService = {
 
     // 2. Синхронизируем с Supabase
     try {
+      const dbPayload = updates.map(item => ({
+        item_type: item.feed_type,
+        quantity_in_stock: item.quantity_in_stock,
+        unit: item.unit,
+        updated_at: item.updated_at
+      }));
       const { error } = await supabase
         .from('feed_inventory')
-        .upsert(updates, { onConflict: 'feed_type' });
+        .upsert(dbPayload, { onConflict: 'item_type' });
       if (error) {
-        console.warn('Error syncing feed deductions to Supabase:', error);
+        console.error('Ошибка списания со склада:', error);
       }
     } catch (err) {
-      console.warn('Network error syncing feed deductions to Supabase:', err);
+      console.error('Ошибка списания со склада (сеть):', err);
     }
   },
 
@@ -233,8 +252,109 @@ export const shiftService = {
   },
 
 
+  async checkPendingHandover(userId: string): Promise<DailyShift | null> {
+    await supabase.auth.getSession();
+    try {
+      const { data, error } = await supabase
+        .from('daily_shifts')
+        .select('*')
+        .eq('status', 'handover_pending')
+        .eq('handover_to_keeper_id', userId)
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data as DailyShift | null;
+    } catch (err) {
+      console.error('Error checking pending handover:', err);
+      return null;
+    }
+  },
+
+  async initiateHandover(shiftId: string, targetKeeperId: string, notes: string): Promise<void> {
+    await supabase.auth.getSession();
+    const { error } = await supabase
+      .from('daily_shifts')
+      .update({
+        status: 'handover_pending',
+        handover_to_keeper_id: targetKeeperId,
+        handover_notes: notes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', shiftId);
+      
+    if (error) throw error;
+  },
+
+  async acceptHandover(pendingShift: DailyShift, newDutyKeeperId: string): Promise<void> {
+    await supabase.auth.getSession();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+
+    if (pendingShift.date === todayStr) {
+      // Смена за сегодня: просто забираем её себе (перехват дежурства)
+      // т.к. в БД стоит ограничение UNIQUE(date) и мы не можем создать вторую смену за день
+      const { error } = await supabase
+        .from('daily_shifts')
+        .update({
+          status: 'in_progress',
+          duty_keeper_id: newDutyKeeperId,
+          handover_to_keeper_id: null,
+          handover_notes: '',
+          updated_at: now
+        })
+        .eq('id', pendingShift.id);
+        
+      if (error) throw error;
+    } else {
+      // Смена за вчера (или раньше): закрываем её и создаём новую за сегодня
+      const { error: closeError } = await supabase
+        .from('daily_shifts')
+        .update({
+          status: 'completed',
+          ended_at: now,
+          updated_at: now,
+          handover_to_keeper_id: null
+        })
+        .eq('id', pendingShift.id);
+        
+      if (closeError) throw closeError;
+
+      const newShiftId = `shift_${todayStr}_${Math.random().toString(36).substring(2, 9)}`;
+      const { error: createError } = await supabase
+        .from('daily_shifts')
+        .insert({
+          id: newShiftId,
+          date: todayStr,
+          duty_keeper_id: newDutyKeeperId,
+          status: 'in_progress',
+          started_at: now,
+          updated_at: now
+        });
+        
+      if (createError) throw createError;
+    }
+  },
+
+  async rejectHandover(pendingShiftId: string): Promise<void> {
+    await supabase.auth.getSession();
+    const { error } = await supabase
+      .from('daily_shifts')
+      .update({
+        status: 'in_progress',
+        handover_to_keeper_id: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', pendingShiftId);
+      
+    if (error) throw error;
+  },
+
   async getShiftData(date: string): Promise<{ shift: DailyShift; metrics: Record<string, ElephantDailyMetrics> }> {
     const db = await getOfflineDb();
+    
+    await supabase.auth.getSession();
 
     // 1. Try Supabase first
     try {
@@ -334,6 +454,9 @@ export const shiftService = {
   async saveShiftData(shift: DailyShift, metricsMap: Record<string, ElephantDailyMetrics>): Promise<void> {
     const db = await getOfflineDb();
 
+    // Ensure session is fresh before making any Supabase calls
+    await supabase.auth.getSession();
+
     // 0. Списание расхода кормов из feed_inventory (по дельте от предыдущего сохраненного состояния)
     try {
       const existingShift = await db.get('daily_shifts', shift.id);
@@ -430,6 +553,8 @@ export const shiftService = {
     const startDate = `${year}-${mm}-01`;
     const endDate = `${year}-${mm}-31`;
     const activityMap: Record<string, number> = {};
+
+    await supabase.auth.getSession();
 
     // 1. Fetch from Supabase
     try {

@@ -9,7 +9,8 @@ export interface ShiftPhoto {
   id: string;
   timestamp: string;
   section: 'stool' | 'urine' | 'sleep' | 'general';
-  dataUrl: string;
+  storage_path?: string; // New field for Supabase storage path
+  dataUrl?: string; // Kept for backward compatibility
 }
 
 export interface HandoverComplaint {
@@ -25,13 +26,16 @@ export interface DailyShift {
   id: string;
   date: string; // YYYY-MM-DD
   duty_keeper_id: string | null;
-  status: 'in_progress' | 'completed' | 'submitted';
+  status: 'in_progress' | 'completed' | 'submitted' | 'handover_pending';
   hay_bales_distributed: number;
   hay_bags_distributed: number;
   reminders: string[];
   feed_notes: string;
   handover_notes: string;
+  handover_to_keeper_id?: string | null;
   handover_complaints?: HandoverComplaint[];
+  started_at?: string;
+  ended_at?: string;
   created_at?: string;
   updated_at?: string;
 }
