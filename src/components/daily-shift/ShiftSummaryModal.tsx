@@ -55,10 +55,7 @@ export function ShiftSummaryModal({
 
   const actualDamages = damages.filter(d => d.count > 0);
   
-  // Base bonus calculation (just for show)
-  const baseBonus = 150;
-  const damagePenalty = actualDamages.reduce((sum, d) => sum + (d.count * 10), 0);
-  const finalBonus = Math.max(0, baseBonus - damagePenalty);
+  
 
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
@@ -171,11 +168,7 @@ export function ShiftSummaryModal({
 
         {/* 4. Подвал и действие */}
         <div className="pt-4 border-t border-slate-200/80 space-y-4">
-          <div className="flex justify-center">
-            <div className="text-sm font-bold text-slate-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl">
-              Премия за смену: {finalBonus} ₽ десятками
-            </div>
-          </div>
+          
           
           <div className="flex flex-col gap-2">
             <button
@@ -186,7 +179,7 @@ export function ShiftSummaryModal({
               }}
               className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-sm shadow-md transition-all active:scale-[0.98]"
             >
-              Подтвердить и закрыть день
+              Сдать дежурство (Передать смену)
             </button>
             <button
               type="button"

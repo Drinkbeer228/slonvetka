@@ -133,6 +133,7 @@ export function VeterinaryAssignmentCard({
                   <Edit3 size={13} className="text-slate-500" />
                   <span className="hidden sm:inline">Изм.</span>
                 </button>
+                {completedAt && (Date.now() - new Date().setHours(parseInt(completedAt.split(':')[0]), parseInt(completedAt.split(':')[1]), 0, 0)) < 5 * 60 * 1000 && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -140,11 +141,12 @@ export function VeterinaryAssignmentCard({
                     onUnmark();
                   }}
                   className="w-10 h-10 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200/70 shadow-xs active:scale-95 transition flex items-center justify-center cursor-pointer tap-target touch-manipulation"
-                  title="Снять отметку о выполнении"
+                  title="Снять отметку о выполнении (доступно 5 минут)"
                   aria-label="Снять отметку"
                 >
                   <Trash2 size={15} />
                 </button>
+                )}
               </div>
             ) : (
               <button

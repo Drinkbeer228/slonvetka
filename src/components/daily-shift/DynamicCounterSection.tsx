@@ -31,7 +31,7 @@ const DEFAULT_MERITS: CounterItem[] = [
 
 const DEFAULT_DAMAGES: CounterItem[] = [
   { id: 'brooms_eaten', label: 'Мётел съедено', emoji: '🧹', count: 0, type: 'damage' },
-  { id: 'shovels_broken', label: 'Совков сломано', emoji: '🪣', count: 0, type: 'damage' },
+  { id: 'shovels_broken', label: 'Ведер/лопат сломано', emoji: '🪣', count: 0, type: 'damage' },
   { id: 'hoses_bitten', label: 'Шлангов откусано', emoji: '🚿', count: 0, type: 'damage' },
   { id: 'fence_torn', label: 'Пастух порван', emoji: '⚡', count: 0, type: 'damage' },
   { id: 'hooks_chewed', label: 'Багров сожрано', emoji: '🪝', count: 0, type: 'damage' },
@@ -45,13 +45,15 @@ interface DynamicCounterSectionProps {
   isLocked?: boolean;
   dutyKeeperName?: string;
   onStatsChange?: (stats: { meritsTotal: number; damageTotal: number; merits: CounterItem[]; damages: CounterItem[] }) => void;
+  onAddEvent?: (title: string, icon: string, type: string, id: string) => void;
 }
 
 export function DynamicCounterSection({
   selectedDate,
   isLocked = false,
   dutyKeeperName,
-  onStatsChange
+  onStatsChange,
+  onAddEvent
 }: DynamicCounterSectionProps) {
   const { profile } = useStore();
   const currentKeeper = dutyKeeperName || profile?.name || 'Олег';
@@ -275,7 +277,7 @@ export function DynamicCounterSection({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         
         {/* BLOCK 1: MERITS (ЗЕЛЕНОВАТЫЙ ОТТЕНОК СТЕКЛА) */}
-        <div className="bg-emerald-500/[0.07] backdrop-blur-2xl border border-emerald-400/30 rounded-3xl p-5 shadow-sm space-y-4 relative overflow-hidden">
+        <div className="bg-emerald-500/[0.07] backdrop-blur-2xl border border-emerald-400/30 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 relative overflow-visible pt-6">
           {/* Subtle Ambient Glow */}
           <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -286,7 +288,7 @@ export function DynamicCounterSection({
                 <Trophy size={20} className="text-emerald-700" />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
                   Боевые заслуги
                   <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 font-bold">
                     Смена
@@ -304,7 +306,7 @@ export function DynamicCounterSection({
           </div>
 
           {/* List of Merits Counters */}
-          <div className="space-y-2.5 relative z-10">
+          <div className="space-y-2.5 relative z-10 pt-1">
             {merits.map(item => (
               <div
                 key={item.id}
@@ -349,7 +351,7 @@ export function DynamicCounterSection({
         </div>
 
         {/* BLOCK 2: DAMAGE & DESTRUCTION (ЯНТАРНО-КРАСНОВАТЫЙ ОТТЕНОК СТЕКЛА) */}
-        <div className="bg-rose-500/[0.07] backdrop-blur-2xl border border-rose-300/40 rounded-3xl p-5 shadow-sm space-y-4 relative overflow-hidden">
+        <div className="bg-rose-500/[0.07] backdrop-blur-2xl border border-rose-300/40 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 relative overflow-visible pt-6">
           {/* Subtle Ambient Glow */}
           <div className="absolute top-0 right-0 w-48 h-48 bg-rose-400/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -360,7 +362,7 @@ export function DynamicCounterSection({
                 <Flame size={20} className="text-rose-600" />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
                   Слоновий дестрой & Ущерб
                   <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100/80 text-rose-800 font-bold">
                     Казусы
@@ -378,7 +380,7 @@ export function DynamicCounterSection({
           </div>
 
           {/* List of Damages Counters */}
-          <div className="space-y-2.5 relative z-10 max-h-[360px] overflow-y-auto pr-1 no-scrollbar">
+          <div className="space-y-2.5 relative z-10 pt-1">
             {damages.map(item => (
               <div
                 key={item.id}

@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Trash2, X, Moon, Waves, Leaf } from 'lucide-react';
+import { Trash2, X, Moon, Waves, Leaf, Clock } from 'lucide-react';
 import { Elephant } from '../../types';
 import { ElephantDailyMetrics, ShiftPhoto, clampCount } from '../../types/shift';
 import { createPortal } from 'react-dom';
+import { useCooldown } from '../../hooks/useCooldown';
 import { PhotoActionThumbnail } from './PhotoActionThumbnail';
 import { compressImage } from '../../utils/imageCompressor';
 import { supabaseService } from '../../services/supabaseService';
@@ -107,6 +108,7 @@ interface ExcretionControlProps {
   metrics?: Record<string, ElephantDailyMetrics>;
   onMetricChange?: (elephantId: string, field: keyof ElephantDailyMetrics, value: unknown) => void;
   isLocked?: boolean;
+  onAddEvent?: (title: string, icon: string, undoPayload: any) => void;
 }
 
 export function ExcretionControl({
@@ -114,6 +116,7 @@ export function ExcretionControl({
   metrics,
   onMetricChange,
   isLocked = false,
+  onAddEvent,
 }: ExcretionControlProps) {
   const [activeTab, setActiveTab] = useState<Tab>('stool');
 
@@ -204,12 +207,50 @@ export function ExcretionControl({
     }
   };
 
-  const handleIncrement = (elephantId: string) => {
+
+  const cdMargoPoop = useCooldown('margo_poop', 3);
+  const cdOdriPoop = useCooldown('odri_poop', 3);
+  const cdPrettyPoop = useCooldown('pretty_poop', 3);
+  const cdMargoUrine = useCooldown('margo_urine', 3);
+  const cdOdriUrine = useCooldown('odri_urine', 3);
+  const cdPrettyUrine = useCooldown('pretty_urine', 3);
+  const cdMargoSleep = useCooldown('margo_sleep', 3);
+  const cdOdriSleep = useCooldown('odri_sleep', 3);
+  const cdPrettySleep = useCooldown('pretty_sleep', 3);
+
+  const getCooldownHook = (elephantId: string, tab: string) => {
+    if (elephantId === 'margo' && tab === 'stool') return cdMargoPoop;
+    if (elephantId === 'odri' && tab === 'stool') return cdOdriPoop;
+    if (elephantId === 'pretty' && tab === 'stool') return cdPrettyPoop;
+    if (elephantId === 'margo' && tab === 'urine') return cdMargoUrine;
+    if (elephantId === 'odri' && tab === 'urine') return cdOdriUrine;
+    if (elephantId === 'pretty' && tab === 'urine') return cdPrettyUrine;
+    if (elephantId === 'margo' && tab === 'sleep') return cdMargoSleep;
+    if (elephantId === 'odri' && tab === 'sleep') return cdOdriSleep;
+    if (elephantId === 'pretty' && tab === 'sleep') return cdPrettySleep;
+    return null;
+  };
+
+  const handleIncrement = (elephantId: string, elephantName: string) => {
     if (isLocked) return;
+    const cd = getCooldownHook(elephantId, activeTab);
+    if (cd && cd.isBlocked) return;
+    
     handleHaptic(10);
     const field = activeTab === 'stool' ? 'poop_count' : 'urination_count';
     const current = (metrics?.[elephantId]?.[field] as number) ?? 0;
-    onMetricChange?.(elephantId, field, clampCount(current + 1));
+    const next = clampCount(current + 1);
+    onMetricChange?.(elephantId, field, next);
+    
+    cd?.triggerCooldown();
+    const actionName = activeTab === 'stool' ? 'куча' : 'лужа';
+    const icon = activeTab === 'stool' ? '💩' : '💦';
+    onAddEvent?.(`+1 ${actionName} для ${elephantName}`, icon, {
+      type: 'physiology',
+      elephant_id: elephantId,
+      field,
+      value: current
+    });
   };
 
   const handleDecrement = (elephantId: string) => {
@@ -220,8 +261,11 @@ export function ExcretionControl({
     if (current > 0) onMetricChange?.(elephantId, field, clampCount(current - 1));
   };
 
-  const handleIncrementSleep = (elephantId: string) => {
+  const handleIncrementSleep = (elephantId: string, elephantName: string) => {
     if (isLocked) return;
+    const cd = getCooldownHook(elephantId, 'sleep');
+    if (cd && cd.isBlocked) return;
+    
     handleHaptic(10);
     const current = metrics?.[elephantId]?.sleep_minutes ?? 0;
     const next = Math.min(720, current + 30);
@@ -419,7 +463,7 @@ export function ExcretionControl({
                     <button
                       type="button"
                       disabled={isLocked || sleepMinutes >= 720}
-                      onClick={() => handleIncrementSleep(elephant.id)}
+                      onClick={() => handleIncrementSleep(elephant.id, elephant.name)}
                       className="h-11 w-full flex items-center justify-center text-xl font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target"
                       style={{
                         background: 'rgba(255,255,255,0.9)',
@@ -469,6 +513,9 @@ export function ExcretionControl({
             const field = activeTab === 'stool' ? 'poop_count' : 'urination_count';
             const count = (metrics?.[elephant.id]?.[field] as number) ?? 0;
             const hasCount = count > 0;
+            const cd = getCooldownHook(elephant.id, activeTab);
+            const isBlocked = cd?.isBlocked || false;
+            const remaining = cd?.remaining || 0;
 
             return (
               <div key={elephant.id} className="flex flex-col gap-1.5">
@@ -490,18 +537,25 @@ export function ExcretionControl({
                   {/* Increment */}
                   <button
                     type="button"
-                    disabled={isLocked}
-                    onClick={() => handleIncrement(elephant.id)}
+                    disabled={isLocked || isBlocked}
+                    onClick={() => handleIncrement(elephant.id, elephant.name)}
                     className="h-11 w-full flex items-center justify-center text-xl font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target"
                     style={{
-                      background: 'rgba(255,255,255,0.9)',
-                      color: hasCount
+                      background: isBlocked ? 'rgba(241,245,249,0.9)' : 'rgba(255,255,255,0.9)',
+                      color: isBlocked ? '#94a3b8' : hasCount
                         ? activeTab === 'stool' ? '#ea580c' : '#0284c7'
                         : '#94a3b8',
                     }}
                     aria-label={`Увеличить для ${elephant.name}`}
                   >
-                    +
+                    {isBlocked ? (
+                      <span className="text-sm font-black flex items-center gap-1">
+                        <Clock size={14} className="animate-pulse" />
+                        {Math.floor(remaining / 60)}:{(remaining % 60).toString().padStart(2, '0')}
+                      </span>
+                    ) : (
+                      '+'
+                    )}
                   </button>
 
                   {/* Counter display с мини-бейджем */}

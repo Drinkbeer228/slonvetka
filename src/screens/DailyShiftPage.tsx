@@ -10,7 +10,7 @@ import { Elephant, Assignment, TreatmentRecordWithPhotos } from '../types';
 import { CounterButton } from '../components/common/CounterButton';
 import { 
   Calendar as CalendarIcon, CheckCircle2, Loader2, Save, UserCheck, 
-  Check, Camera, PackagePlus, Package, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2,
+  Check, Camera, PackagePlus, Package, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2, ShieldAlert,
   Lock, Unlock, LogOut } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
 import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
@@ -22,6 +22,8 @@ import { DynamicCounterSection, CounterItem } from '../components/daily-shift/Dy
 import { ShiftSummaryModal } from '../components/daily-shift/ShiftSummaryModal';
 import { ArchiveBanner } from '../components/daily-shift/ArchiveBanner';
 import { ShiftHandoverModal } from '../components/daily-shift/ShiftHandoverModal';
+import { useShiftEvents, ShiftEvent } from '../hooks/useShiftEvents';
+import { ShiftActivityFeed } from '../components/daily-shift/ShiftActivityFeed';
 import { HandoverAcceptBanner } from '../components/daily-shift/HandoverAcceptBanner';
 
 export const ELEPHANT_MOODS = [
@@ -202,8 +204,24 @@ export function DailyShiftPage() {
   const [shiftRecords, setShiftRecords] = useState<TreatmentRecordWithPhotos[]>([]);
   const [staffList, setStaffList] = useState<{ id: string; name: string; role: string }[]>([]);
   
+  
   const [prevShift, setPrevShift] = useState<DailyShift | null>(null);
   const [prevKeeperName, setPrevKeeperName] = useState<string>('Не указан');
+  
+  const { events: shiftEvents, addEvent, removeEvent } = useShiftEvents(shift?.id || null);
+
+  const handleUndoEvent = (event: ShiftEvent) => {
+    if (!event.undo_payload) return;
+    const { type, elephant_id, field, value, assignment_id, record_id } = event.undo_payload;
+    
+    if (type === 'physiology' && elephant_id && field && value !== undefined) {
+      handleMetricChange(elephant_id, field as keyof ElephantDailyMetrics, value);
+      removeEvent(event.id);
+    } else if (type === 'feed' && field && value !== undefined) {
+      handleShiftFieldChange(field as any, value);
+      removeEvent(event.id);
+    }
+  };
     
   const [feedInventory, setFeedInventory] = useState<Record<FeedInventoryType, FeedInventoryItem>>({
     hay_bales: { feed_type: 'hay_bales', name: 'Тюки сена', quantity_in_stock: 200, unit: 'тюков' },
@@ -288,13 +306,18 @@ export function DailyShiftPage() {
   const [dutyKeeperName, setDutyKeeperName] = useState<string>('');
   const isLocked = isFutureDate || (isArchiveMode && (!isAdmin || !isEditOverride));
   
-  // Режим только чтения: если смена в прогрессе, но назначена ДРУГОМУ киперу
-  const isReadOnlyMode = shift?.status === 'in_progress' && 
-                         shift.duty_keeper_id && 
-                         shift.duty_keeper_id !== profile?.id && 
-                         !isAdmin && profile?.role !== 'vet';
+  // Режим только чтения: архив или чужая смена
+  // Режим только чтения: архив или чужая смена
+  const isSupervisor = profile?.role === 'admin' || profile?.role === 'director';
+  const isOtherKeeper = shift?.duty_keeper_id && shift.duty_keeper_id !== profile?.id;
+  const isArchiveOrOtherKeeper = Boolean(
+    shift && (
+      shift.status === 'completed' || 
+      (isOtherKeeper && !isSupervisor)
+    )
+  );
                          
-  const isEditingDisabled = isLocked || isReadOnlyMode;
+  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper;
 
   useEffect(() => {
     setIsEditOverride(false);
@@ -360,9 +383,10 @@ export function DailyShiftPage() {
 
       if (loadedShift && (!loadedShift.duty_keeper_id || loadedShift.duty_keeper_id !== profile?.id)) {
         const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && profile?.role !== 'vet';
-        // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null)
-        if (!isThisShiftLocked && profile?.id && !loadedShift.duty_keeper_id) {
+        // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null) и это не передача
+        if (!isThisShiftLocked && profile?.id && !loadedShift.duty_keeper_id && loadedShift.status !== 'handover_pending') {
            loadedShift = { ...loadedShift, duty_keeper_id: profile.id };
+           setDutyKeeperName(profile.name);
            // Trigger immediate save in background so it's locked to this user
            shiftService.saveShiftData(loadedShift, data.metrics || {}).catch(console.error);
         } else if (loadedShift.duty_keeper_id) {
@@ -906,20 +930,31 @@ export function DailyShiftPage() {
     : [];
 
   return (
-    <div className="pb-32 space-y-6 mt-3 relative">
+    <div className="pb-40 space-y-6 mt-3 relative">
       
       {/* TOP NOTIFICATION BANNERS */}
-      {isReadOnlyMode && (
-        <div className="mb-4 bg-amber-50 border border-amber-200/60 rounded-[24px] p-3 shadow-sm mx-4 sm:mx-0">
+      {isArchiveOrOtherKeeper && !isEditOverride && (
+        <div className="mb-4 bg-amber-50 border border-amber-200/60 rounded-[24px] p-3 shadow-sm mx-4 sm:mx-0 flex items-center justify-between">
           <p className="text-amber-800 font-bold text-sm flex items-center gap-2">
             <Lock size={16} className="shrink-0" />
-            Дежурит {dutyKeeperName || 'другой кипер'}. Вы в режиме просмотра.
+            Режим просмотра (Архив / Чужая смена)
           </p>
+          <div className="text-xs font-black uppercase tracking-wider text-amber-600 bg-amber-100/50 px-2 py-1 rounded-lg">Read-Only</div>
+        </div>
+      )}
+      
+      {isOtherKeeper && isSupervisor && !isArchiveMode && (
+        <div className="mb-4 bg-blue-50 border border-blue-200/60 rounded-[24px] p-3 shadow-sm mx-4 sm:mx-0 flex items-center justify-between">
+          <p className="text-blue-800 font-bold text-sm flex items-center gap-2">
+            <ShieldAlert size={16} className="shrink-0" />
+            Режим супервизора / директора
+          </p>
+          <div className="text-xs font-black uppercase tracking-wider text-blue-600 bg-blue-100/50 px-2 py-1 rounded-lg">Супервизор</div>
         </div>
       )}
 
       {/* ARCHIVE GUARD BANNER */}
-      {isArchiveMode && !isEditOverride && !isReadOnlyMode && (
+      {isArchiveMode && !isEditOverride && !isArchiveOrOtherKeeper && (
         <ArchiveBanner
           isAdmin={isAdmin}
           onReturnToToday={() => setSelectedDate(todayStr)}
@@ -974,10 +1009,17 @@ export function DailyShiftPage() {
 
       {/* 2. ФИЗИОЛОГИЯ И СОН: <ExcretionControl ... /> (КУЧИ, ЛУЖИ, СОН) */}
       <ExcretionControl
+        isLocked={isEditingDisabled}
         elephants={elephants}
         metrics={metrics}
         onMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
-        isLocked={isLocked}
+        onAddEvent={(actionTitle, icon, undoPayload) => addEvent({
+          keeper_id: profile?.id || '',
+          keeper_name: profile?.name || 'Кипер',
+          action_title: actionTitle,
+          icon,
+          undo_payload: undoPayload
+        })}
       />
 
       {/* 3. ГРУБЫЕ КОРМА: СЕТКА 3 КОЛОНОК (ТЮКИ, РУЛОНЫ, ВЕТКИ) */}
@@ -1122,6 +1164,21 @@ export function DailyShiftPage() {
           onSaladPhotoChange={handleSaladPhotoChange}
         />
       </div>
+      {/* 5. ХОЗЯЙСТВЕННЫЙ БЛОК (Инциденты и счетчики) */}
+      <section className="mb-6 mx-4 sm:mx-0">
+        <DynamicCounterSection 
+          selectedDate={selectedDate}
+          isLocked={isEditingDisabled}
+          dutyKeeperName={dutyKeeperName || dutyKeeper?.name}
+          onStatsChange={setCountersStats}
+          onAddEvent={(title, icon, type, id) => addEvent({
+            keeper_id: profile?.id || '',
+            keeper_name: profile?.name || 'Кипер',
+            action_title: title,
+            icon: icon,
+          })}
+        />
+      </section>
 
       {/* 5. ВЕТЕРИНАРНЫЕ НАЗНАЧЕНИЯ / ПРОЦЕДУРЫ (ЕСЛИ ЕСТЬ АКТИВНЫЕ) */}
       {activeElephant && assignmentsForEle.length > 0 && (
@@ -1157,14 +1214,23 @@ export function DailyShiftPage() {
         </div>
       )}
 
+      {/* 5.5. ЛЕНТА СОБЫТИЙ */}
+      <section className="mb-6 mx-4 sm:mx-0">
+        <ShiftActivityFeed
+          events={shiftEvents}
+          currentUserId={profile?.id}
+          onUndo={handleUndoEvent}
+        />
+      </section>
+
       {/* 6. ЖУРНАЛ НАБЛЮДЕНИЙ: <ObservationEditor ... /> (СВОБОДНЫЕ ЗАМЕТКИ, ПОЛЕ ВВОДА ТЕКСТА, ФОТО) */}
       {activeElephant && m && (
         <ObservationEditor
+          isLocked={isEditingDisabled}
           elephant={activeElephant}
           elephants={elephants}
           allMetrics={metrics}
           metrics={m}
-          isLocked={isLocked}
           onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
           onAllMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
           onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
@@ -1206,7 +1272,8 @@ export function DailyShiftPage() {
         isOpen={isEndMatchModalOpen}
         onClose={() => setIsEndMatchModalOpen(false)}
         onConfirmCompleteShift={() => {
-          handleShiftFieldChange('status', 'completed', true);
+          setIsEndMatchModalOpen(false);
+          setIsHandoverModalOpen(true);
         }}
         dutyKeeperName={dutyKeeper?.name}
         dateString={shift?.date || selectedDate}

@@ -289,54 +289,50 @@ export const shiftService = {
 
   async acceptHandover(pendingShift: DailyShift, newDutyKeeperId: string): Promise<void> {
     await supabase.auth.getSession();
-    const todayStr = new Date().toISOString().split('T')[0];
     const now = new Date().toISOString();
 
-    if (pendingShift.date === todayStr) {
-      // Смена за сегодня: просто забираем её себе (перехват дежурства)
-      // т.к. в БД стоит ограничение UNIQUE(date) и мы не можем создать вторую смену за день
-      const { error } = await supabase
-        .from('daily_shifts')
-        .update({
-          status: 'in_progress',
-          duty_keeper_id: newDutyKeeperId,
-          handover_to_keeper_id: null,
-          handover_notes: '',
-          updated_at: now
-        })
-        .eq('id', pendingShift.id);
-        
-      if (error) throw error;
-    } else {
-      // Смена за вчера (или раньше): закрываем её и создаём новую за сегодня
-      const { error: closeError } = await supabase
-        .from('daily_shifts')
-        .update({
-          status: 'completed',
-          ended_at: now,
-          updated_at: now,
-          handover_to_keeper_id: null
-        })
-        .eq('id', pendingShift.id);
-        
-      if (closeError) throw closeError;
+    // Закрываем старую смену
+    const { error: closeError } = await supabase
+      .from('daily_shifts')
+      .update({
+        status: 'completed',
+        ended_at: now,
+        updated_at: now,
+        handover_to_keeper_id: null
+      })
+      .eq('id', pendingShift.id);
 
-      const newShiftId = `shift_${todayStr}_${Math.random().toString(36).substring(2, 9)}`;
-      const { error: createError } = await supabase
-        .from('daily_shifts')
-        .insert({
-          id: newShiftId,
-          date: todayStr,
-          duty_keeper_id: newDutyKeeperId,
-          status: 'in_progress',
-          started_at: now,
-          updated_at: now
-        });
-        
-      if (createError) throw createError;
+    if (closeError) throw closeError;
+
+    // Пытаемся создать новую смену
+    const newShiftId = `shift_${pendingShift.date}_${Math.random().toString(36).substring(2, 9)}`;
+    const { error: createError } = await supabase
+      .from('daily_shifts')
+      .insert({
+        id: newShiftId,
+        date: pendingShift.date,
+        duty_keeper_id: newDutyKeeperId,
+        status: 'in_progress',
+        started_at: now,
+        updated_at: now
+      });
+
+    if (createError) {
+      if (createError.code === '23505') {
+        // Fallback: if UNIQUE(date) constraint exists in DB, we fallback to hijacking the current shift
+        await supabase
+          .from('daily_shifts')
+          .update({
+            status: 'in_progress',
+            duty_keeper_id: newDutyKeeperId,
+            ended_at: null
+          })
+          .eq('id', pendingShift.id);
+      } else {
+        throw createError;
+      }
     }
   },
-
   async rejectHandover(pendingShiftId: string): Promise<void> {
     await supabase.auth.getSession();
     const { error } = await supabase
@@ -505,7 +501,8 @@ export const shiftService = {
       const realUserId = sessionData?.session?.user?.id;
 
       const payloadShift = { ...shift };
-      if (realUserId && payloadShift.duty_keeper_id) {
+      // Если смена только создана и у нее нет дежурного - подставляем текущего
+      if (realUserId && !payloadShift.duty_keeper_id) {
         payloadShift.duty_keeper_id = realUserId;
       }
 

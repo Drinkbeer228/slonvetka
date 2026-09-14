@@ -26,6 +26,10 @@ export function TreatmentRecordCard({
   const assignment = assignments.find((a) => a.id === record.assignment_id);
   const title = assignment ? assignment.title : 'Внеплановая задача';
 
+  const ageMs = Date.now() - new Date(record.performed_at).getTime();
+  const isAuthor = record.keeper_id === currentProfile?.id;
+  const canDelete = isAuthor && ageMs < 5 * 60 * 1000;
+  
   // Determine keeper name: from joined keeper relation or fallback
   const keeperName = record.keeper?.name 
     ? record.keeper.name 
@@ -65,7 +69,7 @@ export function TreatmentRecordCard({
                 </button>
               )}
 
-              {onDelete && (
+              {onDelete && canDelete && (
                 <button
                   type="button"
                   onClick={() => onDelete(record)}
