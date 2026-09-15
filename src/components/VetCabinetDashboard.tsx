@@ -67,9 +67,15 @@ const DEMO_WEIGHTS: Record<string, number> = {
 };
 
 const CARD_CLASS = 'bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-lg';
+const CLINICAL_CALENDAR_ITEMS = [
+  { title: 'Подиатрия', detail: 'Через 5 дней' },
+  { title: 'ПЦР EEHV', detail: 'Сдан 01.09, отрицательно' },
+  { title: 'Контрольное взвешивание', detail: '+35 кг за месяц' },
+] as const;
 
 export function VetKeeperViewToggle({ value, onChange, className = '' }: VetKeeperViewToggleProps) {
   const isKeeperView = value === 'daily_shift';
+  const isVetCabinetView = value === 'vet_cabinet';
 
   return (
     <div
@@ -91,10 +97,10 @@ export function VetKeeperViewToggle({ value, onChange, className = '' }: VetKeep
       <button
         type="button"
         role="tab"
-        aria-selected={!isKeeperView}
+        aria-selected={isVetCabinetView}
         onClick={() => onChange('vet_cabinet')}
         className={`rounded-xl px-3 py-2 text-xs font-extrabold transition-all sm:px-4 ${
-          !isKeeperView ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'
+          isVetCabinetView ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'
         }`}
       >
         🩺 Веткабинет
@@ -538,7 +544,7 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.22em] text-sky-700">Веткабинет</p>
             <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">GI-мониторинг и назначения на {selectedDate}</h1>
-            <p className="mt-1 text-sm text-slate-600">Данные тянутся из `shiftService.getShiftData`, назначения сохраняются в `feed_notes.diet_override`.</p>
+            <p className="mt-1 text-sm text-slate-600">Сводка собирает физиологию смены, индикаторы ЖКТ и врачебные назначения на выбранную дату.</p>
           </div>
           {feedback && (
             <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900">
@@ -774,18 +780,12 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
             <h3 className="text-lg font-black text-slate-950">Клинический календарь</h3>
           </div>
           <div className="mt-4 space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
-              <p className="text-sm font-black text-slate-900">Подиатрия</p>
-              <p className="mt-1 text-xs font-semibold text-slate-600">Через 5 дней</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
-              <p className="text-sm font-black text-slate-900">ПЦР EEHV</p>
-              <p className="mt-1 text-xs font-semibold text-slate-600">Сдан 01.09, отрицательно</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
-              <p className="text-sm font-black text-slate-900">Контрольное взвешивание</p>
-              <p className="mt-1 text-xs font-semibold text-slate-600">+35 кг за месяц</p>
-            </div>
+            {CLINICAL_CALENDAR_ITEMS.map(item => (
+              <div key={item.title} className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
+                <p className="text-sm font-black text-slate-900">{item.title}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">{item.detail}</p>
+              </div>
+            ))}
           </div>
         </article>
       </section>

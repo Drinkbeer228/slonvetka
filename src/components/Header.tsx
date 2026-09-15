@@ -141,7 +141,7 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
           {onNavigate && (
             <nav className="order-3 flex w-full items-center gap-2 sm:order-2 sm:mx-auto sm:w-auto" aria-label="Основная навигация">
               <VetKeeperViewToggle
-                value={currentScreen === 'daily_shift' ? 'daily_shift' : currentScreen === 'vet_cabinet' || currentScreen === 'vet_dashboard' ? 'vet_cabinet' : 'daily_shift'}
+                value={currentScreen === 'daily_shift' ? 'daily_shift' : currentScreen === 'vet_cabinet' ? 'vet_cabinet' : 'vet_dashboard'}
                 onChange={onNavigate}
                 className="flex-1 sm:flex-none"
               />
