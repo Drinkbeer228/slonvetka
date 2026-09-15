@@ -405,7 +405,7 @@ export function DailyShiftPage() {
       if (loadedShift && (!loadedShift.duty_keeper_id || loadedShift.duty_keeper_id !== profile?.id)) {
         const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && !canManageMedicalAssignments;
         // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null) и это не передача и пользователь не ветврач
-        if (!isThisShiftLocked && profile?.id && canClaimShift(profile, loadedShift) && !loadedShift.duty_keeper_id) {
+        if (profile?.role === 'keeper' && !isThisShiftLocked && profile.id && canClaimShift(profile, loadedShift) && !loadedShift.duty_keeper_id) {
            loadedShift = { ...loadedShift, duty_keeper_id: profile.id };
            setDutyKeeperName(profile.name);
            // Trigger immediate save in background so it's locked to this user

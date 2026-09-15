@@ -19,17 +19,24 @@ export function canCreateTrainingPlan(profile: Pick<Profile, 'role'> | null | un
 
 export function canEditShift(
   profile: Pick<Profile, 'id' | 'role'> | null | undefined,
-  shift: Pick<DailyShift, 'date' | 'duty_keeper_id' | 'status'> | null | undefined
+  shift: Pick<DailyShift, 'date' | 'duty_keeper_id' | 'handover_to_keeper_id' | 'status'> | null | undefined
 ): boolean {
   if (!profile || !shift) return false;
   if (profile.role === 'admin') return true;
 
+  const isTodayShift = shift.date === getTodayDateString();
+  if (!isTodayShift || profile.role !== 'keeper') return false;
+
   return (
-    profile.role === 'keeper' &&
-    shift.duty_keeper_id === profile.id &&
-    shift.date === getTodayDateString() &&
-    shift.status !== 'completed' &&
-    shift.status !== 'submitted'
+    (
+      shift.duty_keeper_id === profile.id &&
+      shift.status !== 'completed' &&
+      shift.status !== 'submitted'
+    ) ||
+    (
+      shift.handover_to_keeper_id === profile.id &&
+      shift.status === 'handover_pending'
+    )
   );
 }
 
@@ -52,5 +59,13 @@ export function canAdjustInventory(
   profile: Pick<Profile, 'id' | 'role'> | null | undefined,
   shift: Pick<DailyShift, 'date' | 'duty_keeper_id' | 'status'> | null | undefined
 ): boolean {
-  return canManageUsers(profile) || canEditShift(profile, shift);
+  return Boolean(
+    canManageUsers(profile) ||
+    (
+      profile?.id &&
+      shift &&
+      shift.date === getTodayDateString() &&
+      shift.duty_keeper_id === profile.id
+    )
+  );
 }
