@@ -84,18 +84,18 @@ export function CounterButton({
     const hasValue = effectiveValue > 0;
     return (
       <div className="w-full flex flex-col select-none">
-        {label && <span className="text-[11px] font-bold text-slate-500 mb-1 text-center truncate">{label}</span>}
+        {label && <span className="text-xs font-black text-slate-700 mb-1 text-center truncate">{label}</span>}
         <div
-          className={`rounded-[20px] overflow-hidden w-full transition-all ${
+          className={`rounded-[22px] overflow-hidden w-full transition-all ${
             disabled ? 'opacity-50 pointer-events-none' : ''
           }`}
           style={{
             boxShadow: hasValue
-              ? '0 2px 10px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.8)'
-              : '0 1px 4px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.8)',
+              ? '0 2px 12px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.9)'
+              : '0 1px 4px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.9)',
             border: hasValue
-              ? '1px solid rgba(132, 204, 22, 0.4)'
-              : '1px solid rgba(203, 213, 225, 0.7)',
+              ? '1px solid rgba(132, 204, 22, 0.6)'
+              : '1px solid rgba(203, 213, 225, 0.9)',
           }}
         >
           {/* Верхняя кнопка [+] */}
@@ -103,10 +103,10 @@ export function CounterButton({
             type="button"
             onClick={handleIncrement}
             disabled={disabled || effectiveValue >= max}
-            className="h-11 w-full flex items-center justify-center text-xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target touch-manipulation"
+            className="h-12 w-full flex items-center justify-center text-2xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target touch-manipulation"
             style={{
-              background: 'rgba(255,255,255,0.92)',
-              color: hasValue ? '#4d7c0f' : '#64748b',
+              background: 'rgba(255,255,255,0.95)',
+              color: hasValue ? '#3f6212' : '#334155',
             }}
             aria-label="Увеличить"
           >
@@ -115,18 +115,18 @@ export function CounterButton({
 
           {/* Центральное значение */}
           <div
-            className="py-2 px-1 text-center select-none flex flex-col items-center justify-center min-h-[54px]"
+            className="py-2 px-1 text-center select-none flex flex-col items-center justify-center min-h-[58px]"
             style={{
               background: hasValue
-                ? 'linear-gradient(180deg, rgba(236,252,203,0.65) 0%, rgba(217,249,157,0.45) 100%)'
-                : 'rgba(248,250,252,0.6)',
+                ? 'linear-gradient(180deg, rgba(236,252,203,0.75) 0%, rgba(217,249,157,0.55) 100%)'
+                : 'rgba(248,250,252,0.85)',
             }}
           >
-            <span className="text-2xl font-black text-slate-800 tracking-tight leading-none">
+            <span className="text-2xl font-black text-slate-950 tracking-tight leading-none">
               {effectiveValue}
             </span>
             {unit && (
-              <span className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">
+              <span className="text-[11px] font-bold text-slate-600 mt-0.5 leading-tight">
                 {unit}
               </span>
             )}
@@ -137,10 +137,10 @@ export function CounterButton({
             type="button"
             onClick={handleDecrement}
             disabled={disabled || effectiveValue <= min}
-            className="h-11 w-full flex items-center justify-center text-lg font-black transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target touch-manipulation"
+            className="h-12 w-full flex items-center justify-center text-xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target touch-manipulation border-t border-slate-200/80"
             style={{
-              background: 'rgba(248,250,252,0.8)',
-              color: '#94a3b8',
+              background: 'rgba(241,245,249,0.95)',
+              color: '#0f172a',
             }}
             aria-label="Уменьшить"
           >
@@ -153,16 +153,16 @@ export function CounterButton({
 
   return (
     <div className="flex flex-col gap-1 w-full">
-      {label && <span className="text-xs font-bold text-zinc-500">{label}</span>}
-      <div className={`flex items-center bg-zinc-100/80 rounded-2xl p-1.5 border border-zinc-200 w-full max-w-[240px] transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+      {label && <span className="text-xs font-black text-slate-700">{label}</span>}
+      <div className={`flex items-center bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200 w-full max-w-[260px] transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <button
           type="button"
           onClick={handleDecrement}
           disabled={disabled || effectiveValue <= min}
-          className="w-[44px] h-[44px] sm:w-[52px] sm:h-[52px] flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-zinc-50 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-zinc-800 font-bold shrink-0 touch-manipulation cursor-pointer"
+          className="w-12 h-12 flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-slate-50 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none text-slate-900 font-black shrink-0 touch-manipulation cursor-pointer"
           aria-label="Decrease"
         >
-          <Minus size={20} />
+          <Minus size={22} className="stroke-[2.5]" />
         </button>
         <input
           type="number"
@@ -173,16 +173,16 @@ export function CounterButton({
           onBlur={handleInputBlur}
           onKeyDown={handleInputKeyDown}
           disabled={disabled}
-          className="flex-1 w-full text-center font-black text-xl sm:text-2xl text-zinc-900 bg-transparent outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded-xl py-2 px-1 mx-1 min-w-[36px] disabled:opacity-60"
+          className="flex-1 w-full text-center font-black text-xl sm:text-2xl text-slate-950 bg-transparent outline-none focus:bg-white focus:ring-2 focus:ring-amber-400 rounded-xl py-2 px-1 mx-1 min-w-[40px] disabled:opacity-60"
         />
         <button
           type="button"
           onClick={handleIncrement}
           disabled={disabled || effectiveValue >= max}
-          className="w-[44px] h-[44px] sm:w-[52px] sm:h-[52px] flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-zinc-50 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none text-zinc-800 font-bold shrink-0 touch-manipulation cursor-pointer"
+          className="w-12 h-12 flex items-center justify-center bg-white rounded-2xl shadow-sm hover:bg-slate-50 active:scale-95 transition disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none text-slate-900 font-black shrink-0 touch-manipulation cursor-pointer"
           aria-label="Increase"
         >
-          <Plus size={20} />
+          <Plus size={22} className="stroke-[2.5]" />
         </button>
       </div>
     </div>

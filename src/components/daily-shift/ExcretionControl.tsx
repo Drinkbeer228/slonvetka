@@ -431,7 +431,7 @@ export function ExcretionControl({
 
         {/* Segmented Tab Control */}
         <div
-          className="mt-3.5 grid grid-cols-3 p-1 rounded-[18px] bg-slate-500/10 dark:bg-slate-950/40"
+          className="mt-3.5 grid grid-cols-3 p-1.5 rounded-[20px] bg-slate-500/10 dark:bg-slate-950/40 gap-1"
           style={{
             boxShadow: 'inset 0 1px 3px rgba(15,23,42,0.06)',
           }}
@@ -444,13 +444,13 @@ export function ExcretionControl({
                 setActiveTab(tab.id);
                 handleHaptic(8);
               }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-[14px] text-xs font-bold transition-all active:scale-95 cursor-pointer select-none tap-target ${
+              className={`min-h-[46px] flex items-center justify-center gap-1.5 py-2.5 px-1 rounded-[16px] text-xs sm:text-sm font-black transition-all active:scale-95 cursor-pointer select-none tap-target ${
                 activeTab === tab.id
-                  ? 'text-slate-900 bg-white/95 shadow-sm dark:bg-slate-800 dark:text-slate-100'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+                  ? 'text-slate-950 bg-white shadow-md ring-1 ring-slate-900/10 dark:bg-slate-800 dark:text-slate-100'
+                  : 'text-slate-600 hover:text-slate-900 font-bold dark:text-slate-400'
               }`}
             >
-              <span>{tab.emoji}</span>
+              <span className="text-base">{tab.emoji}</span>
               <span>{tab.label}</span>
             </button>
           ))}
@@ -475,23 +475,23 @@ export function ExcretionControl({
                     isSelectedElephant ? 'scale-[1.01]' : 'opacity-90 hover:opacity-100'
                   }`}
                 >
-                  <div className="text-[11px] font-bold text-slate-500 text-center flex items-center justify-center gap-1 select-none dark:text-slate-400">
+                  <div className="text-xs sm:text-sm font-black text-slate-700 text-center flex items-center justify-center gap-1 select-none dark:text-slate-300">
                     <span>{ELEPHANT_EMOJI[elephant.id] ?? '🐘'}</span>
-                    <span className={isSelectedElephant ? 'text-violet-600 font-black' : ''}>{elephant.name}</span>
+                    <span className={isSelectedElephant ? 'text-violet-700 font-black' : ''}>{elephant.name}</span>
                   </div>
 
                   {/* Карточка слона для сна */}
                   <div
-                    className={`rounded-[20px] overflow-hidden transition-all duration-150 ${
+                    className={`rounded-[22px] overflow-hidden transition-all duration-150 ${
                       isSelectedElephant 
-                        ? 'ring-2 ring-violet-500/70 border-violet-400 shadow-md' 
+                        ? 'ring-2 ring-violet-500/80 border-violet-400 shadow-md' 
                         : hasSleep
-                        ? 'border-violet-300/40 shadow-xs'
-                        : 'border-slate-200/70 shadow-xs dark:border-slate-700'
+                        ? 'border-violet-300/60 shadow-xs'
+                        : 'border-slate-200/80 shadow-xs dark:border-slate-700'
                     }`}
                     style={{
                       borderWidth: '1px',
-                      background: 'rgba(255,255,255,0.7)',
+                      background: 'rgba(255,255,255,0.85)',
                     }}
                   >
                     {/* Кнопка [+] */}
@@ -502,7 +502,7 @@ export function ExcretionControl({
                         e.stopPropagation();
                         handleIncrementSleep(elephant.id, elephant.name);
                       }}
-                      className="h-11 w-full flex items-center justify-center text-xl font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target bg-white/90 text-violet-600 dark:bg-slate-800/90 dark:text-violet-400"
+                      className="h-12 w-full flex items-center justify-center text-2xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target bg-white text-violet-600 dark:bg-slate-800 dark:text-violet-400"
                       aria-label={`Добавить 30 мин сна для ${elephant.name}`}
                     >
                       +
@@ -510,16 +510,16 @@ export function ExcretionControl({
 
                     {/* Центральное значение */}
                     <div
-                      className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[58px] ${
+                      className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[60px] ${
                         hasSleep
-                          ? 'bg-violet-100/50 dark:bg-violet-950/40'
-                          : 'bg-slate-50/60 dark:bg-slate-900/60'
+                          ? 'bg-violet-100/70 dark:bg-violet-950/40'
+                          : 'bg-slate-50/80 dark:bg-slate-900/60'
                       }`}
                     >
-                      <span className="text-[10px] font-black tracking-wider text-violet-600 flex items-center justify-center gap-1 uppercase dark:text-violet-300">
+                      <span className="text-[10px] font-black tracking-wider text-violet-700 flex items-center justify-center gap-1 uppercase dark:text-violet-300">
                         🌙 СОН
                       </span>
-                      <span className="text-2xl font-black text-slate-900 leading-none dark:text-slate-100">
+                      <span className="text-2xl font-black text-slate-950 leading-none dark:text-slate-100">
                         {formatTotalSleepHours(sleepMinutes)}
                       </span>
                     </div>
@@ -532,7 +532,7 @@ export function ExcretionControl({
                         e.stopPropagation();
                         handleDecrementSleep(elephant.id);
                       }}
-                      className="h-11 w-full flex items-center justify-center text-lg font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target bg-slate-50/70 text-slate-400 hover:text-slate-600 dark:bg-slate-800/60"
+                      className="h-12 w-full flex items-center justify-center text-xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-slate-950 border-t border-slate-200/80 dark:bg-slate-800 dark:text-slate-200"
                       aria-label={`Уменьшить 30 мин сна для ${elephant.name}`}
                     >
                       −
@@ -582,8 +582,8 @@ export function ExcretionControl({
                 }`}
               >
                 {/* Имя слона с иконкой */}
-                <div className="text-[11px] font-bold text-slate-500 text-center flex items-center justify-center gap-1 dark:text-slate-400">
-                  <span className="text-sm">{ELEPHANT_EMOJI[elephant.id] ?? '🐘'}</span>
+                <div className="text-xs sm:text-sm font-black text-slate-700 text-center flex items-center justify-center gap-1 dark:text-slate-300">
+                  <span className="text-base">{ELEPHANT_EMOJI[elephant.id] ?? '🐘'}</span>
                   <span className={`transition-colors ${elephantNameColorClass}`}>
                     {elephant.name}
                   </span>
@@ -591,20 +591,20 @@ export function ExcretionControl({
 
                 {/* Вертикальная карточка: [+] -> [Счетчик] -> [-] */}
                 <div
-                  className={`rounded-[20px] overflow-hidden transition-all duration-150 ${
+                  className={`rounded-[22px] overflow-hidden transition-all duration-150 ${
                     isSelectedElephant
                       ? activeTab === 'stool'
-                        ? 'ring-2 ring-amber-500/80 border-amber-400 shadow-md'
-                        : 'ring-2 ring-sky-500/80 border-sky-400 shadow-md'
+                        ? 'ring-2 ring-amber-500/90 border-amber-400 shadow-md'
+                        : 'ring-2 ring-sky-500/90 border-sky-400 shadow-md'
                       : hasCount
                       ? activeTab === 'stool'
-                        ? 'border-amber-300/60 shadow-xs'
-                        : 'border-sky-300/60 shadow-xs'
-                      : 'border-slate-200/70 shadow-xs dark:border-slate-700'
+                        ? 'border-amber-300/70 shadow-xs'
+                        : 'border-sky-300/70 shadow-xs'
+                      : 'border-slate-200/80 shadow-xs dark:border-slate-700'
                   }`}
                   style={{
                     borderWidth: '1px',
-                    background: 'rgba(255,255,255,0.7)',
+                    background: 'rgba(255,255,255,0.85)',
                   }}
                 >
                   {/* Кнопка инкремента [+] */}
@@ -615,12 +615,12 @@ export function ExcretionControl({
                       e.stopPropagation();
                       handleIncrement(elephant.id, elephant.name);
                     }}
-                    className={`h-11 w-full flex items-center justify-center text-xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target ${incrementBtnBgClass}`}
+                    className={`h-12 w-full flex items-center justify-center text-2xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target ${incrementBtnBgClass}`}
                     aria-label={`Увеличить для ${elephant.name}`}
                   >
                     {isBlocked ? (
                       <span className="text-sm font-black flex items-center gap-1">
-                        <Clock size={14} className="animate-pulse" />
+                        <Clock size={16} className="animate-pulse" />
                         {Math.floor(remaining / 60)}:{(remaining % 60).toString().padStart(2, '0')}
                       </span>
                     ) : (
@@ -630,14 +630,14 @@ export function ExcretionControl({
 
                   {/* Центральный дисплей с плашкой «КУЧИ / ЛУЖИ» */}
                   <div
-                    className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[58px] transition-colors ${displayCardBgClass}`}
+                    className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[60px] transition-colors ${displayCardBgClass}`}
                   >
                     <span
                       className={`text-[10px] font-black tracking-wider flex items-center justify-center gap-1 uppercase ${labelTextColorClass}`}
                     >
                       {activeTab === 'stool' ? '💩 КУЧИ' : '💧 ЛУЖИ'}
                     </span>
-                    <span className="text-2xl font-black text-slate-900 leading-none dark:text-slate-100">
+                    <span className="text-2xl font-black text-slate-950 leading-none dark:text-slate-100">
                       {count}
                     </span>
                   </div>
@@ -650,7 +650,7 @@ export function ExcretionControl({
                       e.stopPropagation();
                       handleDecrement(elephant.id);
                     }}
-                    className="h-11 w-full flex items-center justify-center text-lg font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target bg-slate-50/70 text-slate-400 hover:text-slate-600 dark:bg-slate-800/60 dark:text-slate-400"
+                    className="h-12 w-full flex items-center justify-center text-xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-slate-950 border-t border-slate-200/80 dark:bg-slate-800 dark:text-slate-200"
                     aria-label={`Уменьшить для ${elephant.name}`}
                   >
                     −
@@ -663,10 +663,10 @@ export function ExcretionControl({
       </div>
 
       {/* ─── ХАРАКТЕР И ОСОБЕННОСТИ СТУЛА / МОЧИ / СНА ─── */}
-      <div className="px-4 pb-4 pt-2.5 border-t border-slate-200/50 dark:border-slate-800/80">
+      <div className="px-4 pb-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
         {/* Заголовок секции с бейджем статуса */}
         <div className="flex items-center justify-between px-0.5 mb-2.5">
-          <span className="text-[11px] font-black tracking-wider text-slate-800 uppercase flex items-center gap-1.5 dark:text-slate-200">
+          <span className="text-xs font-black tracking-wider text-slate-900 uppercase flex items-center gap-1.5 dark:text-slate-200">
             {activeTab === 'stool' && '💩 ХАРАКТЕР И ОСОБЕННОСТИ СТУЛА'}
             {activeTab === 'urine' && '💧 ХАРАКТЕР И ОСОБЕННОСТИ МОЧИ'}
             {activeTab === 'sleep' && '🌙 ХАРАКТЕР И ОСОБЕННОСТИ СНА'}
@@ -674,10 +674,10 @@ export function ExcretionControl({
 
           {/* Синхронный бейдж: показывает выбранный статус перед нажатием '+' */}
           <span
-            className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full transition-all ${
+            className={`text-[10px] font-black px-2.5 py-0.5 rounded-full transition-all border ${
               isCurrentTraitAnomaly
-                ? 'bg-rose-100 text-rose-700 border border-rose-200 shadow-xs dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800'
-                : 'bg-amber-100 text-amber-800 border border-amber-200/60 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                ? 'bg-rose-100 text-rose-900 border-rose-300 shadow-xs dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800'
+                : 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
             }`}
           >
             {isCurrentTraitAnomaly ? 'Внимание ⚠️' : 'Норма'}
@@ -690,15 +690,15 @@ export function ExcretionControl({
             const isSelected = currentSelectedTrait === trait;
             const isWarning = trait.includes('⚠️');
 
-            let chipClasses = 'bg-slate-100/70 text-slate-700 border border-slate-200/80 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700';
+            let chipClasses = 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200/70 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700';
             if (isSelected) {
               if (isWarning) {
-                chipClasses = 'bg-rose-50 text-rose-800 border-2 border-rose-500 shadow-sm ring-1 ring-rose-300 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-500';
+                chipClasses = 'bg-rose-100 text-rose-950 border-2 border-rose-500 shadow-sm ring-2 ring-rose-400/30 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-500';
               } else {
                 chipClasses = 'bg-slate-900 text-white border border-slate-900 shadow-md dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100';
               }
             } else if (isWarning) {
-              chipClasses = 'bg-rose-50/50 text-rose-700 border border-rose-200/80 hover:bg-rose-50 dark:bg-slate-800/60 dark:text-rose-300 dark:border-rose-900/60';
+              chipClasses = 'bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100 dark:bg-slate-800/60 dark:text-rose-300 dark:border-rose-900/60';
             }
 
             return (
@@ -707,7 +707,7 @@ export function ExcretionControl({
                 type="button"
                 disabled={isLocked}
                 onClick={() => handleSelectTrait(trait)}
-                className={`min-h-[44px] px-3 py-2 rounded-[16px] text-xs font-bold transition-all flex items-center justify-center text-center leading-tight active:scale-95 cursor-pointer tap-target select-none ${chipClasses} ${
+                className={`min-h-[48px] px-3.5 py-2.5 rounded-[18px] text-xs sm:text-sm font-black transition-all flex items-center justify-center text-center leading-tight active:scale-95 cursor-pointer tap-target select-none ${chipClasses} ${
                   isLocked ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >

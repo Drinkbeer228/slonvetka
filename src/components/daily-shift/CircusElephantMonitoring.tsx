@@ -99,7 +99,7 @@ const DURATION_OPTIONS: DurationOption[] = [
 ];
 
 interface ChoiceChipGroupProps {
-  options: string[];
+  options: readonly string[];
   value?: string | null;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -132,7 +132,7 @@ function ChoiceChipGroup({ options, value, onChange, disabled = false }: ChoiceC
 }
 
 interface MultiSelectChipGroupProps {
-  options: string[];
+  options: readonly string[];
   selected: string[];
   onToggle: (value: string) => void;
   disabled?: boolean;

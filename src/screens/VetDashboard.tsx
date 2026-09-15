@@ -17,6 +17,7 @@ import { formatDuration } from '../components/daily-shift/ExcretionControl';
 import { AssignmentModal } from '../components/AssignmentModal';
 import { ExecutionModal } from '../components/ExecutionModal';
 import { canCreateMedicalAssignment } from '../lib/permissions';
+import { evaluateElephantHealth } from '../utils/elephantHealthStatus';
 
 const ELEPHANT_EMOJI: Record<string, string> = {
   margo: '👑',
@@ -339,22 +340,23 @@ export function VetDashboard() {
         </div>
         
         {/* Date Navigator */}
-        <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/70 self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 bg-slate-100/95 p-1 rounded-2xl border border-slate-200/90 self-start sm:self-auto shadow-xs">
           <button 
             type="button"
             onClick={() => stepDate(-1)}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-all active:scale-90 cursor-pointer"
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-700 hover:text-slate-950 hover:bg-white transition-all active:scale-90 cursor-pointer"
             title="Предыдущий день"
+            aria-label="Предыдущий день"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={20} className="stroke-[2.5]" />
           </button>
           <button 
             type="button"
             onClick={() => setSelectedDate(todayStr)}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            className={`min-h-[44px] px-4 py-2 text-xs sm:text-sm font-black rounded-xl transition-all cursor-pointer flex items-center justify-center ${
               selectedDate === todayStr 
-                ? 'bg-white text-slate-900 shadow-xs font-black' 
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                ? 'bg-white text-slate-950 shadow-xs font-black ring-1 ring-slate-900/10' 
+                : 'text-slate-700 hover:text-slate-950 hover:bg-white/70 font-bold'
             }`}
           >
             Сегодня
@@ -362,43 +364,75 @@ export function VetDashboard() {
           <button 
             type="button"
             onClick={() => stepDate(1)}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-all active:scale-90 cursor-pointer"
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-700 hover:text-slate-950 hover:bg-white transition-all active:scale-90 cursor-pointer"
             title="Следующий день"
+            aria-label="Следующий день"
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={20} className="stroke-[2.5]" />
           </button>
         </div>
       </div>
 
       {/* 2. ELEPHANT SELECTION TABS: [Все слоны] | [Марго] | [Одри] | [Прэтти] */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-hide">
         <button
           type="button"
           onClick={() => setFilterElephantId('all')}
-          className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+          className={`shrink-0 min-h-[46px] sm:min-h-[48px] px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center gap-1.5 active:scale-[0.98] ${
             filterElephantId === 'all' 
               ? 'bg-slate-900 text-white shadow-md' 
-              : 'bg-white/80 backdrop-blur-md text-slate-600 border border-slate-200/80 hover:bg-white hover:text-slate-900'
+              : 'bg-white/90 backdrop-blur-md text-slate-700 border border-slate-200/90 hover:bg-white hover:text-slate-950'
           }`}
         >
-          Все слоны
+          <span>🐘</span>
+          <span>Все слоны</span>
         </button>
         {elephants.map(e => {
           const isSelected = filterElephantId === e.id;
           const emoji = ELEPHANT_EMOJI[e.id] || '🐘';
+          const elephantHealth = evaluateElephantHealth(metrics[e.id]);
+          
           return (
             <button
               key={e.id}
               type="button"
               onClick={() => setFilterElephantId(e.id)}
-              className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`shrink-0 min-h-[46px] sm:min-h-[48px] px-3.5 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer active:scale-[0.98] ${
                 isSelected 
-                  ? 'bg-teal-600 text-white shadow-md' 
-                  : 'bg-white/80 backdrop-blur-md text-slate-700 border border-slate-200/80 hover:bg-white hover:text-slate-900'
+                  ? 'bg-teal-600 text-white shadow-md ring-2 ring-teal-500/30' 
+                  : 'bg-white/90 backdrop-blur-md text-slate-800 border border-slate-200/90 hover:bg-white hover:text-slate-950'
               }`}
             >
               <span>{emoji}</span>
               <span>{e.name}</span>
+              
+              {/* Traffic light pill */}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                  isSelected
+                    ? 'bg-white/20 text-white border-white/40'
+                    : elephantHealth.severity === 'alert'
+                    ? 'bg-rose-100 text-rose-900 border-rose-300'
+                    : elephantHealth.severity === 'warning'
+                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isSelected
+                      ? 'bg-white'
+                      : elephantHealth.severity === 'alert'
+                      ? 'bg-rose-600'
+                      : elephantHealth.severity === 'warning'
+                      ? 'bg-amber-600'
+                      : 'bg-emerald-600'
+                  }`}
+                />
+                <span>
+                  {elephantHealth.severity === 'alert' ? 'Тревога' : elephantHealth.severity === 'warning' ? 'Внимание' : 'Норма'}
+                </span>
+              </span>
             </button>
           );
         })}

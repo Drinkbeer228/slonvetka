@@ -106,16 +106,16 @@ export function ObservationJournal({
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-xl border border-slate-100 rounded-[28px] p-4 sm:p-5 shadow-xs space-y-4">
+    <div className="bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-[28px] p-4 sm:p-5 shadow-xs space-y-4">
       {/* 1. HEADER */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-[20px] bg-amber-500/10 flex items-center justify-center text-2xl shadow-inner shrink-0">
+          <div className="w-12 h-12 rounded-[20px] bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-2xl shadow-inner shrink-0">
             📝
           </div>
           <div>
-            <h2 className="font-extrabold text-slate-800 text-base leading-tight">Журнал наблюдений</h2>
-            <div className="text-xs text-slate-500 font-medium mt-0.5">Свободные заметки за смену</div>
+            <h2 className="font-black text-slate-900 text-base leading-tight">Журнал наблюдений</h2>
+            <div className="text-xs text-slate-600 font-semibold mt-0.5">Свободные заметки за смену</div>
           </div>
         </div>
 
@@ -133,9 +133,9 @@ export function ObservationJournal({
             <button
               type="button"
               onClick={() => setIsLightboxOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] uppercase tracking-wide font-bold transition-all active:scale-95 shadow-sm"
+              className="min-h-[44px] flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs uppercase tracking-wider font-black transition-all active:scale-95 shadow-xs cursor-pointer"
             >
-              <Check size={14} strokeWidth={3} />
+              <Check size={16} strokeWidth={3} className="text-emerald-700" />
               <span>✓ Фото</span>
             </button>
           ) : (
@@ -143,10 +143,10 @@ export function ObservationJournal({
               type="button"
               disabled={isLocked || isProcessingPhoto}
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-slate-600 hover:bg-slate-50 text-[11px] uppercase tracking-wide font-bold transition-all active:scale-95 shadow-sm"
+              className="min-h-[44px] flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-800 text-xs uppercase tracking-wider font-black transition-all active:scale-95 shadow-xs cursor-pointer disabled:opacity-50"
             >
-              {isProcessingPhoto ? <RefreshCw size={14} className="animate-spin" /> : <Camera size={14} />}
-              <span>📷 Фото</span>
+              {isProcessingPhoto ? <RefreshCw size={16} className="animate-spin text-slate-700" /> : <Camera size={16} className="text-slate-700 stroke-[2.4]" />}
+              <span>Фото</span>
             </button>
           )}
 
@@ -170,7 +170,7 @@ export function ObservationJournal({
           onBlur={onBlur}
           disabled={isLocked}
           placeholder="Например: Марго и Прэтти конфликтовали из-за веток, Одри неохотно ела ужин..."
-          className="w-full min-h-[100px] px-4 py-3.5 bg-white/60 border border-slate-200/60 rounded-2xl text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400/90 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400/80 transition-all shadow-inner resize-none overflow-hidden"
+          className="w-full min-h-[110px] px-4 py-3.5 bg-slate-50/70 border border-slate-200 rounded-2xl text-sm sm:text-base font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all shadow-inner resize-none overflow-hidden"
         />
       </div>
 
@@ -190,7 +190,7 @@ export function ObservationJournal({
               type="button"
               disabled={isLocked}
               onClick={handleRemovePhoto}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 text-xs font-bold transition-all active:scale-95"
+              className="min-h-[44px] flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 text-xs font-black transition-all active:scale-95 cursor-pointer"
             >
               <Trash2 size={16} />
               <span>Удалить фото</span>
@@ -199,7 +199,7 @@ export function ObservationJournal({
             <button
               type="button"
               onClick={() => setIsLightboxOpen(false)}
-              className="px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all active:scale-95"
+              className="min-h-[44px] px-6 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-black border border-white/25 transition-all active:scale-95 cursor-pointer"
             >
               Закрыть
             </button>

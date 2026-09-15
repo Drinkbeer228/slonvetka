@@ -71,13 +71,15 @@ export function ShiftHandoverModal({ shiftId, currentUserId, onClose, onSuccess 
       />
       <div className="relative w-full max-w-sm bg-white/95 backdrop-blur-xl rounded-[28px] shadow-2xl overflow-hidden flex flex-col border border-white">
         
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white/50">
-          <h3 className="font-black text-lg text-slate-800">Передача дежурства</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 bg-white/70">
+          <h3 className="font-black text-lg text-slate-950">Передача дежурства</h3>
           <button 
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-700 active:scale-95 transition-all"
+            className="w-11 h-11 flex items-center justify-center rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-950 active:scale-95 transition-all cursor-pointer"
+            aria-label="Закрыть"
           >
-            <X size={18} strokeWidth={2.5} />
+            <X size={22} strokeWidth={2.5} />
           </button>
         </div>
 

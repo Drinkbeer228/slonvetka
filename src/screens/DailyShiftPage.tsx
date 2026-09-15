@@ -10,7 +10,7 @@ import { DailyShift, ElephantDailyMetrics, FeedInventoryItem, FeedInventoryType,
 import { Elephant, Assignment, TreatmentRecordWithPhotos } from '../types';
 import { CounterButton } from '../components/common/CounterButton';
 import { 
-  Calendar as CalendarIcon, CheckCircle2, Loader2, Save, UserCheck, 
+  Calendar as CalendarIcon, Loader2, UserCheck, 
   Check, Camera, PackagePlus, Package, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2, ShieldAlert,
   Lock, Unlock, LogOut, Stethoscope } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
@@ -639,65 +639,6 @@ export function DailyShiftPage() {
     return parseDailyRation(shift?.feed_notes);
   }, [shift?.feed_notes]);
 
-  const shiftSummary = useMemo(() => {
-    const metricsList = Object.values(metrics || {});
-    const totalPoop = metricsList.reduce((sum, item) => sum + (item.poop_count || 0), 0);
-    const totalUrination = metricsList.reduce((sum, item) => sum + (item.urination_count || 0), 0);
-    const totalSleepMinutes = metricsList.reduce((sum, item) => sum + (item.sleep_minutes || 0), 0);
-    const sleepHours = totalSleepMinutes > 0 ? `${(totalSleepMinutes / 60).toFixed(1)} ч` : 'нет данных';
-    const feedReady = Boolean(
-      currentRation.morning_mash_fed || (currentRation.morning_porridge && currentRation.morning_porridge !== 'none')
-    ) && Boolean(currentRation.evening_diet_fed || currentRation.salad_base_included);
-
-    return {
-      totalPoop,
-      totalUrination,
-      sleepHours,
-      feedStatus: feedReady ? 'Рацион отмечен' : 'Рацион не закрыт',
-      syncLabel:
-        globalSaveStatus === 'saving' ? 'Сохраняем…' :
-        globalSaveStatus === 'saved' ? 'Сохранено' :
-        globalSaveStatus === 'error' ? 'Ошибка сохранения' :
-        'Без изменений',
-    };
-  }, [currentRation, globalSaveStatus, metrics]);
-
-  const criticalAlerts = useMemo(() => {
-    const alerts: string[] = [];
-    const metricsList = Object.values(metrics || {});
-    const hasDiarrhea = metricsList.some(item =>
-      (item.feces_traits || []).some(trait => {
-        const value = trait.toLowerCase();
-        return value.includes('жидк') || value.includes('понос');
-      })
-    );
-    const hasDry = metricsList.some(item =>
-      (item.feces_traits || []).some(trait => {
-        const value = trait.toLowerCase();
-        return value.includes('сух') || value.includes('твёрд');
-      })
-    );
-    const elephantsWithoutPoop = (elephants || []).filter(elephant => ((metrics || {})[elephant.id]?.poop_count || 0) === 0);
-
-    if (currentRation.salad_appetite === 'refused') {
-      alerts.push('Есть отказ от салата / вечернего рациона.');
-    }
-    if (hasDiarrhea) {
-      alerts.push('Зафиксирован жидкий стул или понос.');
-    }
-    if (hasDry) {
-      alerts.push('Есть отметки сухого / твёрдого стула.');
-    }
-    if (elephantsWithoutPoop.length > 0) {
-      alerts.push(`Без дефекации за смену: ${elephantsWithoutPoop.map(elephant => elephant.name).join(', ')}.`);
-    }
-    if ((currentRation.coarse_branches || 0) > initialAvailable.branches) {
-      alerts.push('По веткам зафиксирован перерасход относительно доступного остатка.');
-    }
-
-    return alerts;
-  }, [currentRation, elephants, initialAvailable.branches, metrics]);
-
   const handlePorridgeFieldChange = (field: keyof DailyRationData | Partial<DailyRationData>, value?: any) => {
     if (isLocked || !shift) return;
     const patch = typeof field === 'object' ? field : { [field]: value };
@@ -984,14 +925,6 @@ export function DailyShiftPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900" />
-      </div>
-    );
-  }
-
   const activeElephant = (elephants || []).find(e => e.id === activeElephantId) || (elephants || [])[0];
   const m = activeElephant ? ((metrics || {})[activeElephant.id] || createDefaultElephantMetrics(shift?.id || '', activeElephant.id)) : null;
 
@@ -1000,6 +933,7 @@ export function DailyShiftPage() {
     : [];
 
   useEffect(() => {
+    if (loading) return;
     if (typeof window === 'undefined' || typeof document === 'undefined' || typeof IntersectionObserver === 'undefined') return;
 
     const sections = SHIFT_SECTION_TABS
@@ -1025,7 +959,15 @@ export function DailyShiftPage() {
     sections.forEach(section => observer.observe(section));
 
     return () => observer.disconnect();
-  }, [activeElephant?.id, assignmentsForEle.length, selectedDate]);
+  }, [loading, activeElephant?.id, assignmentsForEle.length, selectedDate]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900" />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -1118,7 +1060,7 @@ export function DailyShiftPage() {
       )}
 
       <div className="sticky top-[4.5rem] z-20 -mx-1 px-1">
-        <div className="flex gap-2 overflow-x-auto rounded-[22px] border border-white/80 bg-white/80 p-2 shadow-sm backdrop-blur-xl thin-scroll">
+        <div className="flex gap-2 overflow-x-auto rounded-[24px] border border-slate-200/90 bg-white/90 p-2 shadow-sm backdrop-blur-xl thin-scroll">
           {SHIFT_SECTION_TABS.map((tab) => (
             <button
               key={tab.id}
@@ -1127,10 +1069,10 @@ export function DailyShiftPage() {
                 setActiveSection(tab.id);
                 document.getElementById(`shift-section-${tab.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
-              className={`shrink-0 rounded-2xl px-3.5 py-2 text-xs font-black transition-all active:scale-95 ${
+              className={`min-h-[44px] shrink-0 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-black transition-all active:scale-95 cursor-pointer flex items-center justify-center ${
                 activeSection === tab.id
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-slate-100/85 text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200/80'
+                  ? 'bg-slate-950 text-white shadow-md'
+                  : 'bg-slate-100/90 text-slate-700 hover:bg-white hover:text-slate-950 border border-slate-200'
               }`}
             >
               {tab.label}
@@ -1140,62 +1082,6 @@ export function DailyShiftPage() {
       </div>
 
       <div id="shift-section-physiology" className="space-y-6 scroll-mt-32">
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur-xl">
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Смена</div>
-          <div className="mt-2 text-2xl font-black text-slate-950">{shiftSummary.totalPoop}</div>
-          <div className="text-sm font-semibold text-slate-600">дефекаций за дату</div>
-        </div>
-        <div className="rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur-xl">
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Гидратация</div>
-          <div className="mt-2 text-2xl font-black text-slate-950">{shiftSummary.totalUrination}</div>
-          <div className="text-sm font-semibold text-slate-600">мочеиспусканий отмечено</div>
-        </div>
-        <div className="rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur-xl">
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Сон</div>
-          <div className="mt-2 text-2xl font-black text-slate-950">{shiftSummary.sleepHours}</div>
-          <div className="text-sm font-semibold text-slate-600">{shiftSummary.feedStatus}</div>
-        </div>
-        <div className="rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur-xl">
-          <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
-            <Save size={14} />
-            Синхронизация
-          </div>
-          <div className="mt-2 text-lg font-black text-slate-950">{shiftSummary.syncLabel}</div>
-          <div className="text-sm font-semibold text-slate-600">Общий статус сохранения смены</div>
-        </div>
-      </section>
-
-      <section className={`rounded-[24px] border p-4 shadow-sm backdrop-blur-xl ${criticalAlerts.length > 0 ? 'border-amber-200 bg-amber-50/85' : 'border-emerald-200 bg-emerald-50/85'}`}>
-        <div className="flex items-start gap-3">
-          {criticalAlerts.length > 0 ? (
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" />
-          ) : (
-            <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-700" />
-          )}
-          <div>
-            <div className="text-sm font-black text-slate-950">
-              {criticalAlerts.length > 0 ? 'Критические сигналы смены' : 'Критических сигналов не выявлено'}
-            </div>
-            <div className="mt-1 text-sm text-slate-600">
-              {criticalAlerts.length > 0
-                ? 'Вынесли отклонения отдельно от обычных заметок, чтобы их было видно сразу.'
-                : 'Физиология и рацион выглядят стабильно по текущим отметкам.'}
-            </div>
-            {criticalAlerts.length > 0 && (
-              <ul className="mt-3 space-y-1.5 text-sm font-semibold text-slate-700">
-                {criticalAlerts.map(alert => (
-                  <li key={alert} className="flex gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                    <span>{alert}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </section>
-
       {/* 2. ФИЗИОЛОГИЯ И СОН: <ExcretionControl ... /> (КУЧИ, ЛУЖИ, СОН) */}
       <ExcretionControl
         isLocked={isEditingDisabled}
@@ -1233,10 +1119,10 @@ export function DailyShiftPage() {
                   setModalBranches(feedInventory.branches.quantity_in_stock);
                   setReplenishModalOpen(true);
                 }}
-                className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-800 hover:text-slate-950 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                className="min-h-[44px] px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 rounded-xl text-xs sm:text-sm font-black transition-all shadow-xs flex items-center gap-2 active:scale-95 cursor-pointer"
                 title="Управление остатками на складе feed_inventory"
               >
-                <Package size={13} className="text-amber-600" />
+                <Package size={18} className="text-amber-600 stroke-[2.4]" />
                 <span>Склад</span>
               </button>
             )}

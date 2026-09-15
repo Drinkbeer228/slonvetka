@@ -51,15 +51,15 @@ export function SaladTechModal({ isOpen, onClose }: SaladTechModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 sm:pt-6 pb-4 border-b border-slate-100 shrink-0">
           <div>
-            <h2 className="font-extrabold text-slate-800 text-lg sm:text-xl tracking-tight">Регламент вечернего салата</h2>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Технологическая карта и регламент кормокухни</p>
+            <h2 className="font-black text-slate-950 text-lg sm:text-xl tracking-tight">Регламент вечернего салата</h2>
+            <p className="text-xs sm:text-sm text-slate-600 font-semibold mt-0.5">Технологическая карта и регламент кормокухни</p>
           </div>
           <button 
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors active:scale-95 shrink-0"
-            aria-label="Закрыть"
+            className="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-2xl text-slate-700 hover:text-slate-950 transition-colors active:scale-95 shrink-0 cursor-pointer shadow-xs"
+            aria-label="Закрыть регламент"
           >
-            <X size={18} />
+            <X size={20} className="stroke-[2.5]" />
           </button>
         </div>
 
@@ -69,36 +69,36 @@ export function SaladTechModal({ isOpen, onClose }: SaladTechModalProps) {
           {/* 1. Базовая развесовка (1-й Акт — Основа) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                <Scale size={14} className="text-amber-500" />
-                Базовая развесовка (1-й Акт — Основа)
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Scale size={16} className="text-amber-600 stroke-[2.4]" />
+                <span>Базовая развесовка (1-й Акт — Основа)</span>
               </h3>
-              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100/80 text-amber-800 border border-amber-200/60">
+              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-950 border border-amber-300 shadow-xs">
                 Всего: 60 кг
               </span>
             </div>
 
-            <div className="bg-white/60 backdrop-blur-md border border-slate-200/60 rounded-2xl p-4 shadow-sm space-y-3">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100">
-                  <div className="text-xl mb-1">🥔</div>
-                  <div className="text-xs font-bold text-slate-800">Картофель</div>
-                  <div className="text-sm font-black text-amber-600 mt-0.5">20 кг</div>
+            <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="grid grid-cols-3 gap-2.5 text-center">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs">
+                  <div className="text-2xl mb-1">🥔</div>
+                  <div className="text-xs sm:text-sm font-black text-slate-900">Картофель</div>
+                  <div className="text-sm sm:text-base font-black text-amber-600 mt-0.5">20 кг</div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100">
-                  <div className="text-xl mb-1">🥕</div>
-                  <div className="text-xs font-bold text-slate-800">Морковь</div>
-                  <div className="text-sm font-black text-amber-600 mt-0.5">20 кг</div>
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs">
+                  <div className="text-2xl mb-1">🥕</div>
+                  <div className="text-xs sm:text-sm font-black text-slate-900">Морковь</div>
+                  <div className="text-sm sm:text-base font-black text-amber-600 mt-0.5">20 кг</div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100">
-                  <div className="text-xl mb-1">🍠</div>
-                  <div className="text-xs font-bold text-slate-800">Свёкла</div>
-                  <div className="text-sm font-black text-amber-600 mt-0.5">20 кг</div>
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs">
+                  <div className="text-2xl mb-1">🍠</div>
+                  <div className="text-xs sm:text-sm font-black text-slate-900">Свёкла</div>
+                  <div className="text-sm sm:text-base font-black text-amber-600 mt-0.5">20 кг</div>
                 </div>
               </div>
 
-              <div className="text-xs text-slate-600 font-medium bg-amber-50/60 border border-amber-100/80 rounded-xl p-2.5 flex items-center gap-2">
-                <span className="text-sm">ℹ️</span>
+              <div className="text-xs sm:text-sm text-slate-800 font-semibold bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2.5">
+                <span className="text-base shrink-0">ℹ️</span>
                 <span>
                   <strong>Итого базового замеса: 60 кг.</strong> Распределяется поровну между слонами в индивидуальные тазы (~120 л).
                 </span>
@@ -108,58 +108,58 @@ export function SaladTechModal({ isOpen, onClose }: SaladTechModalProps) {
 
           {/* 2. Технология мойки и очистки */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-              <Droplets size={14} className="text-blue-500" />
-              Технология мойки и очистки
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Droplets size={16} className="text-blue-600 stroke-[2.4]" />
+              <span>Технология мойки и очистки</span>
             </h3>
 
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {/* Шаг 1 */}
-              <div className="bg-white/60 backdrop-blur-md border border-slate-200/50 rounded-2xl p-3.5 shadow-sm">
-                <div className="flex items-center gap-2 font-bold text-sm text-slate-800 mb-1">
-                  <span className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black">1</span>
+              <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center gap-2.5 font-black text-sm text-slate-900 mb-1.5">
+                  <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-black shrink-0">1</span>
                   <span>🚿 Замачивание</span>
                 </div>
-                <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-medium pl-8">
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold pl-9">
                   Засыпать овощи в таз, залить тёплой водой и накрыть. Периодически подходить и <strong>перемешивать щёткой на длинном черенке</strong>, пока грязь полностью не откиснет.
                 </p>
               </div>
 
               {/* Шаг 2 */}
-              <div className="bg-white/60 backdrop-blur-md border border-slate-200/50 rounded-2xl p-3.5 shadow-sm">
-                <div className="flex items-center gap-2 font-bold text-sm text-slate-800 mb-1">
-                  <span className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black">2</span>
+              <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center gap-2.5 font-black text-sm text-slate-900 mb-1.5">
+                  <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-black shrink-0">2</span>
                   <span>🧺 Смыв и сетчатая корзина</span>
                 </div>
-                <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-medium pl-8">
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold pl-9">
                   Финальное перемешивание в тазу. Пересыпать в <strong>сетчатую корзину</strong>, растрясти и промыть чистой проточной водой <strong>до полного удаления песка и глины</strong>.
                 </p>
               </div>
 
               {/* Шаг 3 */}
-              <div className="bg-white/60 backdrop-blur-md border border-slate-200/50 rounded-2xl p-3.5 shadow-sm">
-                <div className="flex items-center gap-2 font-bold text-sm text-slate-800 mb-1.5">
-                  <span className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs font-black">3</span>
+              <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center gap-2.5 font-black text-sm text-slate-900 mb-2">
+                  <span className="w-7 h-7 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-xs font-black shrink-0">3</span>
                   <span>🔪 Сортировка и калибровка</span>
                 </div>
-                <div className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-medium pl-8 space-y-1">
+                <div className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold pl-9 space-y-1.5">
                   <div>• <strong>Картофель:</strong> перебрать, вырезать гниль. Крупные клубни разрезать на части (<em>профилактика завала пищевода</em>). Мелкие оставлять целыми.</div>
                   <div>• <strong>Морковь:</strong> срезать кончики.</div>
                   <div>• <strong>Свёкла:</strong> срезать «голову» и хвостик.</div>
-                  <div className="pt-1 text-rose-600 font-bold flex items-center gap-1">
-                    <ShieldAlert size={14} className="shrink-0" />
+                  <div className="pt-1.5 text-rose-700 font-black flex items-center gap-1.5">
+                    <ShieldAlert size={16} className="shrink-0" />
                     <span>Все обрезки и брак — строго в мусорку!</span>
                   </div>
                 </div>
               </div>
 
               {/* Шаг 4 */}
-              <div className="bg-white/60 backdrop-blur-md border border-slate-200/50 rounded-2xl p-3.5 shadow-sm">
-                <div className="flex items-center gap-2 font-bold text-sm text-slate-800 mb-1">
-                  <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-black">4</span>
+              <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex items-center gap-2.5 font-black text-sm text-slate-900 mb-1.5">
+                  <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-black shrink-0">4</span>
                   <span>⚖️ Раскладка</span>
                 </div>
-                <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-medium pl-8">
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold pl-9">
                   Чистую базу <strong>равномерно разложить</strong> по индивидуальным тазам слонов.
                 </p>
               </div>
@@ -168,27 +168,27 @@ export function SaladTechModal({ isOpen, onClose }: SaladTechModalProps) {
 
           {/* 3. 2-й Акт: Сезонная овощюга и фрукты */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-              <Apple size={14} className="text-emerald-500" />
-              2-й Акт: Сезонная овощюга и фрукты
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Apple size={16} className="text-emerald-600 stroke-[2.4]" />
+              <span>2-й Акт: Сезонные овощи и фрукты</span>
             </h3>
             
-            <div className="bg-white/60 backdrop-blur-md border border-slate-200/50 rounded-2xl p-4 shadow-sm space-y-2.5">
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                <span className="text-lg">🍉🎃🍌</span>
+            <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="flex items-center gap-2 text-sm sm:text-base font-black text-slate-900">
+                <span className="text-xl">🍉🎃🍌</span>
                 <span>Добавка сочного корма поверх базы</span>
               </div>
-              <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-medium">
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold">
                 Поверх базовой подушки докинуть сочные корма по текущей ведомости склада:
               </p>
-              <div className="flex flex-wrap gap-1.5 pt-1">
+              <div className="flex flex-wrap gap-2 pt-1">
                 {['Капуста 🥬', 'Перец 🫑', 'Сельдерей 🌿', 'Арбуз 🍉', 'Дыня 🍈', 'Бананы 🍌', 'Кукуруза 🌽', 'Яблоки 🍏', 'Тыква 🎃'].map((item) => (
-                  <span key={item} className="px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700 text-xs font-semibold">
+                  <span key={item} className="min-h-[40px] px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-900 text-xs sm:text-sm font-black flex items-center shadow-xs">
                     {item}
                   </span>
                 ))}
               </div>
-              <p className="text-[11px] text-slate-500 font-medium italic pt-1">
+              <p className="text-xs text-slate-500 font-semibold italic pt-1">
                 * С учетом сезонных поставок и индивидуальных диетических назначений ветеринара.
               </p>
             </div>
@@ -196,16 +196,16 @@ export function SaladTechModal({ isOpen, onClose }: SaladTechModalProps) {
 
           {/* 4. Минеральный замес (перед самой подачей) */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-              <Sparkles size={14} className="text-indigo-500" />
-              Минеральный замес (перед самой подачей)
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Sparkles size={16} className="text-indigo-600 stroke-[2.4]" />
+              <span>Минеральный замес (перед самой подачей)</span>
             </h3>
 
-            <div className="bg-indigo-50/50 border border-indigo-100/80 rounded-2xl p-4 shadow-sm flex items-start gap-3">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 shadow-xs flex items-start gap-3.5">
               <span className="text-2xl shrink-0 mt-0.5">🧂⚪</span>
-              <div className="space-y-1">
-                <div className="font-bold text-sm text-indigo-950">Кормовой мел и поваренная соль</div>
-                <p className="text-xs sm:text-[13px] text-indigo-900/80 leading-relaxed font-medium">
+              <div className="space-y-1.5">
+                <div className="font-black text-sm sm:text-base text-indigo-950">Кормовой мел и поваренная соль</div>
+                <p className="text-xs sm:text-sm text-indigo-950/90 leading-relaxed font-semibold">
                   Посыпать замес кормовым мелом и солью <strong>непосредственно перед отправкой тазов в вольер</strong> для равномерного усвоения и предотвращения отмокания соли на дне.
                 </p>
               </div>
