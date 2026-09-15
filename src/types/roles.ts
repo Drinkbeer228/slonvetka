@@ -1,4 +1,10 @@
-export type UserRole = 'keeper' | 'vet' | 'director' | 'admin';
+export const USER_ROLES = ['keeper', 'vet', 'director', 'admin'] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
+
+export function isUserRole(value: unknown): value is UserRole {
+  return typeof value === 'string' && USER_ROLES.includes(value as UserRole);
+}
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   keeper: 'Кипер',

@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { useStore } from '../store';
 import { Plus, X, Loader2, User } from 'lucide-react';
-import { canManageUsers } from '../lib/permissions';
-import { ROLE_LABELS, UserRole } from '../types/roles';
+import { isAdmin } from '../lib/permissions';
+import { isUserRole, ROLE_LABELS, USER_ROLES, UserRole } from '../types/roles';
 
 // Create a separate Supabase client that doesn't persist the session.
 // This allows us to sign up a new user without logging out the current admin.
@@ -55,7 +55,9 @@ export function StaffScreen() {
         .order('name');
       
       if (error) throw error;
-      setStaff(data || []);
+      const normalizedStaff = (data || [])
+        .filter((member): member is { id: string; name: string; role: UserRole } => isUserRole(member.role));
+      setStaff(normalizedStaff);
     } catch (err) {
       console.error(err);
     } finally {
@@ -64,7 +66,7 @@ export function StaffScreen() {
   };
 
   useEffect(() => {
-    if (!profile || !canManageUsers(profile)) {
+    if (!isAdmin(profile?.role)) {
       setStaff([]);
       setLoading(false);
       return;
@@ -128,7 +130,7 @@ export function StaffScreen() {
     }
   };
 
-  if (!canManageUsers(profile)) {
+  if (!isAdmin(profile?.role)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
         <span className="text-4xl mb-4">⛔</span>
@@ -243,13 +245,18 @@ export function StaffScreen() {
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Роль</label>
                   <select
                     value={regRole}
-                    onChange={(e) => setRegRole(e.target.value as UserRole)}
+                    onChange={(e) => {
+                      if (isUserRole(e.target.value)) {
+                        setRegRole(e.target.value);
+                      }
+                    }}
                     className="w-full px-4 py-3 bg-zinc-100 border-2 border-transparent focus:bg-white rounded-xl font-bold focus:outline-none focus:border-zinc-900 transition"
                   >
-                    <option value="keeper">Кипер</option>
-                    <option value="vet">Ветврач</option>
-                    <option value="director">Дрессировщик</option>
-                    <option value="admin">Администратор</option>
+                    {USER_ROLES.map((roleOption) => (
+                      <option key={roleOption} value={roleOption}>
+                        {ROLE_LABELS[roleOption]}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
