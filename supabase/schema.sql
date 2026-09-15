@@ -395,7 +395,7 @@ create policy "shifts_keeper_update" on public.daily_shifts
         exists (
           select 1
           from public.daily_shifts as existing_shift
-          where existing_shift.id = id
+          where existing_shift.id = daily_shifts.id
             and existing_shift.handover_to_keeper_id = auth.uid()
             and existing_shift.status = 'handover_pending'
             and existing_shift.date = current_date

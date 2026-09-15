@@ -38,7 +38,7 @@ export function AssignmentsScreen() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
         <span className="text-4xl mb-4">⛔</span>
         <h2 className="text-xl font-black text-zinc-900 mb-2">Доступ запрещен</h2>
-        <p className="text-zinc-500 font-medium text-sm">Этот раздел доступен только ветврачам и администраторам.</p>
+        <p className="text-zinc-500 font-medium text-sm">Этот раздел доступен только ролям «Ветврач» и «Администратор».</p>
       </div>
     );
   }
