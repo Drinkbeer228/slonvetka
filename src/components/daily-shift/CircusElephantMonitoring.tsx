@@ -88,6 +88,7 @@ const FEET_LIST = [
   { id: 'ПЗ', label: 'ПЗ (Правая задняя)' },
   { id: 'ЛЗ', label: 'ЛЗ (Левая задняя)' },
 ];
+const FAVORED_LEG_OPTIONS = FEET_LIST.map((foot) => foot.id);
 
 const EYE_OPTIONS = ['Ясные', 'Прищур', 'Слезотечение', 'Отек век'];
 const TRUNK_TONE_OPTIONS = ['Активный / поднятый', 'Пассивный ("плетью")'];
@@ -119,6 +120,7 @@ function ChoiceChipGroup({ options, value, onChange, disabled = false }: ChoiceC
             type="button"
             disabled={disabled}
             onClick={() => onChange(option)}
+            aria-pressed={isActive}
             className={`min-h-[40px] rounded-2xl border px-3 py-2 text-xs font-bold transition-all active:scale-95 disabled:opacity-50 ${
               isActive
                 ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
@@ -151,6 +153,7 @@ function MultiSelectChipGroup({ options, selected, onToggle, disabled = false }:
             type="button"
             disabled={disabled}
             onClick={() => onToggle(option)}
+            aria-pressed={isActive}
             className={`min-h-[40px] rounded-2xl border px-3 py-2 text-xs font-bold transition-all active:scale-95 disabled:opacity-50 ${
               isActive
                 ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
@@ -801,7 +804,7 @@ export function CircusElephantMonitoring({
           {needsFavoredLeg && (
             <div className="space-y-2">
               <div className="text-[11px] font-bold text-slate-600">Какая нога</div>
-              <ChoiceChipGroup options={['ПП', 'ПЗ', 'ЛП', 'ЛЗ']} value={metrics.favored_leg} onChange={(value) => handleChoiceChange('favored_leg', value)} disabled={isLocked} />
+              <ChoiceChipGroup options={FAVORED_LEG_OPTIONS} value={metrics.favored_leg} onChange={(value) => handleChoiceChange('favored_leg', value)} disabled={isLocked} />
             </div>
           )}
           <div className="space-y-2">

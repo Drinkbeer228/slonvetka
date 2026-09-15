@@ -109,7 +109,7 @@ export function createDefaultElephantMetrics(shiftId: string, elephantId: string
     poop_count: 0,
     feces_traits: ['Сформирован (норма)'],
     urination_count: 0,
-    urination_traits: ['Светлая / Прозрачная'],
+    urination_traits: ['Прозрачная (норма)'],
     behavior: 'Спокойная / В норме',
     sleep_minutes: 0,
     sleep_intervals: [],
