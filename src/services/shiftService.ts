@@ -13,6 +13,7 @@ import {
   cacheFeedInventory, 
   getCachedFeedInventory 
 } from './offlineDb';
+import { getRandomUuid } from '../utils/randomUuid';
 
 export const DEFAULT_FEED_INVENTORY: Record<FeedInventoryType, FeedInventoryItem> = {
   hay_bales: {
@@ -334,7 +335,7 @@ export const shiftService = {
     if (closeError) throw closeError;
 
     // Пытаемся создать новую смену
-    const newShiftId = crypto.randomUUID();
+    const newShiftId = getRandomUuid();
     const { error: createError } = await supabase
       .from('daily_shifts')
       .insert({
@@ -448,7 +449,7 @@ export const shiftService = {
 
     // 3. Return default template if not found anywhere
     const defaultShift: DailyShift = {
-      id: crypto.randomUUID(),
+      id: getRandomUuid(),
       date,
       duty_keeper_id: null,
       status: 'in_progress',
