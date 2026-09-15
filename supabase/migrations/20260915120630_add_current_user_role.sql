@@ -26,3 +26,8 @@ drop policy if exists "records_vet_update_any" on public.treatment_records;
 create policy "records_vet_update_any" on public.treatment_records
   for update using (public.current_user_role() in ('vet', 'admin'))
   with check (public.current_user_role() in ('vet', 'admin'));
+
+drop policy if exists "records_keeper_insert" on public.treatment_records;
+drop policy if exists "records_vet_insert_any" on public.treatment_records;
+create policy "records_vet_insert_any" on public.treatment_records
+  for insert with check (public.current_user_role() in ('vet', 'admin'));
