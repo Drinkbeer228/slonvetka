@@ -288,15 +288,9 @@ export function DynamicCounterSection({
                 <Trophy size={20} className="text-emerald-700" />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                   Работа смены
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 font-bold">
-                    Смена
-                  </span>
                 </h3>
-                <p className="text-xs font-semibold text-emerald-800/70">
-                  Учёт выполненных работ
-                </p>
               </div>
             </div>
 
@@ -362,15 +356,9 @@ export function DynamicCounterSection({
                 <Flame size={20} className="text-rose-600" />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                   Инциденты и поломки
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100/80 text-rose-800 font-bold">
-                    За смену
-                  </span>
                 </h3>
-                <p className="text-xs font-semibold text-rose-800/70">
-                  Фиксируйте событие прямо в смене
-                </p>
               </div>
             </div>
 

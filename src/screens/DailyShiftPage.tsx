@@ -966,29 +966,6 @@ export function DailyShiftPage() {
         </div>
       )}
       
-      {/* VET OBSERVER MODE BANNER */}
-      {isVetUser && (
-        <div className="mb-4 bg-teal-500/10 border-2 border-teal-500/30 rounded-[24px] p-3.5 sm:p-4 shadow-sm mx-4 sm:mx-0 flex items-center justify-between gap-3 animate-in fade-in duration-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Stethoscope size={20} strokeWidth={2.4} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-teal-950 font-black text-sm tracking-tight">
-                  Режим наблюдателя (Ветконтроль)
-                </p>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full border border-teal-200">
-                  Read-Only
-                </span>
-              </div>
-              <p className="text-xs font-semibold text-teal-800/80 mt-0.5">
-                Ввод смены киперов отключен. Управление назначениями и процедурами доступно в разделе «Вет-Кабинет».
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* TOP NOTIFICATION BANNERS */}
       {isArchiveOrOtherKeeper && !isEditOverride && (
@@ -1081,16 +1058,16 @@ export function DailyShiftPage() {
       />
 
       {/* 3. ГРУБЫЕ КОРМА: СЕТКА 3 КОЛОНОК (ТЮКИ, РУЛОНЫ, ВЕТКИ) */}
-      <div className="bg-white/70 backdrop-blur-xl border border-white/80 rounded-[22px] p-3.5 sm:p-4 shadow-[0_4px_16px_rgba(15,23,42,0.03)] space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xl leading-none">🌾</span>
-            <div>
-              <span className="font-extrabold text-slate-900 text-sm tracking-tight">Грубые корма</span>
-              <span className="text-[11px] text-slate-400 font-medium ml-2">Основной фураж и клетчатка</span>
-            </div>
+      <div className="bg-white/70 backdrop-blur-xl border border-white/80 rounded-[22px] p-3.5 sm:p-4 shadow-[0_4px_16px_rgba(15,23,42,0.03)] space-y-3">
+        {/* Шапка: Слева иконка и заголовок, справа компактные бейджи («Склад», «Без ограничений») */}
+        <div className="flex items-center justify-between gap-2 px-0.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xl leading-none shrink-0">🌾</span>
+            <span className="font-extrabold text-slate-900 text-sm tracking-tight truncate">
+              Грубые корма
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {profile?.role !== 'vet' && (
               <button
                 type="button"
@@ -1100,25 +1077,24 @@ export function DailyShiftPage() {
                   setModalBranches(feedInventory.branches.quantity_in_stock);
                   setReplenishModalOpen(true);
                 }}
-                className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-800 hover:text-slate-950 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
                 title="Управление остатками на складе feed_inventory"
               >
                 <Package size={13} className="text-amber-600" />
                 <span>Склад</span>
               </button>
             )}
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-lime-700 bg-lime-100/70 border border-lime-200/80 px-2 py-0.5 rounded-full">
-              Без ограничений
-            </span>
           </div>
         </div>
 
+        {/* Карточки счетчиков: 3 колонки */}
         <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
           {/* Тюки сена */}
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="text-center select-none px-0.5">
-              <div className="text-xs font-black text-slate-800 tracking-tight truncate">Тюки сена</div>
-              <div className="text-[10px] text-slate-400 font-semibold truncate">Основная раздача</div>
+              <div className="text-[13px] font-bold text-slate-900 tracking-tight truncate">
+                Тюки сена
+              </div>
             </div>
             <CounterButton
               value={hayBalesDistributed}
@@ -1132,7 +1108,7 @@ export function DailyShiftPage() {
               const remaining = initialAvailable.bales - dist;
               const isOver = remaining < 0;
               return (
-                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-500'}`}>
+                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-600'}`}>
                   <span className="font-medium">Остаток: </span>
                   <span className={`font-bold ${remaining < 30 && !isOver ? 'text-amber-600 font-black' : (isOver ? 'font-black' : '')}`}>
                     {Math.max(0, remaining)}
@@ -1144,11 +1120,12 @@ export function DailyShiftPage() {
             })()}
           </div>
 
-          {/* Рулоны / Мешки */}
+          {/* Рулоны */}
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="text-center select-none px-0.5">
-              <div className="text-xs font-black text-slate-800 tracking-tight truncate">Рулоны</div>
-              <div className="text-[10px] text-slate-400 font-semibold truncate">Доп. фураж</div>
+              <div className="text-[13px] font-bold text-slate-900 tracking-tight truncate">
+                Рулоны
+              </div>
             </div>
             <CounterButton
               value={hayBagsDistributed}
@@ -1162,7 +1139,7 @@ export function DailyShiftPage() {
               const remaining = initialAvailable.rolls - dist;
               const isOver = remaining < 0;
               return (
-                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-500'}`}>
+                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-600'}`}>
                   <span className="font-medium">Остаток: </span>
                   <span className={`font-bold ${remaining < 5 && !isOver ? 'text-amber-600 font-black' : (isOver ? 'font-black' : '')}`}>
                     {Math.max(0, remaining)}
@@ -1174,11 +1151,12 @@ export function DailyShiftPage() {
             })()}
           </div>
 
-          {/* Ветки, веники */}
+          {/* Ветки */}
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="text-center select-none px-0.5">
-              <div className="text-xs font-black text-slate-800 tracking-tight truncate">Ветки</div>
-              <div className="text-[10px] text-slate-400 font-semibold truncate">Веники / бамбук</div>
+              <div className="text-[13px] font-bold text-slate-900 tracking-tight truncate">
+                Ветки
+              </div>
             </div>
             <CounterButton
               value={currentRation.coarse_branches || 0}
@@ -1192,7 +1170,7 @@ export function DailyShiftPage() {
               const remaining = initialAvailable.branches - dist;
               const isOver = remaining < 0;
               return (
-                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-500'}`}>
+                <div className={`text-[11px] text-center pt-0.5 select-none truncate ${isOver ? 'text-rose-600' : 'text-slate-600'}`}>
                   <span className="font-medium">Остаток: </span>
                   <span className={`font-bold ${remaining < 10 && !isOver ? 'text-amber-600 font-black' : (isOver ? 'font-black' : '')}`}>
                     {Math.max(0, remaining)}

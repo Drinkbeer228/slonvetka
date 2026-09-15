@@ -174,10 +174,7 @@ export function FeedControl({
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <span className="text-xl leading-none">🥣</span>
-          <div>
-            <span className="font-extrabold text-slate-900 text-sm tracking-tight">Рацион / Концентраты</span>
-            <span className="text-[11px] text-slate-400 font-medium ml-2">Запарка каши и вечерний рацион</span>
-          </div>
+          <span className="font-extrabold text-slate-900 text-sm tracking-tight">Рацион / Концентраты</span>
         </div>
       </div>
 

@@ -7,9 +7,7 @@ import {
   Trash2, 
   Clock, 
   Check, 
-  ShieldAlert,
-  Flame,
-  Sparkles
+  ShieldAlert
 } from 'lucide-react';
 
 export type DefecationAnomalyType = 
@@ -23,19 +21,15 @@ export interface DefecationLogEntry {
   id: string;
   timestamp: string; // "14:25"
   type: DefecationAnomalyType;
+  createdAt: number; // Unix timestamp в мс для точного интервала
   createdDate?: string; // YYYY-MM-DD
 }
 
 export interface DefecationTrackerSectionProps {
-  /** Optional external list of entries for controlled usage */
   entries?: DefecationLogEntry[];
-  /** Callback on entries change */
   onChange?: (entries: DefecationLogEntry[]) => void;
-  /** Name of the elephant being tracked (e.g. 'Марго') */
   elephantName?: string;
-  /** Read-only mode for completed/view-only shifts */
   isLocked?: boolean;
-  /** Optional initial count if migrating from plain number */
   initialCount?: number;
 }
 
@@ -108,34 +102,10 @@ function pluralizePiles(count: number): string {
   return `${count} куч`;
 }
 
-function getCurrentTimeString(): string {
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
+function getCurrentTimeString(date = new Date()): string {
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
   return `${hh}:${mm}`;
-}
-
-/**
- * Calculates minutes passed between a timestamp (HH:MM) and current time today.
- * If negative (cross-day edge case), handles it gracefully.
- */
-function getMinutesSinceTimestamp(timestamp: string): number {
-  if (!timestamp || !timestamp.includes(':')) return 0;
-  const [hStr, mStr] = timestamp.split(':');
-  const targetHour = parseInt(hStr, 10);
-  const targetMin = parseInt(mStr, 10);
-  if (isNaN(targetHour) || isNaN(targetMin)) return 0;
-
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const targetMinutes = targetHour * 60 + targetMin;
-
-  let diff = currentMinutes - targetMinutes;
-  if (diff < 0) {
-    // Possibly from late yesterday shift
-    diff += 24 * 60;
-  }
-  return diff;
 }
 
 export function DefecationTrackerSection({
@@ -145,21 +115,21 @@ export function DefecationTrackerSection({
   isLocked = false,
   initialCount = 0,
 }: DefecationTrackerSectionProps) {
-  // Local state for standalone or fallback usage
   const [internalEntries, setInternalEntries] = useState<DefecationLogEntry[]>(() => {
     if (controlledEntries && controlledEntries.length > 0) return controlledEntries;
     if (initialCount > 0) {
-      // Seed initial dummy timestamps if only count was known
+      const now = Date.now();
       return Array.from({ length: initialCount }, (_, i) => ({
-        id: `seed-${Date.now()}-${i}`,
+        id: `seed-${now}-${i}`,
         timestamp: getCurrentTimeString(),
         type: 'NORMAL' as const,
+        createdAt: now - i * 60000,
+        createdDate: new Date().toISOString().split('T')[0],
       }));
     }
     return [];
   });
 
-  // Keep internal in sync with controlled if supplied
   useEffect(() => {
     if (controlledEntries) {
       setInternalEntries(controlledEntries);
@@ -167,12 +137,12 @@ export function DefecationTrackerSection({
   }, [controlledEntries]);
 
   const activeEntries = controlledEntries || internalEntries;
-
-  // Selected anomaly pending for the next tap
   const [pendingAnomaly, setPendingAnomaly] = useState<DefecationAnomalyType>('NORMAL');
+  const [currentTime, setCurrentTime] = useState<string>(() => getCurrentTimeString());
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+  const [undoToast, setUndoToast] = useState<string | null>(null);
 
-  // Real-time ticking clock for "+1 (HH:MM)" label
-  const [currentTime, setCurrentTime] = useState<string>(getCurrentTimeString);
+  // Обновление живых часов на кнопке раз в 15 секунд
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(getCurrentTimeString());
@@ -180,51 +150,48 @@ export function DefecationTrackerSection({
     return () => clearInterval(timer);
   }, []);
 
-  // Expand/collapse history
-  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
-
-  // Undo notification state
-  const [undoToast, setUndoToast] = useState<string | null>(null);
-
-  const triggerHaptic = (pattern: number | number[] = 12) => {
-    if (typeof window !== 'undefined' && typeof navigator.vibrate === 'function') {
+  const triggerHaptic = useCallback((pattern: number | number[] = 12) => {
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
       try {
-        navigator.vibrate(pattern as any);
+        navigator.vibrate(pattern);
       } catch {
-        // Safe vibration fallback
+        // Fallback для неподдерживаемых устройств
       }
     }
-  };
+  }, []);
 
   const updateEntries = useCallback(
     (newEntries: DefecationLogEntry[]) => {
-      setInternalEntries(newEntries);
+      if (!controlledEntries) {
+        setInternalEntries(newEntries);
+      }
       onChange?.(newEntries);
     },
-    [onChange]
+    [controlledEntries, onChange]
   );
 
-  // 1-Tap Add Action
+  // Тап: +1 куча
   const handleAddDefecation = () => {
     if (isLocked) return;
 
-    const time = getCurrentTimeString();
+    const now = new Date();
     const newEntry: DefecationLogEntry = {
       id: `def-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      timestamp: time,
+      timestamp: getCurrentTimeString(now),
       type: pendingAnomaly,
+      createdAt: now.getTime(),
+      createdDate: now.toISOString().split('T')[0],
     };
 
     const updated = [newEntry, ...activeEntries];
     updateEntries(updated);
     triggerHaptic(pendingAnomaly === 'NORMAL' ? 14 : [20, 40, 20]);
 
-    // Reset pending anomaly back to normal
     setPendingAnomaly('NORMAL');
     setUndoToast(null);
   };
 
-  // Micro Undo Action
+  // Отмена последнего ввода
   const handleUndoLast = () => {
     if (isLocked || activeEntries.length === 0) return;
 
@@ -242,7 +209,6 @@ export function DefecationTrackerSection({
     }, 3500);
   };
 
-  // Delete a specific entry from history
   const handleDeleteEntry = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return;
@@ -251,41 +217,33 @@ export function DefecationTrackerSection({
     triggerHaptic(10);
   };
 
-  // Smart Colic Alarm computation:
-  // Daytime is generally 07:00 - 23:00. Threshold is 3.5 hours (210 minutes).
+  // Смарт-аларм риска колик (> 3.5 часов в дневное время)
   const colicAlarmInfo = useMemo(() => {
     if (activeEntries.length === 0) return null;
 
-    // Entries are sorted newest first. The first item is the most recent defecation.
     const latest = activeEntries[0];
-    const diffMinutes = getMinutesSinceTimestamp(latest.timestamp);
+    const now = Date.now();
+    
+    // Рассчитываем точную разницу по миллисекундам
+    const diffMinutes = latest.createdAt 
+      ? Math.max(0, Math.floor((now - latest.createdAt) / 60000))
+      : 0;
 
-    const now = new Date();
-    const currentHour = now.getHours();
+    const currentHour = new Date().getHours();
     const isDaytime = currentHour >= 7 && currentHour < 23;
 
-    // Warning triggers if > 210 minutes (3.5 hours)
-    if (diffMinutes >= 210 && isDaytime) {
-      const hours = Math.floor(diffMinutes / 60);
-      const mins = diffMinutes % 60;
-      const formattedDiff = mins > 0 ? `${hours} ч ${mins} мин` : `${hours} ч`;
-      return {
-        isWarning: true,
-        diffMinutes,
-        formattedDiff,
-        lastTimestamp: latest.timestamp,
-      };
-    }
+    const hours = Math.floor(diffMinutes / 60);
+    const mins = diffMinutes % 60;
+    const formattedDiff = mins > 0 ? `${hours} ч ${mins} мин` : `${hours} ч`;
 
     return {
-      isWarning: false,
+      isWarning: diffMinutes >= 210 && isDaytime,
       diffMinutes,
-      formattedDiff: `${Math.floor(diffMinutes / 60)} ч ${diffMinutes % 60} мин`,
+      formattedDiff,
       lastTimestamp: latest.timestamp,
     };
   }, [activeEntries]);
 
-  // Count anomalies in the shift
   const anomalyCount = useMemo(() => {
     return activeEntries.filter((e) => e.type !== 'NORMAL').length;
   }, [activeEntries]);
@@ -295,7 +253,7 @@ export function DefecationTrackerSection({
       aria-label="Мониторинг дефекации и ЖКТ"
       className="relative overflow-hidden rounded-3xl border border-white/60 bg-white/75 p-4 shadow-sm backdrop-blur-xl transition-all [data-theme='dark']:border-slate-800/80 [data-theme='dark']:bg-slate-900/85"
     >
-      {/* HEADER & MAIN COUNTER */}
+      {/* Шапка и счетчик */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <div className="flex items-center gap-1.5">
@@ -314,7 +272,6 @@ export function DefecationTrackerSection({
           </p>
         </div>
 
-        {/* Big Counter Badge */}
         <div className="flex flex-col items-end shrink-0">
           <div className="flex items-center gap-1.5 rounded-2xl bg-amber-500/10 px-3 py-1.5 border border-amber-500/20 [data-theme='dark']:bg-amber-500/20">
             <span className="text-base font-black text-amber-900 [data-theme='dark']:text-amber-200">
@@ -329,7 +286,7 @@ export function DefecationTrackerSection({
         </div>
       </div>
 
-      {/* SMART COLIC ALARM (Таймер риска колик > 3.5 ч) */}
+      {/* Смарт-аларм риска колик */}
       {colicAlarmInfo?.isWarning && (
         <div 
           role="alert"
@@ -343,15 +300,14 @@ export function DefecationTrackerSection({
               <span>Риск колик: нет дефекации {colicAlarmInfo.formattedDiff}!</span>
             </div>
             <p className="mt-0.5 text-[11px] leading-relaxed opacity-95">
-              Крайняя куча была в <strong>{colicAlarmInfo.lastTimestamp}</strong>. Обязательно осмотри слона на беспокойство, позу натуживания, отказ от корма и отсутствие перистальтики.
+              Крайняя куча была в <strong>{colicAlarmInfo.lastTimestamp}</strong>. Осмотри слона: проверь перистальтику с обоих боков, позу натуживания и интерес к сену.
             </p>
           </div>
         </div>
       )}
 
-      {/* PRIMARY ACTION ROW: 1-Tap Button + Micro Undo Button */}
+      {/* Главная кнопка + отмена */}
       <div className="flex items-center gap-2 mb-3">
-        {/* Main 1-Tap Button */}
         <button
           type="button"
           disabled={isLocked}
@@ -363,10 +319,8 @@ export function DefecationTrackerSection({
           } ${isLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         >
           <span className="text-lg leading-none">💩</span>
-          <span className="font-extrabold text-base">
-            +1 куча
-          </span>
-          <span className="rounded-lg bg-black/20 px-2 py-0.5 text-xs font-mono font-semibold text-white/95 backdrop-blur-xs">
+          <span className="font-extrabold text-base">+1 куча</span>
+          <span className="rounded-lg bg-black/20 px-2 py-0.5 text-xs font-mono font-semibold text-white/95">
             {currentTime}
           </span>
           {pendingAnomaly !== 'NORMAL' && (
@@ -376,30 +330,27 @@ export function DefecationTrackerSection({
           )}
         </button>
 
-        {/* Micro Undo Button ↺ */}
         <button
           type="button"
           disabled={isLocked || activeEntries.length === 0}
           onClick={handleUndoLast}
-          aria-label="Отменить последний тап дефекации"
-          title="Отменить последний ввод"
-          className="h-[50px] w-[50px] min-w-[50px] rounded-2xl border border-slate-200/80 bg-white/90 text-slate-700 hover:bg-slate-50 hover:text-slate-900 active:scale-90 disabled:opacity-35 disabled:cursor-not-allowed flex items-center justify-center transition-all shadow-xs shrink-0 [data-theme='dark']:border-slate-700 [data-theme='dark']:bg-slate-800/90 [data-theme='dark']:text-slate-200"
+          aria-label="Отменить последний ввод"
+          className="h-[50px] w-[50px] min-w-[50px] rounded-2xl border border-slate-200/80 bg-white/90 text-slate-700 hover:bg-slate-50 active:scale-90 disabled:opacity-35 disabled:cursor-not-allowed flex items-center justify-center transition-all shadow-xs shrink-0 [data-theme='dark']:border-slate-700 [data-theme='dark']:bg-slate-800/90 [data-theme='dark']:text-slate-200"
         >
           <RotateCcw size={18} strokeWidth={2.3} />
         </button>
       </div>
 
-      {/* UNDO TOAST FEEDBACK */}
       {undoToast && (
         <div className="mb-2 text-center text-xs font-medium text-amber-800 [data-theme='dark']:text-amber-300 animate-fadeIn">
           {undoToast}
         </div>
       )}
 
-      {/* ANOMALY & STOOL QUALITY CHIPS */}
+      {/* Чипсы аномалий */}
       <div className="space-y-1.5 pt-1">
         <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 [data-theme='dark']:text-slate-400 px-0.5">
-          <span>Особенности стула (нажми перед тапом «+1»):</span>
+          <span>Особенности стула (выбери перед тапом):</span>
           {pendingAnomaly !== 'NORMAL' && (
             <button
               type="button"
@@ -411,7 +362,6 @@ export function DefecationTrackerSection({
           )}
         </div>
 
-        {/* 4 Quick Anomaly Chips */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {ANOMALIES.map((anomaly) => {
             const isSelected = pendingAnomaly === anomaly.type;
@@ -422,9 +372,9 @@ export function DefecationTrackerSection({
                 disabled={isLocked}
                 onClick={() => {
                   triggerHaptic(8);
-                  setPendingAnomaly(current => (current === anomaly.type ? 'NORMAL' : anomaly.type));
+                  setPendingAnomaly(cur => (cur === anomaly.type ? 'NORMAL' : anomaly.type));
                 }}
-                className={`min-h-[44px] px-2.5 py-2 rounded-2xl border text-xs font-bold transition-all duration-150 flex items-center justify-center gap-1.5 active:scale-95 text-center select-none ${
+                className={`min-h-[44px] px-2.5 py-2 rounded-2xl border text-xs font-bold transition-all duration-150 flex items-center justify-center gap-1.5 active:scale-95 select-none ${
                   isSelected
                     ? anomaly.activeClass
                     : `${anomaly.colorClass} [data-theme='dark']:bg-slate-800 [data-theme='dark']:border-slate-700`
@@ -439,7 +389,7 @@ export function DefecationTrackerSection({
         </div>
       </div>
 
-      {/* COMPACT SHIFT HISTORY (Мини-история дежурства) */}
+      {/* Раскрывающаяся лента истории */}
       <div className="mt-3.5 border-t border-slate-200/60 pt-2 [data-theme='dark']:border-slate-800">
         <button
           type="button"
@@ -463,7 +413,7 @@ export function DefecationTrackerSection({
                 За эту смену дефекация еще не отмечалась
               </div>
             ) : (
-              activeEntries.map((entry, index) => {
+              activeEntries.map((entry) => {
                 const anomaly = ANOMALIES.find((a) => a.type === entry.type);
                 const isNormal = entry.type === 'NORMAL';
 
@@ -482,9 +432,7 @@ export function DefecationTrackerSection({
                           <Check size={11} strokeWidth={3} /> Норма
                         </span>
                       ) : (
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-bold ${anomaly?.badgeClass || 'bg-rose-50 text-rose-700'}`}
-                        >
+                        <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-bold ${anomaly?.badgeClass || 'bg-rose-50 text-rose-700'}`}>
                           <span>{anomaly?.emoji}</span>
                           <span>{anomaly?.label}</span>
                           {anomaly?.alertIcon}
@@ -497,8 +445,7 @@ export function DefecationTrackerSection({
                         type="button"
                         onClick={(e) => handleDeleteEntry(entry.id, e)}
                         aria-label={`Удалить запись ${entry.timestamp}`}
-                        title="Удалить эту запись"
-                        className="min-h-[44px] min-w-[44px] p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50/50 active:scale-90 flex items-center justify-center transition-colors [data-theme='dark']:hover:bg-rose-950/30"
+                        className="min-h-[44px] min-w-[44px] p-2 text-slate-400 hover:text-rose-600 rounded-lg active:scale-90 flex items-center justify-center transition-colors"
                       >
                         <Trash2 size={13} />
                       </button>

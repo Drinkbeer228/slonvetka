@@ -1,0 +1,8 @@
+{
+  "name": "СлоноВет",
+  "description": "Полевой журнал и система мониторинга состояния слонов",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

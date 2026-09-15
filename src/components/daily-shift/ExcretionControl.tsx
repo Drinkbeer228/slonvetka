@@ -60,9 +60,9 @@ export const formatDuration = (minutes: number): string => {
 };
 
 const ELEPHANT_EMOJI: Record<string, string> = {
-  margo:  '👑',
-  odri:   '🎀',
-  pretty: '🌸',
+  margo:  '🐘',
+  odri:   '🐘',
+  pretty: '🐘',
 };
 
 type Tab = 'stool' | 'urine' | 'sleep';
@@ -122,6 +122,9 @@ export function ExcretionControl({
 
   const displayElephants = elephants && elephants.length > 0 ? elephants : DEFAULT_ELEPHANTS;
 
+  // Активный слон (для контекстной подсветки и явного выбора)
+  const [activeElephantId, setActiveElephantId] = useState<string>(displayElephants[0]?.id || 'margo');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);
@@ -131,82 +134,43 @@ export function ExcretionControl({
     photo: ShiftPhoto;
   } | null>(null);
 
-  const [localStoolTraits, setLocalStoolTraits] = useState<string[]>([]);
-  const [localUrineTraits, setLocalUrineTraits] = useState<string[]>([]);
-  const [localSleepTraits, setLocalSleepTraits] = useState<string[]>([]);
+  // Текущие выбранные чипсы
+  // По умолчанию: 'Сформирован (норма)'
+  const [selectedStoolTrait, setSelectedStoolTrait] = useState<string>('Сформирован (норма)');
+  const [selectedUrineTrait, setSelectedUrineTrait] = useState<string>('Прозрачная (норма)');
+  const [selectedSleepTrait, setSelectedSleepTrait] = useState<string>('Спокойно (норма)');
 
   const currentTab = TABS.find(t => t.id === activeTab)!;
 
+  // Обновляем activeElephantId, если список слонов изменился
   useEffect(() => {
-    if (metrics && displayElephants.length > 0) {
-      const first = displayElephants[0];
-      const m = metrics[first.id];
-      if (m) {
-        if (m.feces_traits?.length) setLocalStoolTraits(m.feces_traits);
-        if (m.urination_traits?.length) setLocalUrineTraits(m.urination_traits);
-        const found = SLEEP_TRAITS.filter(t => (m.notes || '').includes(t));
-        if (found.length) setLocalSleepTraits(found);
-      }
+    if (displayElephants.length > 0 && !displayElephants.some(e => e.id === activeElephantId)) {
+      setActiveElephantId(displayElephants[0].id);
     }
-  }, [metrics, displayElephants]);
+  }, [displayElephants, activeElephantId]);
 
-  const activeStoolTraits = localStoolTraits.length > 0 ? localStoolTraits : ['Сформирован (норма)'];
-  const activeUrineTraits = localUrineTraits.length > 0
-    ? localUrineTraits.map(t => (t === 'Светлая / Прозрачная' ? 'Прозрачная (норма)' : t))
-    : ['Прозрачная (норма)'];
-  const activeSleepTraits = localSleepTraits.length > 0 ? localSleepTraits : ['Спокойно (норма)'];
-
-  const handleHaptic = (ms = 10) => {
-    if ('vibrate' in navigator) {
-      try { navigator.vibrate(ms); } catch { /* ignore */ }
+  const handleHaptic = (pattern: number | number[] = 10) => {
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(pattern);
+      } catch {
+        // Fallback for unsupported devices
+      }
     }
   };
 
-  const toggleTrait = (trait: string) => {
+  const handleSelectTrait = (trait: string) => {
     if (isLocked) return;
     handleHaptic(12);
 
     if (activeTab === 'stool') {
-      let newTraits = activeStoolTraits.includes(trait)
-        ? activeStoolTraits.filter(t => t !== trait)
-        : [...activeStoolTraits, trait];
-      if (newTraits.length === 0) newTraits = ['Сформирован (норма)'];
-      setLocalStoolTraits(newTraits);
-      displayElephants.forEach(e => onMetricChange?.(e.id, 'feces_traits', newTraits));
+      setSelectedStoolTrait(trait);
     } else if (activeTab === 'urine') {
-      let newTraits = activeUrineTraits.includes(trait)
-        ? activeUrineTraits.filter(t => t !== trait)
-        : [...activeUrineTraits, trait];
-      if (newTraits.length === 0) newTraits = ['Прозрачная (норма)'];
-      setLocalUrineTraits(newTraits);
-      displayElephants.forEach(e => onMetricChange?.(e.id, 'urination_traits', newTraits));
+      setSelectedUrineTrait(trait);
     } else {
-      let newTraits: string[];
-      if (trait === 'Спокойно (норма)') {
-        newTraits = ['Спокойно (норма)'];
-      } else if (activeSleepTraits.includes(trait)) {
-        newTraits = activeSleepTraits.filter(t => t !== trait);
-        if (newTraits.length === 0) newTraits = ['Спокойно (норма)'];
-      } else {
-        newTraits = activeSleepTraits.filter(t => t !== 'Спокойно (норма)');
-        newTraits.push(trait);
-      }
-      setLocalSleepTraits(newTraits);
-      displayElephants.forEach(e => {
-        let currentNotes = metrics?.[e.id]?.notes || '';
-        SLEEP_TRAITS.forEach(t => {
-          const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          currentNotes = currentNotes
-            .replace(new RegExp(`\\s*\\[${escaped}\\]`, 'g'), '')
-            .replace(new RegExp(`\\s*${escaped}`, 'g'), '');
-        });
-        const appended = newTraits.map(t => `[${t}]`).join(' ');
-        const finalNotes = (currentNotes.trim() + (appended ? ` ${appended}` : '')).trim();
-        onMetricChange?.(e.id, 'notes', finalNotes);
-      });
+      setSelectedSleepTrait(trait);
     }
   };
-
 
   const cdMargoPoop = useCooldown('margo_poop', 3);
   const cdOdriPoop = useCooldown('odri_poop', 3);
@@ -231,34 +195,87 @@ export function ExcretionControl({
     return null;
   };
 
+  // НАЖАТИЕ НА "+" У КОНКРЕТНОГО СЛОНА:
+  // 1. Увеличиваем счетчик этого слона
+  // 2. Записываем выбранный характер в feces_traits/urination_traits слона
+  // 3. АВТОСБРОС выбранного чипса обратно на «Сформирован (норма)»
   const handleIncrement = (elephantId: string, elephantName: string) => {
     if (isLocked) return;
     const cd = getCooldownHook(elephantId, activeTab);
     if (cd && cd.isBlocked) return;
     
-    handleHaptic(10);
+    // Переключаем активную колонку на того слона, которому нажали "+"
+    setActiveElephantId(elephantId);
+
+    const isAnomaly = activeTab === 'stool' 
+      ? selectedStoolTrait !== 'Сформирован (норма)' 
+      : selectedUrineTrait !== 'Прозрачная (норма)';
+
+    handleHaptic(isAnomaly ? [15, 30, 15] : 10);
+
     const field = activeTab === 'stool' ? 'poop_count' : 'urination_count';
     const current = (metrics?.[elephantId]?.[field] as number) ?? 0;
     const next = clampCount(current + 1);
     onMetricChange?.(elephantId, field, next);
-    
-    cd?.triggerCooldown();
-    const actionName = activeTab === 'stool' ? 'куча' : 'лужа';
-    const icon = activeTab === 'stool' ? '💩' : '💦';
-    onAddEvent?.(`+1 ${actionName} для ${elephantName}`, icon, {
-      type: 'physiology',
-      elephant_id: elephantId,
-      field,
-      value: current
-    });
+
+    if (activeTab === 'stool') {
+      const traitToSave = selectedStoolTrait;
+      const prevTraits = metrics?.[elephantId]?.feces_traits || [];
+      const updatedTraits = Array.from(new Set([...prevTraits, traitToSave]));
+      onMetricChange?.(elephantId, 'feces_traits', updatedTraits);
+
+      // АВТОСБРОС НА ДЕФОЛТНУЮ НОРМУ
+      setSelectedStoolTrait('Сформирован (норма)');
+
+      cd?.triggerCooldown();
+      const actionName = traitToSave === 'Сформирован (норма)' ? 'куча' : `куча (${traitToSave})`;
+      onAddEvent?.(`+1 ${actionName} для ${elephantName}`, '💩', {
+        type: 'physiology',
+        elephant_id: elephantId,
+        field,
+        value: current,
+        trait: traitToSave
+      });
+    } else if (activeTab === 'urine') {
+      const traitToSave = selectedUrineTrait;
+      const prevTraits = metrics?.[elephantId]?.urination_traits || [];
+      const updatedTraits = Array.from(new Set([...prevTraits, traitToSave]));
+      onMetricChange?.(elephantId, 'urination_traits', updatedTraits);
+
+      // АВТОСБРОС НА ДЕФОЛТНУЮ НОРМУ
+      setSelectedUrineTrait('Прозрачная (норма)');
+
+      cd?.triggerCooldown();
+      const actionName = traitToSave === 'Прозрачная (норма)' ? 'лужа' : `лужа (${traitToSave})`;
+      onAddEvent?.(`+1 ${actionName} для ${elephantName}`, '💦', {
+        type: 'physiology',
+        elephant_id: elephantId,
+        field,
+        value: current,
+        trait: traitToSave
+      });
+    }
   };
 
   const handleDecrement = (elephantId: string) => {
     if (isLocked) return;
+    setActiveElephantId(elephantId);
     handleHaptic(10);
     const field = activeTab === 'stool' ? 'poop_count' : 'urination_count';
     const current = (metrics?.[elephantId]?.[field] as number) ?? 0;
-    if (current > 0) onMetricChange?.(elephantId, field, clampCount(current - 1));
+    if (current > 0) {
+      const next = clampCount(current - 1);
+      onMetricChange?.(elephantId, field, next);
+
+      // Если счетчик упал в 0, сбрасываем особенности на дефолт
+      if (next === 0) {
+        if (activeTab === 'stool') {
+          onMetricChange?.(elephantId, 'feces_traits', ['Сформирован (норма)']);
+        } else if (activeTab === 'urine') {
+          onMetricChange?.(elephantId, 'urination_traits', ['Прозрачная (норма)']);
+        }
+      }
+    }
   };
 
   const handleIncrementSleep = (elephantId: string, elephantName: string) => {
@@ -266,6 +283,7 @@ export function ExcretionControl({
     const cd = getCooldownHook(elephantId, 'sleep');
     if (cd && cd.isBlocked) return;
     
+    setActiveElephantId(elephantId);
     handleHaptic(10);
     const current = metrics?.[elephantId]?.sleep_minutes ?? 0;
     const next = Math.min(720, current + 30);
@@ -278,10 +296,20 @@ export function ExcretionControl({
         ]);
       }
     }
+
+    if (selectedSleepTrait !== 'Спокойно (норма)') {
+      let currentNotes = metrics?.[elephantId]?.notes || '';
+      const appended = `[${selectedSleepTrait}]`;
+      if (!currentNotes.includes(appended)) {
+        onMetricChange?.(elephantId, 'notes', (currentNotes.trim() + ' ' + appended).trim());
+      }
+      setSelectedSleepTrait('Спокойно (норма)');
+    }
   };
 
   const handleDecrementSleep = (elephantId: string) => {
     if (isLocked) return;
+    setActiveElephantId(elephantId);
     handleHaptic(10);
     const current = metrics?.[elephantId]?.sleep_minutes ?? 0;
     const next = Math.max(0, current - 30);
@@ -298,25 +326,23 @@ export function ExcretionControl({
     handleHaptic(20);
 
     try {
-      const blob = await compressImage(file);
-      const sDate = new Date().toISOString().split('T')[0]; // Adjust if shiftDate can be passed
-      const storagePath = await supabaseService.uploadShiftMedia(blob, sDate, activeTab);
-      
-      setPendingPhotoUrl(storagePath);
+      const compressed = await compressImage(file);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const path = await supabaseService.uploadShiftMedia(compressed, todayStr, activeTab);
+      setPendingPhotoUrl(path);
       setIsPhotoAttribOpen(true);
     } catch (err) {
-      console.error('Failed to process and upload image:', err);
-      alert('Ошибка загрузки фото');
+      console.error('Photo error:', err);
     } finally {
       setIsProcessingPhoto(false);
-      e.target.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const handleAssignPhoto = (elephantId: string) => {
     if (!pendingPhotoUrl) return;
     const newPhoto: ShiftPhoto = {
-      id: crypto.randomUUID(),
+      id: `photo-${Date.now()}`,
       timestamp: new Date().toISOString(),
       section: activeTab,
       storage_path: pendingPhotoUrl,
@@ -339,44 +365,45 @@ export function ExcretionControl({
     return acc + ((metrics?.[e.id]?.[field] as number) ?? 0);
   }, 0);
 
-  const currentTraits = activeTab === 'stool' ? activeStoolTraits : activeTab === 'urine' ? activeUrineTraits : activeSleepTraits;
+  const currentSelectedTrait = activeTab === 'stool' 
+    ? selectedStoolTrait 
+    : activeTab === 'urine' 
+    ? selectedUrineTrait 
+    : selectedSleepTrait;
+
   const traitsForCurrentTab = activeTab === 'stool' ? STOOL_TRAITS : activeTab === 'urine' ? URINE_TRAITS : SLEEP_TRAITS;
+
+  const isCurrentTraitAnomaly = currentSelectedTrait.includes('⚠️') || currentSelectedTrait.includes('Понос') || currentSelectedTrait.includes('Непереварен');
+
+  const activeElephantName = displayElephants.find(e => e.id === activeElephantId)?.name || 'слона';
 
   return (
     <div
-      className="rounded-[26px] overflow-hidden"
-      style={{
-        background: 'rgba(255,255,255,0.78)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        boxShadow: '0 2px 16px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.9)',
-      }}
+      className="rounded-[26px] overflow-hidden border border-white/70 shadow-[0_2px_16px_rgba(15,23,42,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] bg-white/80 backdrop-blur-2xl transition-colors dark:border-slate-800 dark:bg-slate-900/85"
     >
       {/* Hidden File Input */}
-      <input type="file" accept="image/*" capture="environment"
-        ref={fileInputRef} onChange={handlePhotoCapture} className="hidden"
+      <input 
+        type="file" 
+        accept="image/*" 
+        capture="environment"
+        ref={fileInputRef} 
+        onChange={handlePhotoCapture} 
+        className="hidden"
       />
 
       {/* ─── SECTION HEADER ─── */}
-      <div className={`px-5 pt-5 pb-4 bg-gradient-to-br ${currentTab.headerBg} border-b border-white/60`}>
+      <div className={`px-5 pt-4 pb-3 bg-gradient-to-br ${currentTab.headerBg} border-b border-white/60 dark:bg-slate-800/60 dark:border-slate-700/60`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
-              className={`w-11 h-11 rounded-[14px] flex items-center justify-center text-xl bg-gradient-to-br ${currentTab.accentColor} shadow-lg`}
+              className={`w-11 h-11 rounded-[14px] flex items-center justify-center text-xl bg-gradient-to-br ${currentTab.accentColor} shadow-md`}
             >
               {currentTab.emoji}
             </div>
             <div>
-              <h3 className="font-black text-slate-900 text-base tracking-tight">
+              <h3 className="font-black text-slate-900 text-base tracking-tight dark:text-slate-100">
                 Физиология
               </h3>
-              <p className="text-[11px] font-medium text-slate-500">
-                {activeTab === 'stool'
-                  ? 'Стул, цвет и консистенция'
-                  : activeTab === 'urine'
-                  ? 'Моча, мутность и признаки'
-                  : 'Время сна и укладки'}
-              </p>
             </div>
           </div>
 
@@ -404,9 +431,8 @@ export function ExcretionControl({
 
         {/* Segmented Tab Control */}
         <div
-          className="mt-4 grid grid-cols-3 p-1 rounded-[18px]"
+          className="mt-3.5 grid grid-cols-3 p-1 rounded-[18px] bg-slate-500/10 dark:bg-slate-950/40"
           style={{
-            background: 'rgba(148,163,184,0.12)',
             boxShadow: 'inset 0 1px 3px rgba(15,23,42,0.06)',
           }}
         >
@@ -414,16 +440,15 @@ export function ExcretionControl({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                handleHaptic(8);
+              }}
               className={`flex items-center justify-center gap-1.5 py-2 px-1 rounded-[14px] text-xs font-bold transition-all active:scale-95 cursor-pointer select-none tap-target ${
                 activeTab === tab.id
-                  ? 'text-slate-900'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'text-slate-900 bg-white/95 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
               }`}
-              style={activeTab === tab.id ? {
-                background: 'rgba(255,255,255,0.9)',
-                boxShadow: '0 1px 6px rgba(15,23,42,0.1), inset 0 1px 0 rgba(255,255,255,1)',
-              } : {}}
             >
               <span>{tab.emoji}</span>
               <span>{tab.label}</span>
@@ -432,75 +457,82 @@ export function ExcretionControl({
         </div>
       </div>
 
-      {/* ─── ELEPHANT CARDS ─── */}
-      <div className="px-4 pt-4 pb-3">
-        <div className="grid grid-cols-3 gap-2.5">
+      {/* ─── ELEPHANT CARDS (3 КОЛОНКИ СЛОНОВ: МАРГО, ОДРИ, ПРЭТТИ) ─── */}
+      <div className="px-4 pt-3.5 pb-2.5">
+        <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
           {displayElephants.map(elephant => {
+            const isSelectedElephant = elephant.id === activeElephantId;
+
             if (activeTab === 'sleep') {
               const sleepMinutes = metrics?.[elephant.id]?.sleep_minutes ?? 0;
               const hasSleep = sleepMinutes > 0;
 
               return (
-                <div key={elephant.id} className="flex flex-col gap-1.5">
-                  <div className="text-[11px] font-bold text-slate-500 text-center flex items-center justify-center gap-1 select-none">
+                <div 
+                  key={elephant.id} 
+                  onClick={() => setActiveElephantId(elephant.id)}
+                  className={`flex flex-col gap-1.5 cursor-pointer transition-all ${
+                    isSelectedElephant ? 'scale-[1.01]' : 'opacity-90 hover:opacity-100'
+                  }`}
+                >
+                  <div className="text-[11px] font-bold text-slate-500 text-center flex items-center justify-center gap-1 select-none dark:text-slate-400">
                     <span>{ELEPHANT_EMOJI[elephant.id] ?? '🐘'}</span>
-                    <span>{elephant.name}</span>
+                    <span className={isSelectedElephant ? 'text-violet-600 font-black' : ''}>{elephant.name}</span>
                   </div>
 
                   {/* Карточка слона для сна */}
                   <div
-                    className="rounded-[20px] overflow-hidden"
+                    className={`rounded-[20px] overflow-hidden transition-all duration-150 ${
+                      isSelectedElephant 
+                        ? 'ring-2 ring-violet-500/70 border-violet-400 shadow-md' 
+                        : hasSleep
+                        ? 'border-violet-300/40 shadow-xs'
+                        : 'border-slate-200/70 shadow-xs dark:border-slate-700'
+                    }`}
                     style={{
-                      boxShadow: hasSleep
-                        ? '0 2px 10px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.8)'
-                        : '0 1px 4px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.8)',
-                      border: hasSleep
-                        ? '1px solid rgba(167,139,250,0.35)'
-                        : '1px solid rgba(203,213,225,0.6)',
+                      borderWidth: '1px',
+                      background: 'rgba(255,255,255,0.7)',
                     }}
                   >
-                    {/* Верхняя кнопка [+] */}
+                    {/* Кнопка [+] */}
                     <button
                       type="button"
                       disabled={isLocked || sleepMinutes >= 720}
-                      onClick={() => handleIncrementSleep(elephant.id, elephant.name)}
-                      className="h-11 w-full flex items-center justify-center text-xl font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target"
-                      style={{
-                        background: 'rgba(255,255,255,0.9)',
-                        color: hasSleep ? '#7c3aed' : '#94a3b8',
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleIncrementSleep(elephant.id, elephant.name);
                       }}
+                      className="h-11 w-full flex items-center justify-center text-xl font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target bg-white/90 text-violet-600 dark:bg-slate-800/90 dark:text-violet-400"
                       aria-label={`Добавить 30 мин сна для ${elephant.name}`}
                     >
                       +
                     </button>
 
-                    {/* Центральное значение с мини-бейджем */}
+                    {/* Центральное значение */}
                     <div
-                      className="py-2.5 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[62px]"
-                      style={{
-                        background: hasSleep
-                          ? 'linear-gradient(180deg, rgba(237,233,254,0.6) 0%, rgba(221,214,254,0.4) 100%)'
-                          : 'rgba(248,250,252,0.6)',
-                      }}
+                      className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[58px] ${
+                        hasSleep
+                          ? 'bg-violet-100/50 dark:bg-violet-950/40'
+                          : 'bg-slate-50/60 dark:bg-slate-900/60'
+                      }`}
                     >
-                      <span className="text-[11px] font-black tracking-wider text-violet-600 flex items-center justify-center gap-1 uppercase">
+                      <span className="text-[10px] font-black tracking-wider text-violet-600 flex items-center justify-center gap-1 uppercase dark:text-violet-300">
                         🌙 СОН
                       </span>
-                      <span className="text-2xl font-black text-slate-900 leading-none">
+                      <span className="text-2xl font-black text-slate-900 leading-none dark:text-slate-100">
                         {formatTotalSleepHours(sleepMinutes)}
                       </span>
                     </div>
 
-                    {/* Нижняя кнопка [-] */}
+                    {/* Кнопка [-] */}
                     <button
                       type="button"
                       disabled={isLocked || sleepMinutes <= 0}
-                      onClick={() => handleDecrementSleep(elephant.id)}
-                      className="h-11 w-full flex items-center justify-center text-lg font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target"
-                      style={{
-                        background: 'rgba(248,250,252,0.7)',
-                        color: '#94a3b8',
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDecrementSleep(elephant.id);
                       }}
+                      className="h-11 w-full flex items-center justify-center text-lg font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target bg-slate-50/70 text-slate-400 hover:text-slate-600 dark:bg-slate-800/60"
                       aria-label={`Уменьшить 30 мин сна для ${elephant.name}`}
                     >
                       −
@@ -517,35 +549,73 @@ export function ExcretionControl({
             const isBlocked = cd?.isBlocked || false;
             const remaining = cd?.remaining || 0;
 
+            const incrementBtnBgClass = isBlocked
+              ? 'bg-slate-100/90 text-slate-400 dark:bg-slate-800'
+              : hasCount
+              ? activeTab === 'stool'
+                ? 'bg-white/90 text-amber-600 dark:bg-slate-800/90 dark:text-amber-400'
+                : 'bg-white/90 text-sky-600 dark:bg-slate-800/90 dark:text-sky-400'
+              : 'bg-white/90 text-slate-400 hover:text-slate-600 dark:bg-slate-800/90 dark:text-slate-400';
+
+            const displayCardBgClass = hasCount
+              ? activeTab === 'stool'
+                ? 'bg-amber-100/60 dark:bg-amber-950/40'
+                : 'bg-sky-100/60 dark:bg-sky-950/40'
+              : 'bg-slate-50/60 dark:bg-slate-900/60';
+
+            const labelTextColorClass = activeTab === 'stool' 
+              ? 'text-amber-700 dark:text-amber-300' 
+              : 'text-sky-700 dark:text-sky-300';
+
+            const elephantNameColorClass = isSelectedElephant
+              ? activeTab === 'stool'
+                ? 'text-amber-700 font-black dark:text-amber-400'
+                : 'text-sky-700 font-black dark:text-sky-400'
+              : 'text-slate-600 dark:text-slate-300';
+
             return (
-              <div key={elephant.id} className="flex flex-col gap-1.5">
-                <div className="text-[11px] font-bold text-slate-500 text-center flex items-center justify-center gap-1">
-                  <span>{ELEPHANT_EMOJI[elephant.id] ?? '🐘'}</span>
-                  <span>{elephant.name}</span>
+              <div 
+                key={elephant.id} 
+                onClick={() => setActiveElephantId(elephant.id)}
+                className={`flex flex-col gap-1.5 cursor-pointer transition-all ${
+                  isSelectedElephant ? 'scale-[1.01]' : 'opacity-90 hover:opacity-100'
+                }`}
+              >
+                {/* Имя слона с иконкой */}
+                <div className="text-[11px] font-bold text-slate-500 text-center flex items-center justify-center gap-1 dark:text-slate-400">
+                  <span className="text-sm">{ELEPHANT_EMOJI[elephant.id] ?? '🐘'}</span>
+                  <span className={`transition-colors ${elephantNameColorClass}`}>
+                    {elephant.name}
+                  </span>
                 </div>
+
+                {/* Вертикальная карточка: [+] -> [Счетчик] -> [-] */}
                 <div
-                  className="rounded-[20px] overflow-hidden"
+                  className={`rounded-[20px] overflow-hidden transition-all duration-150 ${
+                    isSelectedElephant
+                      ? activeTab === 'stool'
+                        ? 'ring-2 ring-amber-500/80 border-amber-400 shadow-md'
+                        : 'ring-2 ring-sky-500/80 border-sky-400 shadow-md'
+                      : hasCount
+                      ? activeTab === 'stool'
+                        ? 'border-amber-300/60 shadow-xs'
+                        : 'border-sky-300/60 shadow-xs'
+                      : 'border-slate-200/70 shadow-xs dark:border-slate-700'
+                  }`}
                   style={{
-                    boxShadow: hasCount
-                      ? `0 2px 10px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.8)`
-                      : '0 1px 4px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.8)',
-                    border: hasCount
-                      ? `1px solid ${activeTab === 'stool' ? 'rgba(251,146,60,0.3)' : 'rgba(56,189,248,0.3)'}`
-                      : '1px solid rgba(203,213,225,0.6)',
+                    borderWidth: '1px',
+                    background: 'rgba(255,255,255,0.7)',
                   }}
                 >
-                  {/* Increment */}
+                  {/* Кнопка инкремента [+] */}
                   <button
                     type="button"
                     disabled={isLocked || isBlocked}
-                    onClick={() => handleIncrement(elephant.id, elephant.name)}
-                    className="h-11 w-full flex items-center justify-center text-xl font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target"
-                    style={{
-                      background: isBlocked ? 'rgba(241,245,249,0.9)' : 'rgba(255,255,255,0.9)',
-                      color: isBlocked ? '#94a3b8' : hasCount
-                        ? activeTab === 'stool' ? '#ea580c' : '#0284c7'
-                        : '#94a3b8',
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleIncrement(elephant.id, elephant.name);
                     }}
+                    className={`h-11 w-full flex items-center justify-center text-xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target ${incrementBtnBgClass}`}
                     aria-label={`Увеличить для ${elephant.name}`}
                   >
                     {isBlocked ? (
@@ -558,39 +628,29 @@ export function ExcretionControl({
                     )}
                   </button>
 
-                  {/* Counter display с мини-бейджем */}
+                  {/* Центральный дисплей с плашкой «КУЧИ / ЛУЖИ» */}
                   <div
-                    className="py-2.5 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[62px]"
-                    style={{
-                      background: hasCount
-                        ? activeTab === 'stool'
-                          ? 'linear-gradient(180deg, rgba(254,243,199,0.6) 0%, rgba(253,230,138,0.4) 100%)'
-                          : 'linear-gradient(180deg, rgba(224,242,254,0.6) 0%, rgba(186,230,253,0.4) 100%)'
-                        : 'rgba(248,250,252,0.6)',
-                    }}
+                    className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[58px] transition-colors ${displayCardBgClass}`}
                   >
                     <span
-                      className={`text-[11px] font-black tracking-wider flex items-center justify-center gap-1 uppercase ${
-                        activeTab === 'stool' ? 'text-amber-600' : 'text-sky-600'
-                      }`}
+                      className={`text-[10px] font-black tracking-wider flex items-center justify-center gap-1 uppercase ${labelTextColorClass}`}
                     >
                       {activeTab === 'stool' ? '💩 КУЧИ' : '💧 ЛУЖИ'}
                     </span>
-                    <span className="text-2xl font-black text-slate-900 leading-none">
+                    <span className="text-2xl font-black text-slate-900 leading-none dark:text-slate-100">
                       {count}
                     </span>
                   </div>
 
-                  {/* Decrement */}
+                  {/* Кнопка декремента [-] */}
                   <button
                     type="button"
                     disabled={isLocked || count === 0}
-                    onClick={() => handleDecrement(elephant.id)}
-                    className="h-11 w-full flex items-center justify-center text-lg font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target"
-                    style={{
-                      background: 'rgba(248,250,252,0.7)',
-                      color: '#94a3b8',
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDecrement(elephant.id);
                     }}
+                    className="h-11 w-full flex items-center justify-center text-lg font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target bg-slate-50/70 text-slate-400 hover:text-slate-600 dark:bg-slate-800/60 dark:text-slate-400"
                     aria-label={`Уменьшить для ${elephant.name}`}
                   >
                     −
@@ -602,67 +662,43 @@ export function ExcretionControl({
         </div>
       </div>
 
-      {/* ─── TRAITS GRID ─── */}
-      <div
-        className="px-4 pb-5 pt-3"
-        style={{ borderTop: '1px solid rgba(148,163,184,0.15)' }}
-      >
-        {/* Плашка-заголовок секции свойств */}
+      {/* ─── ХАРАКТЕР И ОСОБЕННОСТИ СТУЛА / МОЧИ / СНА ─── */}
+      <div className="px-4 pb-4 pt-2.5 border-t border-slate-200/50 dark:border-slate-800/80">
+        {/* Заголовок секции с бейджем статуса */}
         <div className="flex items-center justify-between px-0.5 mb-2.5">
-          <span className="text-[11px] font-black tracking-wider text-slate-700 uppercase flex items-center gap-1.5">
+          <span className="text-[11px] font-black tracking-wider text-slate-800 uppercase flex items-center gap-1.5 dark:text-slate-200">
             {activeTab === 'stool' && '💩 ХАРАКТЕР И ОСОБЕННОСТИ СТУЛА'}
             {activeTab === 'urine' && '💧 ХАРАКТЕР И ОСОБЕННОСТИ МОЧИ'}
             {activeTab === 'sleep' && '🌙 ХАРАКТЕР И ОСОБЕННОСТИ СНА'}
           </span>
+
+          {/* Синхронный бейдж: показывает выбранный статус перед нажатием '+' */}
           <span
-            className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
-              activeTab === 'stool'
-                ? currentTraits.some(t => t.includes('⚠️'))
-                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                  : 'bg-amber-100 text-amber-800'
-                : activeTab === 'urine'
-                ? currentTraits.some(t => t.includes('⚠️'))
-                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                  : 'bg-sky-100 text-sky-800'
-                : activeSleepTraits.some(t => t.includes('⚠️'))
-                ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                : 'bg-violet-100 text-violet-800'
+            className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full transition-all ${
+              isCurrentTraitAnomaly
+                ? 'bg-rose-100 text-rose-700 border border-rose-200 shadow-xs dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800'
+                : 'bg-amber-100 text-amber-800 border border-amber-200/60 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
             }`}
           >
-            {(activeTab === 'sleep' ? activeSleepTraits : currentTraits).some(t => t.includes('⚠️'))
-              ? 'Внимание ⚠️'
-              : 'Норма'}
+            {isCurrentTraitAnomaly ? 'Внимание ⚠️' : 'Норма'}
           </span>
         </div>
 
+        {/* Сетка из 4 чипсов (2х2, как на скриншоте) */}
         <div className="grid grid-cols-2 gap-2">
           {traitsForCurrentTab.map(trait => {
-            const isSelected = currentTraits.includes(trait);
+            const isSelected = currentSelectedTrait === trait;
             const isWarning = trait.includes('⚠️');
 
-            let style: React.CSSProperties;
+            let chipClasses = 'bg-slate-100/70 text-slate-700 border border-slate-200/80 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700';
             if (isSelected) {
               if (isWarning) {
-                style = {
-                  background: 'var(--alert-crit-bg)',
-                  color: 'var(--alert-crit-text)',
-                  border: '1px solid var(--alert-crit-border)',
-                  boxShadow: '0 2px 8px rgba(239,68,68,0.12)',
-                };
+                chipClasses = 'bg-rose-50 text-rose-800 border-2 border-rose-500 shadow-sm ring-1 ring-rose-300 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-500';
               } else {
-                style = {
-                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                  color: '#fff',
-                  border: '1px solid transparent',
-                  boxShadow: '0 2px 10px rgba(15,23,42,0.3)',
-                };
+                chipClasses = 'bg-slate-900 text-white border border-slate-900 shadow-md dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100';
               }
-            } else {
-              style = {
-                background: 'rgba(248,250,252,0.8)',
-                color: isWarning ? '#b91c1c' : '#475569',
-                border: isWarning ? '1px solid rgba(252,165,165,0.4)' : '1px solid rgba(203,213,225,0.7)',
-              };
+            } else if (isWarning) {
+              chipClasses = 'bg-rose-50/50 text-rose-700 border border-rose-200/80 hover:bg-rose-50 dark:bg-slate-800/60 dark:text-rose-300 dark:border-rose-900/60';
             }
 
             return (
@@ -670,17 +706,23 @@ export function ExcretionControl({
                 key={trait}
                 type="button"
                 disabled={isLocked}
-                onClick={() => toggleTrait(trait)}
-                className={`min-h-[44px] px-3 rounded-[14px] text-xs font-bold transition-all flex items-center justify-center text-center leading-tight active:scale-95 cursor-pointer tap-target ${
+                onClick={() => handleSelectTrait(trait)}
+                className={`min-h-[44px] px-3 py-2 rounded-[16px] text-xs font-bold transition-all flex items-center justify-center text-center leading-tight active:scale-95 cursor-pointer tap-target select-none ${chipClasses} ${
                   isLocked ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
-                style={style}
               >
                 {trait}
               </button>
             );
           })}
         </div>
+
+        {/* Подсказка автосброса при выборе аномалии */}
+        {isCurrentTraitAnomaly && (
+          <div className="mt-2 text-center text-[11px] font-semibold text-rose-600 dark:text-rose-300 animate-fadeIn">
+            Нажми «+» у {activeElephantName}, чтобы записать отклонение. После тапа статус вернется в «Норму».
+          </div>
+        )}
       </div>
 
       {/* ─── PHOTO ATTRIBUTION MODAL ─── */}
@@ -689,21 +731,16 @@ export function ExcretionControl({
           style={{ background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(10px)' }}
         >
           <div
-            className="w-full max-w-sm rounded-[32px] p-6 space-y-5 animate-slide-up"
-            style={{
-              background: 'rgba(255,255,255,0.96)',
-              backdropFilter: 'blur(24px)',
-              boxShadow: '0 32px 80px rgba(15,23,42,0.25), inset 0 1px 0 rgba(255,255,255,1)',
-            }}
+            className="w-full max-w-sm rounded-[32px] p-6 space-y-5 animate-slide-up bg-white/95 backdrop-blur-2xl shadow-2xl dark:bg-slate-900"
           >
             <div className="text-center">
               <div className="text-3xl mb-2">
                 {activeTab === 'stool' ? '💩' : activeTab === 'urine' ? '💧' : '🌙'}
               </div>
-              <h3 className="text-xl font-black text-slate-900">
+              <h3 className="text-xl font-black text-slate-900 dark:text-slate-100">
                 Чья это {activeTab === 'stool' ? 'куча' : activeTab === 'urine' ? 'лужа' : 'зона сна'}?
               </h3>
-              <p className="text-sm text-slate-500 mt-1">Выберите слона для привязки фото</p>
+              <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Выберите слона для привязки фото</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -712,15 +749,10 @@ export function ExcretionControl({
                   key={e.id}
                   type="button"
                   onClick={() => handleAssignPhoto(e.id)}
-                  className="flex flex-col items-center justify-center gap-2 min-h-[80px] rounded-[20px] transition-all active:scale-95 cursor-pointer tap-target"
-                  style={{
-                    background: 'rgba(248,250,252,0.9)',
-                    border: '1px solid rgba(203,213,225,0.7)',
-                    boxShadow: '0 2px 8px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
-                  }}
+                  className="flex flex-col items-center justify-center gap-2 min-h-[80px] rounded-[20px] transition-all active:scale-95 cursor-pointer tap-target bg-slate-50/90 border border-slate-200/80 shadow-xs dark:bg-slate-800 dark:border-slate-700"
                 >
                   <span className="text-2xl">{ELEPHANT_EMOJI[e.id] ?? '🐘'}</span>
-                  <span className="font-bold text-xs text-slate-800">{e.name}</span>
+                  <span className="font-bold text-xs text-slate-800 dark:text-slate-200">{e.name}</span>
                 </button>
               ))}
             </div>
@@ -728,11 +760,7 @@ export function ExcretionControl({
             <button
               type="button"
               onClick={() => { setIsPhotoAttribOpen(false); setPendingPhotoUrl(null); }}
-              className="w-full min-h-[48px] rounded-[18px] font-bold text-sm text-slate-600 transition-all active:scale-95 cursor-pointer tap-target"
-              style={{
-                background: 'rgba(241,245,249,0.9)',
-                border: '1px solid rgba(203,213,225,0.6)',
-              }}
+              className="w-full min-h-[48px] rounded-[18px] font-bold text-sm text-slate-600 transition-all active:scale-95 cursor-pointer tap-target bg-slate-100/90 border border-slate-200/70 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
             >
               Отмена
             </button>
@@ -760,8 +788,7 @@ export function ExcretionControl({
             <button
               type="button"
               onClick={() => setPreviewModalPhoto(null)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer tap-target"
-              style={{ background: 'rgba(255,255,255,0.1)' }}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer tap-target bg-white/10"
             >
               <X size={20} />
             </button>
@@ -777,8 +804,7 @@ export function ExcretionControl({
           </div>
 
           <div
-            className="px-5 py-4 flex items-center justify-end max-w-2xl mx-auto w-full"
-            style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}
+            className="px-5 py-4 flex items-center justify-end max-w-2xl mx-auto w-full border-t border-white/10"
           >
             <button
               type="button"
@@ -789,12 +815,7 @@ export function ExcretionControl({
                 onMetricChange?.(elephantId, 'photos', currentPhotos.filter(p => p.id !== photoId));
                 setPreviewModalPhoto(null);
               }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-[14px] font-bold text-sm transition-all active:scale-95 cursor-pointer disabled:opacity-50 tap-target"
-              style={{
-                background: 'rgba(254,202,202,0.15)',
-                border: '1px solid rgba(239,68,68,0.25)',
-                color: '#fca5a5',
-              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[14px] font-bold text-sm transition-all active:scale-95 cursor-pointer disabled:opacity-50 tap-target bg-rose-500/20 border border-rose-500/30 text-rose-300"
             >
               <Trash2 size={15} />
               Удалить фото
