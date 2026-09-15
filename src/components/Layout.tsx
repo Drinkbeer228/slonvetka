@@ -65,7 +65,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
     <div
       className="min-h-screen text-slate-800 flex flex-col font-sans antialiased"
       data-theme={darkMode ? 'dark' : 'light'}
-      style={{ background: darkMode ? '#020617' : 'linear-gradient(160deg, #f1f5f9 0%, #e9f0f8 60%, #eff6ff 100%)' }}
+      style={{ background: darkMode ? '#121212' : 'linear-gradient(160deg, #f1f5f9 0%, #e9f0f8 60%, #eff6ff 100%)' }}
     >
       {/* STICKY HEADER */}
       <Header 

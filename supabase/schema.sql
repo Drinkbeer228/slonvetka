@@ -77,7 +77,7 @@ create table public.treatment_photos (
 
 -- DAILY SHIFTS (смены дежурства)
 create table public.daily_shifts (
-  id text primary key, -- format: 'shift_YYYY-MM-DD_<random>'
+  id uuid primary key default uuid_generate_v4(),
   date date not null unique,
   duty_keeper_id uuid references public.profiles(id),
   status text check (status in ('in_progress', 'completed', 'submitted', 'handover_pending')) default 'in_progress',
@@ -97,7 +97,7 @@ create table public.daily_shifts (
 -- ELEPHANT DAILY METRICS (физиология per слон per смена)
 create table public.elephant_daily_metrics (
   id text primary key, -- format: 'metric_<shift_id>_<elephant_id>_<random>'
-  shift_id text references public.daily_shifts(id) on delete cascade not null,
+  shift_id uuid references public.daily_shifts(id) on delete cascade not null,
   elephant_id uuid references public.elephants(id) not null,
   poop_count integer default 0 check (poop_count >= 0),
   feces_traits jsonb default '["Сформирован (норма)"]',
@@ -108,6 +108,22 @@ create table public.elephant_daily_metrics (
   sleep_intervals jsonb default '[]',
   notes text default '',
   photos jsonb default '[]', -- массив ShiftPhoto объектов (base64 dataUrl)
+  trunk_tone text,
+  breathing_observation text,
+  trunk_tip_condition text,
+  nasal_discharge text,
+  dust_bathing boolean default false,
+  ear_flapping text,
+  temporal_glands text,
+  eye_observations jsonb default '[]',
+  feed_consumption text,
+  selective_eating text default '',
+  foreign_object_suspected boolean default false,
+  foreign_object_note text default '',
+  gait_assessment text,
+  favored_leg text,
+  hoof_warmth text,
+  arena_reaction text,
   unique (shift_id, elephant_id)
 );
 

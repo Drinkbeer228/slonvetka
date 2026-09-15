@@ -6,7 +6,7 @@ import { shiftService } from '../services/shiftService';
 import { SyncManager } from '../services/SyncManager';
 import { getOfflineDb } from '../services/offlineDb';
 import { clearShiftDraft, getShiftDraft, saveShiftDraft } from '../services/shiftDraft';
-import { DailyShift, ElephantDailyMetrics, FeedInventoryItem, FeedInventoryType } from '../types/shift';
+import { DailyShift, ElephantDailyMetrics, FeedInventoryItem, FeedInventoryType, createDefaultElephantMetrics } from '../types/shift';
 import { Elephant, Assignment, TreatmentRecordWithPhotos } from '../types';
 import { CounterButton } from '../components/common/CounterButton';
 import { 
@@ -26,6 +26,7 @@ import { ArchiveBanner } from '../components/daily-shift/ArchiveBanner';
 import { ShiftHandoverModal } from '../components/daily-shift/ShiftHandoverModal';
 import { useShiftEvents, ShiftEvent } from '../hooks/useShiftEvents';
 import { HandoverAcceptBanner } from '../components/daily-shift/HandoverAcceptBanner';
+import { ElephantSelector } from '../components/daily-shift/ElephantSelector';
 import { canAdjustInventory, canClaimShift, canCreateMedicalAssignment, canEditShift, canManageUsers } from '../lib/permissions';
 
 export const ELEPHANT_MOODS = [
@@ -68,6 +69,16 @@ export const MOOD_ICON_MAP: Record<string, string> = {
   'Игривая / Контактная': '🎸',
   'Беспокойная / Настороже': '⚡',
 };
+
+type ShiftSectionId = 'physiology' | 'feed' | 'behavior' | 'vet' | 'summary';
+
+const SHIFT_SECTION_TABS: Array<{ id: ShiftSectionId; label: string }> = [
+  { id: 'physiology', label: 'Физиология' },
+  { id: 'feed', label: 'Корма' },
+  { id: 'behavior', label: 'Поведение' },
+  { id: 'vet', label: 'Вет & Ноги' },
+  { id: 'summary', label: 'Смена/Итоги' },
+];
 
 const parseDateString = (dateStr: string) => {
   const parts = (dateStr || '').split('-').map(Number);
@@ -178,6 +189,7 @@ export function DailyShiftPage() {
   const touchStartY = useRef<number>(0);
   const touchEndY = useRef<number>(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeSection, setActiveSection] = useState<ShiftSectionId>('physiology');
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0].clientX;
@@ -516,16 +528,7 @@ export function DailyShiftPage() {
   const handleMetricChange = (elephantId: string, field: keyof ElephantDailyMetrics, value: any) => {
     if (isLocked) return;
     setMetrics(prev => {
-      const current = prev[elephantId] || {
-        shift_id: shift?.id || '',
-        elephant_id: elephantId,
-        poop_count: 0,
-        feces_traits: ['Сформирован (норма)'],
-        urination_count: 0,
-        urination_traits: ['Светлая / Прозрачная'],
-        behavior: 'Спокойная / В норме',
-        notes: ''
-      };
+      const current = prev[elephantId] || createDefaultElephantMetrics(shift?.id || '', elephantId);
       const updatedMetrics = {
         ...prev,
         [elephantId]: {
@@ -548,16 +551,7 @@ export function DailyShiftPage() {
 
   const handleTraitToggle = (elephantId: string, traitType: 'feces_traits' | 'urination_traits', trait: string) => {
     if (isLocked) return;
-    const currentMetric = metrics[elephantId] || {
-      shift_id: shift?.id || '',
-      elephant_id: elephantId,
-      poop_count: 0,
-      feces_traits: ['Сформирован (норма)'],
-      urination_count: 0,
-      urination_traits: ['Светлая / Прозрачная'],
-      behavior: 'Спокойная / В норме',
-      notes: ''
-    };
+    const currentMetric = metrics[elephantId] || createDefaultElephantMetrics(shift?.id || '', elephantId);
 
     let traits = [...(currentMetric[traitType] || [])];
     if (traits.includes(trait)) {
@@ -999,25 +993,44 @@ export function DailyShiftPage() {
   }
 
   const activeElephant = (elephants || []).find(e => e.id === activeElephantId) || (elephants || [])[0];
-  const m = activeElephant ? ((metrics || {})[activeElephant.id] || {
-    shift_id: shift?.id || '',
-    elephant_id: activeElephant.id,
-    poop_count: 0,
-    feces_traits: ['Сформирован (норма)'],
-    urination_count: 0,
-    urination_traits: ['Светлая / Прозрачная'],
-    behavior: 'Спокойная / В норме',
-    sleep_minutes: 420,
-    notes: ''
-  }) : null;
+  const m = activeElephant ? ((metrics || {})[activeElephant.id] || createDefaultElephantMetrics(shift?.id || '', activeElephant.id)) : null;
 
   const assignmentsForEle = activeElephant
     ? (assignments || []).filter(a => a.elephant_id === activeElephant.id)
     : [];
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return;
+
+    const sections = SHIFT_SECTION_TABS
+      .map(tab => document.getElementById(`shift-section-${tab.id}`))
+      .filter((section): section is HTMLElement => Boolean(section));
+
+    if (sections.length === 0) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const visibleEntry = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+      if (visibleEntry) {
+        const sectionId = visibleEntry.target.id.replace('shift-section-', '') as ShiftSectionId;
+        setActiveSection(sectionId);
+      }
+    }, {
+      rootMargin: '-120px 0px -55% 0px',
+      threshold: [0.2, 0.35, 0.5],
+    });
+
+    sections.forEach(section => observer.observe(section));
+
+    return () => observer.disconnect();
+  }, [activeElephant?.id, assignmentsForEle.length, selectedDate]);
+
   return (
     <div
-      className="pb-60 space-y-6 mt-3 relative"
+      className="space-y-6 mt-3 relative"
+      style={{ paddingBottom: 'calc(10rem + env(safe-area-inset-bottom, 0px))' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -1104,6 +1117,29 @@ export function DailyShiftPage() {
         </div>
       )}
 
+      <div className="sticky top-18 z-20 -mx-1 px-1">
+        <div className="flex gap-2 overflow-x-auto rounded-[22px] border border-white/80 bg-white/80 p-2 shadow-sm backdrop-blur-xl thin-scroll">
+          {SHIFT_SECTION_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setActiveSection(tab.id);
+                document.getElementById(`shift-section-${tab.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className={`shrink-0 rounded-2xl px-3.5 py-2 text-xs font-black transition-all active:scale-95 ${
+                activeSection === tab.id
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100/85 text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200/80'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div id="shift-section-physiology" className="space-y-6 scroll-mt-32">
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur-xl">
           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Смена</div>
@@ -1174,7 +1210,9 @@ export function DailyShiftPage() {
           undo_payload: undoPayload
         })}
       />
+      </div>
 
+      <div id="shift-section-feed" className="space-y-3 scroll-mt-32">
       {/* 3. ГРУБЫЕ КОРМА: СЕТКА 3 КОЛОНОК (ТЮКИ, РУЛОНЫ, ВЕТКИ) */}
       <div className="bg-white/70 backdrop-blur-xl border border-white/80 rounded-[22px] p-3.5 sm:p-4 shadow-[0_4px_16px_rgba(15,23,42,0.03)] space-y-3">
         {/* Шапка: Слева иконка и заголовок, справа компактные бейджи («Склад», «Без ограничений») */}
@@ -1320,6 +1358,9 @@ export function DailyShiftPage() {
           onSaladPhotoChange={handleSaladPhotoChange}
         />
       </div>
+      </div>
+
+      <div id="shift-section-behavior" className="space-y-4 scroll-mt-32">
       {/* 5. ХОЗЯЙСТВЕННЫЙ БЛОК (Инциденты и счетчики) */}
       <section className="mb-6 mx-4 sm:mx-0">
         <DynamicCounterSection 
@@ -1335,13 +1376,21 @@ export function DailyShiftPage() {
           })}
         />
       </section>
+      </div>
 
       {/* 5. ВЕТЕРИНАРНЫЕ НАЗНАЧЕНИЯ / ПРОЦЕДУРЫ (ЕСЛИ ЕСТЬ АКТИВНЫЕ) */}
+      <div id="shift-section-vet" className="space-y-4 scroll-mt-32">
       {activeElephant && assignmentsForEle.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 px-1">
             <span className="text-base leading-none">🩺</span> Вет. назначения
           </div>
+          <ElephantSelector
+            elephants={elephants || []}
+            activeElephantId={activeElephant.id}
+            onSelect={setActiveElephantId}
+            metrics={metrics}
+          />
           {assignmentsForEle.map(assignment => {
             const relatedRecord = (shiftRecords || []).find(r => r.assignment_id === assignment.id);
             const isCompletedToday = !!relatedRecord;
@@ -1370,11 +1419,20 @@ export function DailyShiftPage() {
         </div>
       )}
 
-
-
       {/* 6. ЖУРНАЛ НАБЛЮДЕНИЙ: <ObservationEditor ... /> (СВОБОДНЫЕ ЗАМЕТКИ, ПОЛЕ ВВОДА ТЕКСТА, ФОТО) */}
       {activeElephant && m && (
         <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 px-1">
+              <span className="text-base leading-none">🐘</span> Поведение и осмотр
+            </div>
+            <ElephantSelector
+              elephants={elephants || []}
+              activeElephantId={activeElephant.id}
+              onSelect={setActiveElephantId}
+              metrics={metrics}
+            />
+          </div>
           <ObservationEditor
             isLocked={isEditingDisabled}
             elephant={activeElephant}
@@ -1400,8 +1458,10 @@ export function DailyShiftPage() {
           />
         </div>
       )}
+      </div>
 
       {/* 7. НИЖНЯЯ ПАНЕЛЬ: КНОПКА [ ЗАВЕРШИТЬ СМЕНУ ] */}
+      <div id="shift-section-summary" className="scroll-mt-32">
       {!isEditingDisabled && (
         <div className="flex flex-col gap-3">
           {profile?.role === 'keeper' && selectedDate === todayStr && (
@@ -1429,6 +1489,7 @@ export function DailyShiftPage() {
         />
         </div>
       )}
+      </div>
 
       {/* END MATCH SUMMARY MODAL */}
       <ShiftSummaryModal

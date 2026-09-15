@@ -4,6 +4,7 @@ import {
   ElephantDailyMetrics, 
   FeedInventoryItem, 
   FeedInventoryType, 
+  createDefaultElephantMetrics,
   clampCount, 
   clampSleepMinutes 
 } from '../types/shift';
@@ -42,6 +43,33 @@ function parseBranchesFromNotes(feedNotes?: string | null): number {
   } catch {
     return 0;
   }
+}
+
+function normalizeMetric(rawMetric: Partial<ElephantDailyMetrics> & Pick<ElephantDailyMetrics, 'shift_id' | 'elephant_id'>): ElephantDailyMetrics {
+  const baseMetric = createDefaultElephantMetrics(rawMetric.shift_id, rawMetric.elephant_id);
+
+  return {
+    ...baseMetric,
+    ...rawMetric,
+    poop_count: clampCount(rawMetric.poop_count ?? 0),
+    feces_traits: Array.isArray(rawMetric.feces_traits) && rawMetric.feces_traits.length > 0
+      ? rawMetric.feces_traits
+      : baseMetric.feces_traits,
+    urination_count: clampCount(rawMetric.urination_count ?? 0),
+    urination_traits: Array.isArray(rawMetric.urination_traits) && rawMetric.urination_traits.length > 0
+      ? rawMetric.urination_traits
+      : baseMetric.urination_traits,
+    behavior: rawMetric.behavior || baseMetric.behavior,
+    sleep_minutes: clampSleepMinutes(rawMetric.sleep_minutes ?? 0),
+    sleep_intervals: Array.isArray(rawMetric.sleep_intervals) ? rawMetric.sleep_intervals : [],
+    notes: rawMetric.notes ?? '',
+    photos: Array.isArray(rawMetric.photos) ? rawMetric.photos : [],
+    eye_observations: Array.isArray(rawMetric.eye_observations) ? rawMetric.eye_observations : [],
+    selective_eating: rawMetric.selective_eating ?? '',
+    dust_bathing: Boolean(rawMetric.dust_bathing),
+    foreign_object_suspected: Boolean(rawMetric.foreign_object_suspected),
+    foreign_object_note: rawMetric.foreign_object_note ?? '',
+  };
 }
 
 export const shiftService = {
@@ -306,7 +334,7 @@ export const shiftService = {
     if (closeError) throw closeError;
 
     // Пытаемся создать новую смену
-    const newShiftId = `shift_${pendingShift.date}_${Math.random().toString(36).substring(2, 9)}`;
+    const newShiftId = crypto.randomUUID();
     const { error: createError } = await supabase
       .from('daily_shifts')
       .insert({
@@ -380,24 +408,13 @@ export const shiftService = {
           for (const m of metricsData) {
             const sleepMinutes = m.sleep_minutes != null ? m.sleep_minutes : 0;
 
-            metricsMap[m.elephant_id] = {
+            metricsMap[m.elephant_id] = normalizeMetric({
+              ...m,
               id: m.id,
               shift_id: m.shift_id,
               elephant_id: m.elephant_id,
-              poop_count: clampCount(m.poop_count ?? 0),
-              feces_traits: Array.isArray(m.feces_traits) && m.feces_traits.length > 0
-                ? m.feces_traits
-                : ['Сформирован (норма)'],
-              urination_count: clampCount(m.urination_count ?? 0),
-              urination_traits: Array.isArray(m.urination_traits) && m.urination_traits.length > 0
-                ? m.urination_traits
-                : ['Прозрачная (норма)'],
-              behavior: m.behavior || 'Спокойная / В норме',
-              sleep_minutes: clampSleepMinutes(sleepMinutes),
-              sleep_intervals: Array.isArray(m.sleep_intervals) ? m.sleep_intervals : [],
-              notes: m.notes ?? '',
-              photos: Array.isArray(m.photos) ? m.photos : [],
-            };
+              sleep_minutes: sleepMinutes,
+            });
             await db.put('elephant_daily_metrics', metricsMap[m.elephant_id]);
           }
         }
@@ -417,14 +434,11 @@ export const shiftService = {
         const metricsList = await db.getAllFromIndex('elephant_daily_metrics', 'by-shiftId', cachedShift.id);
         const metricsMap: Record<string, ElephantDailyMetrics> = {};
         for (const m of metricsList) {
-          metricsMap[m.elephant_id] = {
+          metricsMap[m.elephant_id] = normalizeMetric({
             ...m,
-            poop_count: clampCount(m.poop_count ?? 0),
-            urination_count: clampCount(m.urination_count ?? 0),
-            sleep_minutes: clampSleepMinutes(m.sleep_minutes ?? 0),
-            sleep_intervals: Array.isArray(m.sleep_intervals) ? m.sleep_intervals : [],
-            photos: Array.isArray(m.photos) ? m.photos : [],
-          };
+            shift_id: m.shift_id,
+            elephant_id: m.elephant_id,
+          });
         }
         return { shift: cachedShift, metrics: metricsMap };
       }
@@ -434,7 +448,7 @@ export const shiftService = {
 
     // 3. Return default template if not found anywhere
     const defaultShift: DailyShift = {
-      id: `shift_${date}_${Math.random().toString(36).substring(2, 9)}`,
+      id: crypto.randomUUID(),
       date,
       duty_keeper_id: null,
       status: 'in_progress',
@@ -530,6 +544,22 @@ export const shiftService = {
           sleep_intervals: m.sleep_intervals ?? [],
           notes: m.notes ?? '',
           photos: m.photos ?? [],
+          trunk_tone: m.trunk_tone ?? null,
+          breathing_observation: m.breathing_observation ?? null,
+          trunk_tip_condition: m.trunk_tip_condition ?? null,
+          nasal_discharge: m.nasal_discharge ?? null,
+          dust_bathing: Boolean(m.dust_bathing),
+          ear_flapping: m.ear_flapping ?? null,
+          temporal_glands: m.temporal_glands ?? null,
+          eye_observations: Array.isArray(m.eye_observations) ? m.eye_observations : [],
+          feed_consumption: m.feed_consumption ?? null,
+          selective_eating: m.selective_eating ?? '',
+          foreign_object_suspected: Boolean(m.foreign_object_suspected),
+          foreign_object_note: m.foreign_object_note ?? '',
+          gait_assessment: m.gait_assessment ?? null,
+          favored_leg: m.favored_leg ?? null,
+          hoof_warmth: m.hoof_warmth ?? null,
+          arena_reaction: m.arena_reaction ?? null,
         };
         return payload;
       });

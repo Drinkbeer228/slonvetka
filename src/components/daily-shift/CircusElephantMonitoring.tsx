@@ -5,14 +5,17 @@ import {
   CheckCircle2, Volume2, Footprints, Flame, Play, Timer
 } from 'lucide-react';
 import { Elephant } from '../../types';
+import { ElephantDailyMetrics } from '../../types/shift';
 import { compressImage } from '../../utils/imageCompressor';
 import { supabaseService } from '../../services/supabaseService';
 
 interface CircusElephantMonitoringProps {
   elephant: Elephant;
   selectedDate: string;
+  metrics: ElephantDailyMetrics;
   notes: string;
   isLocked?: boolean;
+  onMetricChange: (field: keyof ElephantDailyMetrics, value: any) => void;
   onAppendLog: (logText: string) => void;
   onAddMediaLog?: (logText: string, photoDataUrl: string) => void;
 }
@@ -86,11 +89,89 @@ const FEET_LIST = [
   { id: 'ЛЗ', label: 'ЛЗ (Левая задняя)' },
 ];
 
+const EYE_OPTIONS = ['Ясные', 'Прищур', 'Слезотечение', 'Отек век'];
+const TRUNK_TONE_OPTIONS = ['Активный / поднятый', 'Пассивный ("плетью")'];
+const BREATHING_OPTIONS = ['Чистое дыхание', 'Сопение / храп'];
+const TRUNK_TIP_OPTIONS = ['Кончик в норме', 'Сухой кончик', 'Влажный кончик'];
+const DISCHARGE_OPTIONS = ['Нет', 'Серозные', 'Гнойные', 'Пылевые пробки'];
+const EAR_OPTIONS = ['Активный обмах', 'Уши прижаты'];
+const TEMPORAL_OPTIONS = ['Сухие', 'Активная секреция'];
+const FEED_CONSUMPTION_OPTIONS = ['Жадно', 'Норма', 'Вяло', 'Отказ'];
+const GAIT_OPTIONS = ['Шаг уверенный', 'Бережет ногу', 'Шарканье'];
+const HOOF_WARMTH_OPTIONS = ['Норма', 'Теплее обычного'];
+const ARENA_REACTION_OPTIONS = ['Стабильная работа', 'Сопротивление', 'Возбудимость', 'Пугливость'];
+
+interface ChoiceChipGroupProps {
+  options: string[];
+  value?: string | null;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+function ChoiceChipGroup({ options, value, onChange, disabled = false }: ChoiceChipGroupProps) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map(option => {
+        const isActive = value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(option)}
+            className={`min-h-[40px] rounded-2xl border px-3 py-2 text-xs font-bold transition-all active:scale-95 disabled:opacity-50 ${
+              isActive
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                : 'bg-white/90 text-slate-700 border-slate-200/80 hover:border-slate-300'
+            }`}
+          >
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+interface MultiSelectChipGroupProps {
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  disabled?: boolean;
+}
+
+function MultiSelectChipGroup({ options, selected, onToggle, disabled = false }: MultiSelectChipGroupProps) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map(option => {
+        const isActive = selected.includes(option);
+        return (
+          <button
+            key={option}
+            type="button"
+            disabled={disabled}
+            onClick={() => onToggle(option)}
+            className={`min-h-[40px] rounded-2xl border px-3 py-2 text-xs font-bold transition-all active:scale-95 disabled:opacity-50 ${
+              isActive
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                : 'bg-white/90 text-slate-700 border-slate-200/80 hover:border-indigo-300'
+            }`}
+          >
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function CircusElephantMonitoring({
   elephant,
   selectedDate,
+  metrics,
   notes,
   isLocked = false,
+  onMetricChange,
   onAppendLog,
   onAddMediaLog,
 }: CircusElephantMonitoringProps) {
@@ -135,6 +216,36 @@ export function CircusElephantMonitoring({
         navigator.vibrate(ms);
       } catch {}
     }
+  };
+
+  const eyeObservations = metrics.eye_observations || [];
+  const foreignObjectSuspected = Boolean(metrics.foreign_object_suspected);
+  const needsFavoredLeg = metrics.gait_assessment === 'Бережет ногу';
+
+  const handleChoiceChange = (field: keyof ElephantDailyMetrics, value: string) => {
+    if (isLocked) return;
+    handleHaptic(10);
+    onMetricChange(field, value);
+  };
+
+  const handleTextChange = (field: keyof ElephantDailyMetrics, value: string) => {
+    if (isLocked) return;
+    onMetricChange(field, value);
+  };
+
+  const handleBooleanChange = (field: keyof ElephantDailyMetrics, value: boolean) => {
+    if (isLocked) return;
+    handleHaptic(10);
+    onMetricChange(field, value);
+  };
+
+  const handleEyeToggle = (value: string) => {
+    if (isLocked) return;
+    const next = eyeObservations.includes(value)
+      ? eyeObservations.filter(item => item !== value)
+      : [...eyeObservations, value];
+    handleHaptic(10);
+    onMetricChange('eye_observations', next);
   };
 
   // 1. Стереотипия: быстрая фиксация в лог
@@ -572,6 +683,139 @@ export function CircusElephantMonitoring({
           </div>
         )}
 
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4 space-y-3">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Хобот и дыхание</h3>
+            <p className="text-[11px] text-slate-500">Тонус, дыхание, кончик хобота и выделения</p>
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Тонус хобота</div>
+            <ChoiceChipGroup options={TRUNK_TONE_OPTIONS} value={metrics.trunk_tone} onChange={(value) => handleChoiceChange('trunk_tone', value)} disabled={isLocked} />
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Дыхание</div>
+            <ChoiceChipGroup options={BREATHING_OPTIONS} value={metrics.breathing_observation} onChange={(value) => handleChoiceChange('breathing_observation', value)} disabled={isLocked} />
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Кончик хобота</div>
+            <ChoiceChipGroup options={TRUNK_TIP_OPTIONS} value={metrics.trunk_tip_condition} onChange={(value) => handleChoiceChange('trunk_tip_condition', value)} disabled={isLocked} />
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Носовые выделения</div>
+            <ChoiceChipGroup options={DISCHARGE_OPTIONS} value={metrics.nasal_discharge} onChange={(value) => handleChoiceChange('nasal_discharge', value)} disabled={isLocked} />
+          </div>
+          <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/85 px-3 py-2.5">
+            <span className="text-sm font-semibold text-slate-700">Пылевая / грязевая ванна</span>
+            <input
+              type="checkbox"
+              checked={Boolean(metrics.dust_bathing)}
+              disabled={isLocked}
+              onChange={(e) => handleBooleanChange('dust_bathing', e.target.checked)}
+              className="h-5 w-5 rounded-md border-slate-300 text-emerald-600"
+            />
+          </label>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4 space-y-3">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Глаза, уши, терморегуляция</h3>
+            <p className="text-[11px] text-slate-500">Уши, височные железы и быстрые маркеры по глазам</p>
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Работа ушами</div>
+            <ChoiceChipGroup options={EAR_OPTIONS} value={metrics.ear_flapping} onChange={(value) => handleChoiceChange('ear_flapping', value)} disabled={isLocked} />
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Височные железы</div>
+            <ChoiceChipGroup options={TEMPORAL_OPTIONS} value={metrics.temporal_glands} onChange={(value) => handleChoiceChange('temporal_glands', value)} disabled={isLocked} />
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Глаза</div>
+            <MultiSelectChipGroup options={EYE_OPTIONS} selected={eyeObservations} onToggle={handleEyeToggle} disabled={isLocked} />
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4 space-y-3">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Аппетит и кормление</h3>
+            <p className="text-[11px] text-slate-500">Поедаемость, выборочность и риск инородки</p>
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Поедаемость</div>
+            <ChoiceChipGroup options={FEED_CONSUMPTION_OPTIONS} value={metrics.feed_consumption} onChange={(value) => handleChoiceChange('feed_consumption', value)} disabled={isLocked} />
+          </div>
+          <label className="block space-y-1">
+            <span className="text-[11px] font-bold text-slate-600">Выборочное поедание</span>
+            <input
+              type="text"
+              value={metrics.selective_eating || ''}
+              disabled={isLocked}
+              onChange={(e) => handleTextChange('selective_eating', e.target.value)}
+              placeholder="Напр. съела морковь, кашу оставила"
+              className="w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/85 px-3 py-2.5">
+            <span className="text-sm font-semibold text-slate-700">Подозрение на инородку</span>
+            <input
+              type="checkbox"
+              checked={foreignObjectSuspected}
+              disabled={isLocked}
+              onChange={(e) => handleBooleanChange('foreign_object_suspected', e.target.checked)}
+              className="h-5 w-5 rounded-md border-slate-300 text-rose-600"
+            />
+          </label>
+          {foreignObjectSuspected && (
+            <label className="block space-y-1">
+              <span className="text-[11px] font-bold text-slate-600">Примечание</span>
+              <textarea
+                value={metrics.foreign_object_note || ''}
+                disabled={isLocked}
+                onChange={(e) => handleTextChange('foreign_object_note', e.target.value)}
+                rows={3}
+                placeholder="Что жевала / где заметили"
+                className="w-full rounded-2xl border border-slate-200/80 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-rose-400 resize-none"
+              />
+            </label>
+          )}
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4 space-y-3">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Вет и ноги</h3>
+            <p className="text-[11px] text-slate-500">Походка, конечность и теплота копыта/венчика</p>
+          </div>
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Походка</div>
+            <ChoiceChipGroup options={GAIT_OPTIONS} value={metrics.gait_assessment} onChange={(value) => {
+              handleChoiceChange('gait_assessment', value);
+              if (value !== 'Бережет ногу') {
+                onMetricChange('favored_leg', null);
+              }
+            }} disabled={isLocked} />
+          </div>
+          {needsFavoredLeg && (
+            <div className="space-y-2">
+              <div className="text-[11px] font-bold text-slate-600">Какая нога</div>
+              <ChoiceChipGroup options={['ПП', 'ПЗ', 'ЛП', 'ЛЗ']} value={metrics.favored_leg} onChange={(value) => handleChoiceChange('favored_leg', value)} disabled={isLocked} />
+            </div>
+          )}
+          <div className="space-y-2">
+            <div className="text-[11px] font-bold text-slate-600">Копытный башмак / венчик</div>
+            <ChoiceChipGroup options={HOOF_WARMTH_OPTIONS} value={metrics.hoof_warmth} onChange={(value) => handleChoiceChange('hoof_warmth', value)} disabled={isLocked} />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4 space-y-3">
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-wide text-slate-900">Манеж / репетиция</h3>
+          <p className="text-[11px] text-slate-500">Реакция на команду, кипера и новые раздражители</p>
+        </div>
+        <ChoiceChipGroup options={ARENA_REACTION_OPTIONS} value={metrics.arena_reaction} onChange={(value) => handleChoiceChange('arena_reaction', value)} disabled={isLocked} />
       </div>
 
       {/* LIGHTBOX MODAL */}
