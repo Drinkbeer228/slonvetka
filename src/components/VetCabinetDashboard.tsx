@@ -292,9 +292,9 @@ const buildSyntheticTimestamps = (selectedDate: string, count: number): string[]
   const step = span / (count + 1);
 
   return Array.from({ length: count }, (_, index) => {
-    const totalMinutes = SHIFT_START_MINUTES + step * (index + 1);
+    const totalMinutes = Math.round(SHIFT_START_MINUTES + step * (index + 1));
     const hours = Math.floor(totalMinutes / 60);
-    const minutes = Math.round(totalMinutes % 60);
+    const minutes = totalMinutes % 60;
     return toShiftDate(selectedDate, hours, minutes).toISOString();
   });
 };
@@ -411,7 +411,7 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
   const dashboardStates = useMemo(() => {
     return elephants.map(elephant => {
       const defecationLogs = buildDefecationLogs(elephant, metricsMap[elephant.id], selectedDate);
-      const risk = computeGiRisk(defecationLogs, refusedFood);
+      const risk = computeGiRisk(defecationLogs, false);
       return {
         elephant,
         state: {
@@ -483,6 +483,10 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
 
       setFeedback('Поделиться эпикризом не удалось: браузер не поддерживает share/clipboard.');
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setFeedback('');
+        return;
+      }
       console.error('Не удалось поделиться эпикризом:', error);
       setFeedback('Не удалось сформировать эпикриз для Telegram.');
     }

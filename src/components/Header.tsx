@@ -124,6 +124,8 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     return 'bg-emerald-600 border border-emerald-700 text-white font-black shadow-xs hover:bg-emerald-700';
   };
 
+  const showViewToggle = currentScreen === 'daily_shift' || currentScreen === 'vet_cabinet';
+
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-[0_2px_12px_rgba(15,23,42,0.06)] backdrop-blur-xl">
@@ -140,11 +142,13 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
 
           {onNavigate && (
             <nav className="order-3 flex w-full items-center gap-2 sm:order-2 sm:mx-auto sm:w-auto" aria-label="Основная навигация">
-              <VetKeeperViewToggle
-                value={currentScreen === 'daily_shift' ? 'daily_shift' : currentScreen === 'vet_cabinet' ? 'vet_cabinet' : 'vet_dashboard'}
-                onChange={onNavigate}
-                className="flex-1 sm:flex-none"
-              />
+              {showViewToggle && (
+                <VetKeeperViewToggle
+                  value={currentScreen}
+                  onChange={onNavigate}
+                  className="flex-1 sm:flex-none"
+                />
+              )}
               {(() => {
                 const isActive = currentScreen === JOURNAL_NAV.id;
                 const Icon = JOURNAL_NAV.icon;
