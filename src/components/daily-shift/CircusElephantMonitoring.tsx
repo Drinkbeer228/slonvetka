@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { 
   Sparkles, AlertTriangle, Camera, Check, Clock, 
-  RotateCw, RefreshCw, Eye, X, Upload, Activity, ShieldAlert
+  RotateCw, RefreshCw, Eye, X, Upload, Activity, ShieldAlert,
+  CheckCircle2, Volume2, Footprints, Flame, Play, Timer
 } from 'lucide-react';
 import { Elephant } from '../../types';
 import { compressImage } from '../../utils/imageCompressor';
@@ -16,19 +17,65 @@ interface CircusElephantMonitoringProps {
   onAddMediaLog?: (logText: string, photoDataUrl: string) => void;
 }
 
-// 1. Стереотипии по слонам
-const STEREOTYPY_PRESETS: Record<string, string[]> = {
-  margo: ['Круги по вольеру', 'Вертит хоботом'],
-  pretty: ['Качает головой'],
-  odri: ['Поиск движения / Беспокойство'],
-};
+// 1. Этологические паттерны движений (что делает слон)
+interface StereotypyPattern {
+  id: string;
+  label: string;
+  iconText: string;
+  shortName: string;
+}
 
-// 2. Триггеры / Причины стереотипий
-const STEREOTYPY_TRIGGERS = [
-  'Перед пайкой',
-  'Шум / Монтаж',
-  'Скука / Фоновое',
-  'После манежа',
+const STEREOTYPY_PATTERNS: StereotypyPattern[] = [
+  { id: 'weaving', label: 'Качание (Weaving)', iconText: '🔄', shortName: 'Качание' },
+  { id: 'bobbing', label: 'Кивание головой', iconText: '🐘', shortName: 'Кивание головой' },
+  { id: 'stepping', label: 'Переступание ног', iconText: '👣', shortName: 'Переступание ног' },
+  { id: 'trunk', label: 'Игра хоботом', iconText: '🪵', shortName: 'Игра хоботом' },
+];
+
+// 2. Вероятные триггеры / контекст (когда проявляется)
+interface StereotypyTrigger {
+  id: string;
+  label: string;
+  iconText: string;
+  shortName: string;
+}
+
+const STEREOTYPY_TRIGGERS: StereotypyTrigger[] = [
+  { id: 'before_feeding', label: 'Перед пайкой', iconText: '🥣', shortName: 'перед пайкой' },
+  { id: 'before_arena', label: 'Перед выходом', iconText: '🚪', shortName: 'перед выходом' },
+  { id: 'noise_stress', label: 'Шум / стресс', iconText: '🔊', shortName: 'шум/стресс' },
+  { id: 'no_cause', label: 'Без видимой причины', iconText: '❓', shortName: 'без видимой причины' },
+];
+
+// 3. Шкала длительности / интенсивности эпизода
+type DurationTier = '< 5 мин' | '5–15 мин' | '> 15 мин';
+
+interface DurationOption {
+  id: DurationTier;
+  label: string;
+  badgeClass: string;
+  activeClass: string;
+}
+
+const DURATION_OPTIONS: DurationOption[] = [
+  { 
+    id: '< 5 мин', 
+    label: '< 5 мин', 
+    badgeClass: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-300/60 dark:border-emerald-700/50',
+    activeClass: 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400'
+  },
+  { 
+    id: '5–15 мин', 
+    label: '5–15 мин', 
+    badgeClass: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-300/60 dark:border-amber-700/50',
+    activeClass: 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-400'
+  },
+  { 
+    id: '> 15 мин', 
+    label: '> 15 мин (затяжная)', 
+    badgeClass: 'bg-rose-500/10 text-rose-800 dark:text-rose-300 border-rose-300/60 dark:border-rose-700/50',
+    activeClass: 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400'
+  },
 ];
 
 // 3. Ноги для мониторинга
@@ -47,8 +94,11 @@ export function CircusElephantMonitoring({
   onAppendLog,
   onAddMediaLog,
 }: CircusElephantMonitoringProps) {
-  // Стереотипии: выбранное действие для микро-выбора причины
-  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  // Стереотипии: стейт конструктора
+  const [selectedPattern, setSelectedPattern] = useState<StereotypyPattern | null>(null);
+  const [selectedTrigger, setSelectedTrigger] = useState<StereotypyTrigger | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<DurationTier>('< 5 мин');
+  const [justLoggedSuccess, setJustLoggedSuccess] = useState<string | null>(null);
 
   // Бережёт ногу: раскрытие выбора ног
   const [isFootPickerOpen, setIsFootPickerOpen] = useState(false);
@@ -87,13 +137,43 @@ export function CircusElephantMonitoring({
     }
   };
 
-  // 1. Стереотипия: фиксация действия и триггера
-  const handleSelectStereotypy = (action: string, trigger: string) => {
+  // 1. Стереотипия: быстрая фиксация в лог
+  const handleLogStereotypy = (
+    pattern: StereotypyPattern,
+    trigger: StereotypyTrigger,
+    duration: DurationTier
+  ) => {
     if (isLocked) return;
-    handleHaptic(15);
+    handleHaptic(18);
     const timeStr = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    onAppendLog(`[${timeStr} Стереотипия]: ${elephant.name} — ${action} (Триггер: ${trigger})`);
-    setSelectedAction(null);
+    const logLine = `${timeStr} • ${pattern.shortName} (${trigger.shortName}) • ${duration}`;
+    onAppendLog(`[${timeStr} Этология]: ${elephant.name} — ${pattern.label}, триггер: ${trigger.label}, длительность: ${duration}`);
+    
+    setJustLoggedSuccess(logLine);
+    setTimeout(() => {
+      setJustLoggedSuccess(null);
+    }, 4000);
+
+    // Сброс выбора после успешной фиксации
+    setSelectedPattern(null);
+    setSelectedTrigger(null);
+  };
+
+  // Фиксация нормы («Стереотипий не наблюдалось»)
+  const handleLogNorm = () => {
+    if (isLocked) return;
+    handleHaptic(20);
+    const timeStr = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const logLine = `${timeStr} • Стереотипий не наблюдалось (Норма)`;
+    onAppendLog(`[${timeStr} Этология]: ${elephant.name} — стереотипий не наблюдалось (Норма)`);
+    
+    setJustLoggedSuccess(logLine);
+    setTimeout(() => {
+      setJustLoggedSuccess(null);
+    }, 4000);
+
+    setSelectedPattern(null);
+    setSelectedTrigger(null);
   };
 
   // 3. Бережёт ногу: выбор ноги
@@ -170,76 +250,160 @@ export function CircusElephantMonitoring({
     }
   };
 
-  const elephantStereotypies = STEREOTYPY_PRESETS[elephant.id] || ['Беспокойство / Пайка'];
-
   return (
     <div className="bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-[28px] p-4 sm:p-5 shadow-[0_4px_20px_rgba(15,23,42,0.03)] space-y-4">
       
-      {/* 1. ИНДИВИДУАЛЬНЫЕ СТЕРЕОТИПИИ (СВЯЗКА «ФАКТ + ПРИЧИНА») */}
-      <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/70 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🌀</span>
-            <span className="font-extrabold text-xs text-slate-800 uppercase tracking-tight">
-              Стереотипии: {elephant.name}
-            </span>
+      {/* 1. ЭТОЛОГИЧЕСКИЙ МОНИТОРИНГ СТЕРЕОТИПИЙ (ДВУХУРОВНЕВАЯ ФИКСАЦИЯ В 1 ТАП) */}
+      <div className="p-4 sm:p-4.5 bg-slate-50/90 dark:bg-slate-900/60 rounded-[24px] border border-slate-200/80 dark:border-slate-800/80 space-y-3.5 shadow-xs">
+        {/* Заголовок блока с индикатором нормы */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-base font-bold">
+              🌀
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-xs text-slate-900 dark:text-slate-100 uppercase tracking-tight">
+                  Стереотипии: {elephant.name}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:inline">
+                  Этология
+                </span>
+              </div>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                Паттерн движения → Триггер → Длительность
+              </p>
+            </div>
           </div>
-          <span className="text-[10px] font-semibold text-slate-400">
-            Факт → Триггер
-          </span>
+
+          {/* Кнопка быстрой фиксации нормы (без стереотипий) */}
+          <button
+            type="button"
+            disabled={isLocked}
+            onClick={handleLogNorm}
+            className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-800 dark:text-emerald-300 border border-emerald-400/40 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer touch-manipulation disabled:opacity-50 shrink-0"
+            title="Зафиксировать отсутствие стереотипий"
+          >
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden xs:inline">Норма</span>
+            <span className="xs:hidden">Ок</span>
+          </button>
         </div>
 
-        {/* Действия (стереотипии для конкретного слона) */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {elephantStereotypies.map(action => {
-            const isSelected = selectedAction === action;
-            return (
-              <button
-                key={action}
-                type="button"
-                disabled={isLocked}
-                onClick={() => {
-                  handleHaptic(10);
-                  setSelectedAction(isSelected ? null : action);
-                }}
-                className={`min-h-[44px] px-3.5 py-2 rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40'
-                }`}
-              >
-                <span>{action}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Уведомление о последней записи */}
+        {justLoggedSuccess && (
+          <div className="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-400/30 text-emerald-900 dark:text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-150">
+            <Check size={15} className="text-emerald-600 shrink-0" />
+            <span className="truncate">Зафиксировано в лог: {justLoggedSuccess}</span>
+          </div>
+        )}
 
-        {/* Микро-выбор причины / триггера при клике на действие */}
-        {selectedAction && (
-           <div className="p-3 bg-indigo-50/90 rounded-2xl border border-indigo-200/80 space-y-2 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between text-[11px] font-black text-indigo-900">
-              <span>Причина стереотипии «{selectedAction}»:</span>
-              <button
-                type="button"
-                onClick={() => setSelectedAction(null)}
-                className="text-indigo-500 hover:text-indigo-800 p-0.5"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              {STEREOTYPY_TRIGGERS.map(trigger => (
+        {/* УРОВЕНЬ 1: Паттерн движения (что делает слон) */}
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-0.5 flex items-center justify-between">
+            <span>1. Паттерн движения</span>
+            {selectedPattern && (
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                Выбран: {selectedPattern.shortName}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {STEREOTYPY_PATTERNS.map(pattern => {
+              const isSelected = selectedPattern?.id === pattern.id;
+              return (
                 <button
-                  key={trigger}
+                  key={pattern.id}
                   type="button"
-                  onClick={() => handleSelectStereotypy(selectedAction, trigger)}
-                  className="min-h-[44px] px-2.5 py-2 rounded-2xl bg-white text-indigo-950 hover:bg-indigo-600 hover:text-white border border-indigo-200 text-[11px] font-extrabold transition-all active:scale-95 text-center cursor-pointer shadow-2xs"
+                  disabled={isLocked}
+                  onClick={() => {
+                    handleHaptic(12);
+                    setSelectedPattern(isSelected ? null : pattern);
+                  }}
+                  className={`min-h-[44px] px-3 py-2 rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 border text-center ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-300 dark:ring-indigo-700'
+                      : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border-slate-200/90 dark:border-slate-700/80 hover:border-indigo-300 hover:bg-indigo-50/40 dark:hover:bg-slate-700'
+                  }`}
                 >
-                  {trigger}
+                  <span className="text-base leading-none select-none">{pattern.iconText}</span>
+                  <span className="truncate">{pattern.label}</span>
                 </button>
-              ))}
+              );
+            })}
+          </div>
+        </div>
+
+        {/* УРОВЕНЬ 2: Триггер + шкала длительности (активен при выборе паттерна) */}
+        {selectedPattern ? (
+          <div className="p-3.5 bg-indigo-50/80 dark:bg-indigo-950/30 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/60 space-y-3 animate-in fade-in zoom-in-98 duration-150">
+            {/* Шкала фиксации длительности эпизода */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-indigo-950 dark:text-indigo-200">
+                <span className="flex items-center gap-1">
+                  <Timer size={12} className="text-indigo-600 dark:text-indigo-400" />
+                  Длительность эпизода
+                </span>
+                <span className="font-bold text-slate-500 dark:text-slate-400">
+                  {selectedDuration}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {DURATION_OPTIONS.map(opt => {
+                  const isDurSelected = selectedDuration === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => {
+                        handleHaptic(10);
+                        setSelectedDuration(opt.id);
+                      }}
+                      className={`min-h-[44px] px-2.5 py-1.5 rounded-xl border text-xs font-black transition-all active:scale-95 flex items-center justify-center text-center cursor-pointer touch-manipulation disabled:opacity-50 ${
+                        isDurSelected ? opt.activeClass : `bg-white/80 dark:bg-slate-800/80 ${opt.badgeClass}`
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* Вероятный триггер (фиксация в 1 тап) */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-indigo-950 dark:text-indigo-200">
+                <span>2. Вероятный триггер (нажмите для сохранения)</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPattern(null)}
+                  className="text-indigo-500 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 text-[11px] font-bold"
+                >
+                  Отмена
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {STEREOTYPY_TRIGGERS.map(trigger => (
+                  <button
+                    key={trigger.id}
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => handleLogStereotypy(selectedPattern, trigger, selectedDuration)}
+                    className="min-h-[44px] px-2.5 py-2 rounded-xl bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 border border-indigo-200 dark:border-indigo-700/60 text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-1.5 text-center cursor-pointer shadow-2xs touch-manipulation"
+                  >
+                    <span className="text-sm select-none">{trigger.iconText}</span>
+                    <span className="truncate">{trigger.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-1.5">
+            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+              Выберите паттерн движения слона выше для фиксации триггера и тайминга
+            </span>
           </div>
         )}
       </div>
