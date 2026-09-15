@@ -7,6 +7,8 @@ import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
 import { Header } from './Header';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { canManageUsers } from '../lib/permissions';
+import { ROLE_LABELS } from '../types/roles';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,13 +23,6 @@ const NAV_ITEMS = [
   { id: 'journal',       label: 'Журнал',             icon: BookOpen,      role: 'all' },
   { id: 'staff',         label: 'Сотрудники',         icon: Users,         role: 'admin' },
 ];
-
-const ROLE_LABEL: Record<string, string> = {
-  vet:      'Ветврач',
-  director: 'Дрессировщик',
-  admin:    'Администратор',
-  keeper:   'Кипер',
-};
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -138,7 +133,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
 
         {/* Навигация */}
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          {NAV_ITEMS.filter(i => i.role === 'all' || i.role === profile?.role).map(item => {
+          {NAV_ITEMS.filter(i => i.role === 'all' || (i.id === 'staff' && canManageUsers(profile))).map(item => {
             const isActive = currentScreen === item.id ||
               (currentScreen === 'elephant_details' && item.id === 'elephants');
             const Icon = item.icon;
@@ -173,7 +168,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
             style={{ borderTop: '1px solid rgba(148,163,184,0.15)' }}
           >
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-              {ROLE_LABEL[profile.role] ?? 'Сотрудник'}
+              {ROLE_LABELS[profile.role] ?? 'Сотрудник'}
             </div>
             <div
               className="px-4 py-3 rounded-[18px] flex items-center justify-between mb-3"

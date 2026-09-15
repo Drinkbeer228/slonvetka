@@ -16,6 +16,7 @@ import { DailyRationData } from '../components/daily-shift/FeedControl';
 import { formatDuration } from '../components/daily-shift/ExcretionControl';
 import { AssignmentModal } from '../components/AssignmentModal';
 import { ExecutionModal } from '../components/ExecutionModal';
+import { canCreateMedicalAssignment } from '../lib/permissions';
 
 const ELEPHANT_EMOJI: Record<string, string> = {
   margo: '👑',
@@ -46,8 +47,7 @@ export function VetDashboard() {
   const [loading, setLoading] = useState(true);
 
   // RBAC permissions
-  const isVetOrAdmin = profile?.role === 'vet' || profile?.role === 'admin' || profile?.role === 'director';
-  const isKeeper = profile?.role === 'keeper';
+  const isVetOrAdmin = canCreateMedicalAssignment(profile);
 
   // Modal states
   const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);

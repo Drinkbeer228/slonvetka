@@ -4,6 +4,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useStore } from '../store';
+import { ROLE_SHORT_LABELS } from '../types/roles';
 import { shiftService } from '../services/shiftService';
 import { getTodayStr } from '../utils/dates';
 import { VetKeeperViewToggle } from './VetCabinetDashboard';
@@ -28,6 +29,20 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
   const { selectedDate, setSelectedDate, profile } = useStore();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
+  const roleBadgeClass = profile?.role === 'admin'
+    ? 'bg-rose-50 text-rose-800'
+    : profile?.role === 'director'
+      ? 'bg-amber-50 text-amber-800'
+      : profile?.role === 'vet'
+        ? 'bg-sky-50 text-sky-800'
+        : 'bg-emerald-50 text-emerald-800';
+  const roleDotClass = profile?.role === 'admin'
+    ? 'bg-rose-500'
+    : profile?.role === 'director'
+      ? 'bg-amber-500'
+      : profile?.role === 'vet'
+        ? 'bg-sky-500'
+        : 'bg-emerald-500';
 
   useEffect(() => {
     const updateNetwork = () => setIsOnline(navigator.onLine);
@@ -179,9 +194,9 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
               <span className="hidden sm:inline">{isOnline ? 'Онлайн' : 'Оффлайн'}</span>
             </span>
             {profile && (
-              <span className="hidden items-center gap-1.5 rounded-xl bg-emerald-50 px-2 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-800 sm:inline-flex" title={profile.name}>
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                {profile.role === 'vet' ? 'Вет' : profile.role === 'admin' ? 'Админ' : 'Кипер'}
+              <span className={`hidden items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-black uppercase tracking-wide sm:inline-flex ${roleBadgeClass}`} title={profile.name}>
+                <span className={`h-2 w-2 rounded-full ${roleDotClass}`} />
+                {ROLE_SHORT_LABELS[profile.role] ?? 'Сотр.'}
               </span>
             )}
             <button
@@ -372,4 +387,3 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     </>
   );
 }
-
