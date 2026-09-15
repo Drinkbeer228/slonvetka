@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { DailyShift } from '../../types/shift';
 import { shiftService } from '../../services/shiftService';
+import { supabase } from '../../lib/supabase';
 
 export interface HandoverQuestionItem {
   id: string;
@@ -28,6 +29,12 @@ const DEFAULT_QUESTIONS = [
   { id: 'inventory', question: '5. Инвентарь целый (ущерб сходится)?' },
 ];
 
+const ELEPHANTS = ['Марго', 'Одри', 'Прэтти'] as const;
+type ElephantName = typeof ELEPHANTS[number];
+
+const WASH_ZONES = ['Бок', 'Ноги', 'Круп'] as const;
+type WashZone = typeof WASH_ZONES[number];
+
 export function HandoverAcceptModal({
   pendingShift,
   senderName,
@@ -43,6 +50,14 @@ export function HandoverAcceptModal({
     inventory: null,
   });
 
+  // Замывка: испачканные слоны и зоны загрязнения
+  const [activeDirtyElephant, setActiveDirtyElephant] = useState<ElephantName>('Марго');
+  const [dirtyWashMap, setDirtyWashMap] = useState<Record<string, string[]>>({
+    'Марго': [],
+    'Одри': [],
+    'Прэтти': [],
+  });
+
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -56,6 +71,39 @@ export function HandoverAcceptModal({
       [qId]: value
     }));
     setErrorMessage(null);
+
+    // Если сменщик нажал "Да" на вопрос о замывке, сбрасываем выбранные загрязнения
+    if (qId === 'washed' && value === true) {
+      setDirtyWashMap({
+        'Марго': [],
+        'Одри': [],
+        'Прэтти': [],
+      });
+    }
+  };
+
+  const handleToggleZone = (elephantName: ElephantName, zone: WashZone) => {
+    if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(12);
+    }
+    setDirtyWashMap(prev => {
+      const current = prev[elephantName] || [];
+      const updated = current.includes(zone)
+        ? current.filter(z => z !== zone)
+        : [...current, zone];
+      return {
+        ...prev,
+        [elephantName]: updated
+      };
+    });
+    setErrorMessage(null);
+  };
+
+  const formatDirtySummary = (map: Record<string, string[]>): string => {
+    const items = Object.entries(map)
+      .filter(([_, zones]) => zones && zones.length > 0)
+      .map(([name, zones]) => `${name} (${zones.join(', ')})`);
+    return items.join('; ');
   };
 
   // Проверяем: есть ли хотя бы один пункт "Нет"
@@ -64,8 +112,18 @@ export function HandoverAcceptModal({
   // Проверяем: все ли 5 вопросов отвечены
   const allAnswered = Object.values(answers).every(ans => ans !== null);
 
-  // Валидация: если есть "Нет", комментарий обязателен (не менее 3 символов)
-  const isCommentValid = !hasNegativeAnswer || comment.trim().length >= 3;
+  const dirtySummary = formatDirtySummary(dirtyWashMap);
+  const hasDirtyDetails = answers.washed === false && Boolean(dirtySummary);
+
+  // Есть ли "Нет" в других пунктах кроме washed
+  const otherNegativeAnswers = Object.entries(answers).some(([qId, val]) => qId !== 'washed' && val === false);
+
+  // Валидация:
+  // Если есть "Нет", комментарий обязателен (не менее 3 символов),
+  // ЛИБО если "Нет" только на washed, достаточно выбранного слона и зоны загрязнения
+  const isCommentValid = !hasNegativeAnswer 
+    || (!otherNegativeAnswers && hasDirtyDetails)
+    || comment.trim().length >= 3;
 
   const canSubmit = allAnswered && isCommentValid;
 
@@ -75,8 +133,8 @@ export function HandoverAcceptModal({
       return;
     }
 
-    if (hasNegativeAnswer && comment.trim().length < 3) {
-      setErrorMessage('При наличии замечаний («Нет») укажите обязательный комментарий сменщика');
+    if (hasNegativeAnswer && !isCommentValid) {
+      setErrorMessage('При наличии замечаний («Нет») укажите обязательный комментарий сменщика или выберите испачканных слонов');
       return;
     }
 
@@ -86,22 +144,43 @@ export function HandoverAcceptModal({
     try {
       // Собираем результаты опросника в читаемый лог
       const summaryItems: string[] = [];
+      const dirtyDetailStr = formatDirtySummary(dirtyWashMap);
+
       DEFAULT_QUESTIONS.forEach(q => {
         const val = answers[q.id];
-        summaryItems.push(`${q.question.replace(/^\d+\.\s*/, '')}: ${val ? 'Да (Норма)' : 'НЕТ ⚠️'}`);
+        if (q.id === 'washed' && val === false) {
+          summaryItems.push(
+            `${q.question.replace(/^\d+\.\s*/, '')}: НЕТ ⚠️${dirtyDetailStr ? ` (Требуют замывки: ${dirtyDetailStr})` : ''}`
+          );
+        } else {
+          summaryItems.push(`${q.question.replace(/^\d+\.\s*/, '')}: ${val ? 'Да (Норма)' : 'НЕТ ⚠️'}`);
+        }
       });
 
       let handoverAuditNotes = `[Приёмка дежурства]:\n${summaryItems.join('\n')}`;
+      if (answers.washed === false && dirtyDetailStr) {
+        handoverAuditNotes += `\n🚿 Требуется замывка: ${dirtyDetailStr}`;
+      }
       if (comment.trim()) {
         handoverAuditNotes += `\nЗамечания сменщика: ${comment.trim()}`;
       }
 
-      // Сохраняем в handover_notes смены через update или при закрытии
-      // acceptHandover закрывает смену и передает дежурство
-      // Для прозрачности дополним handover_notes
+      // Сохраняем в handover_notes смены через update и финализируем
       const fullNotes = pendingShift.handover_notes 
         ? `${pendingShift.handover_notes}\n\n${handoverAuditNotes}`
         : handoverAuditNotes;
+
+      try {
+        await supabase
+          .from('daily_shifts')
+          .update({
+            handover_notes: fullNotes,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', pendingShift.id);
+      } catch (dbErr) {
+        console.warn('Direct update of handover_notes on daily_shifts skipped:', dbErr);
+      }
 
       // Обновляем pendingShift с новыми заметками перед финализацией
       await shiftService.acceptHandover({
@@ -170,13 +249,13 @@ export function HandoverAcceptModal({
             Чек-лист состояния объекта:
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {DEFAULT_QUESTIONS.map((q) => {
               const currentVal = answers[q.id];
               return (
                 <div 
                   key={q.id}
-                  className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-3 ${
                     currentVal === null 
                       ? 'bg-slate-50/70 border-slate-200/70' 
                       : currentVal === true 
@@ -184,38 +263,137 @@ export function HandoverAcceptModal({
                         : 'bg-rose-50/80 border-rose-300 shadow-2xs'
                   }`}
                 >
-                  <div className="font-bold text-sm text-slate-900 leading-snug">
-                    {q.question}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="font-bold text-sm text-slate-900 leading-snug">
+                      {q.question}
+                    </div>
+
+                    {/* Крупные эргономичные кнопки Да / Нет (44px) */}
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAnswer(q.id, true)}
+                        className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer touch-manipulation ${
+                          currentVal === true
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-emerald-50 hover:text-emerald-700'
+                        }`}
+                      >
+                        <Check size={15} strokeWidth={3} />
+                        <span>Да</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAnswer(q.id, false)}
+                        className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer touch-manipulation ${
+                          currentVal === false
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-rose-50 hover:text-rose-700'
+                        }`}
+                      >
+                        <X size={15} strokeWidth={3} />
+                        <span>Нет</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Крупные эргономичные кнопки Да / Нет */}
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAnswer(q.id, true)}
-                      className={`min-h-[42px] px-4 py-1.5 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer touch-manipulation ${
-                        currentVal === true
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-emerald-50 hover:text-emerald-700'
-                      }`}
-                    >
-                      <Check size={14} strokeWidth={3} />
-                      <span>Да</span>
-                    </button>
+                  {/* Плавный блок детализации замывки при выборе «НЕТ» на вопросе "Слоны замыты?" */}
+                  {q.id === 'washed' && currentVal === false && (
+                    <div className="w-full pt-3 border-t border-rose-200/80 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-black text-rose-950">
+                          <span className="text-base">🚿</span>
+                          <span>Кто испачкан и требует замывки?</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-rose-700/80 uppercase tracking-tight">
+                          Слон → Зона
+                        </span>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAnswer(q.id, false)}
-                      className={`min-h-[42px] px-4 py-1.5 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer touch-manipulation ${
-                        currentVal === false
-                          ? 'bg-rose-600 text-white shadow-sm'
-                          : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-rose-50 hover:text-rose-700'
-                      }`}
-                    >
-                      <X size={14} strokeWidth={3} />
-                      <span>Нет</span>
-                    </button>
-                  </div>
+                      {/* Выбор слона: чипсы [Марго] | [Одри] | [Прэтти] */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {ELEPHANTS.map(eleName => {
+                          const isSelected = activeDirtyElephant === eleName;
+                          const count = (dirtyWashMap[eleName] || []).length;
+                          return (
+                            <button
+                              key={eleName}
+                              type="button"
+                              onClick={() => {
+                                if (typeof window !== 'undefined' && navigator.vibrate) {
+                                  navigator.vibrate(10);
+                                }
+                                setActiveDirtyElephant(eleName);
+                              }}
+                              className={`min-h-[44px] px-2 py-2 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer touch-manipulation ${
+                                isSelected
+                                  ? 'bg-rose-700 text-white shadow-md ring-2 ring-rose-300'
+                                  : count > 0
+                                    ? 'bg-rose-100 text-rose-900 border border-rose-300 font-extrabold'
+                                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-rose-50/70'
+                              }`}
+                            >
+                              <span>🐘</span>
+                              <span>{eleName}</span>
+                              {count > 0 && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${
+                                  isSelected ? 'bg-white text-rose-800' : 'bg-rose-600 text-white'
+                                }`}>
+                                  {count}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Выбор зоны загрязнения для активного слона: [Бок] | [Ноги] | [Круп] */}
+                      <div className="p-3 bg-white/90 backdrop-blur-sm rounded-2xl border border-rose-200/90 space-y-2">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-extrabold text-slate-800">
+                            Зоны загрязнения: <span className="text-rose-700 font-black">{activeDirtyElephant}</span>
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            выберите одну или несколько
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          {WASH_ZONES.map(zone => {
+                            const currentZones = dirtyWashMap[activeDirtyElephant] || [];
+                            const isZoneSelected = currentZones.includes(zone);
+                            return (
+                              <button
+                                key={zone}
+                                type="button"
+                                onClick={() => handleToggleZone(activeDirtyElephant, zone)}
+                                className={`min-h-[44px] px-2 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer touch-manipulation ${
+                                  isZoneSelected
+                                    ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-300'
+                                    : 'bg-slate-50 text-slate-700 border border-slate-200 hover:bg-rose-50/60 hover:border-rose-300'
+                                }`}
+                              >
+                                {isZoneSelected && <Check size={14} strokeWidth={3} />}
+                                <span>{zone}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Сводка отмеченных загрязнений */}
+                      {dirtySummary && (
+                        <div className="p-2.5 bg-rose-100/80 border border-rose-200/90 rounded-xl text-xs text-rose-950 flex items-start gap-2">
+                          <span className="text-sm shrink-0">⚠️</span>
+                          <div className="leading-snug">
+                            <span className="font-black">К замывке: </span>
+                            <span className="font-bold">{dirtySummary}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -224,7 +402,11 @@ export function HandoverAcceptModal({
           {/* Поле комментария с обязательным заполнением при выборе "Нет" */}
           <div className="pt-2">
             <label className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-1.5 px-1">
-              Комментарий сменщика {hasNegativeAnswer ? <span className="text-rose-600 font-extrabold">(Обязательно при замечаниях «Нет») *</span> : '(необязательно)'}
+              Комментарий сменщика {hasNegativeAnswer && !hasDirtyDetails ? (
+                <span className="text-rose-600 font-extrabold">(Обязательно при замечаниях «Нет») *</span>
+              ) : (
+                '(необязательно)'
+              )}
             </label>
             <textarea
               rows={3}
@@ -233,9 +415,15 @@ export function HandoverAcceptModal({
                 setComment(e.target.value);
                 setErrorMessage(null);
               }}
-              placeholder={hasNegativeAnswer ? "Укажите, что не замыто, где сыро или какой инвентарь сломан..." : "Любые уточнения или особенности приёмки смены..."}
+              placeholder={
+                hasNegativeAnswer 
+                  ? (hasDirtyDetails 
+                      ? "Дополнительные примечания к приёмке (необязательно)..." 
+                      : "Укажите, что не замыто, где сыро или какой инвентарь сломан...")
+                  : "Любые уточнения или особенности приёмки смены..."
+              }
               className={`w-full p-3 bg-slate-50/80 border rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:bg-white resize-none transition ${
-                hasNegativeAnswer && comment.trim().length < 3
+                hasNegativeAnswer && !isCommentValid
                   ? 'border-rose-300 focus:ring-2 focus:ring-rose-400/50 bg-rose-50/30'
                   : 'border-slate-200/90 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
               }`}

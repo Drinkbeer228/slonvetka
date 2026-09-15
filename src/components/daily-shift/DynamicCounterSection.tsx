@@ -289,13 +289,13 @@ export function DynamicCounterSection({
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
-                  Боевые заслуги
+                  Работа смены
                   <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 font-bold">
                     Смена
                   </span>
                 </h3>
                 <p className="text-xs font-semibold text-emerald-800/70">
-                  Полезная работа и регламент чистоты
+                  Учёт выполненных работ
                 </p>
               </div>
             </div>
@@ -325,7 +325,7 @@ export function DynamicCounterSection({
                     type="button"
                     disabled={isLocked || item.count <= 0}
                     onClick={() => handleCountChange(item.id, -1, 'merit')}
-                    className="w-8 h-8 rounded-lg bg-white text-slate-600 hover:text-slate-900 hover:bg-emerald-100/50 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                    className="w-11 h-11 rounded-xl bg-white text-slate-600 hover:text-slate-900 hover:bg-emerald-100/50 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
                     title="Уменьшить"
                   >
                     <Minus size={15} strokeWidth={2.5} />
@@ -339,7 +339,7 @@ export function DynamicCounterSection({
                     type="button"
                     disabled={isLocked}
                     onClick={() => handleCountChange(item.id, 1, 'merit')}
-                    className="w-8 h-8 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 shadow-xs"
+                    className="w-11 h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 shadow-xs"
                     title="Увеличить"
                   >
                     <Plus size={16} strokeWidth={2.5} />
@@ -363,13 +363,13 @@ export function DynamicCounterSection({
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
-                  Слоновий дестрой & Ущерб
+                  Инциденты и поломки
                   <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100/80 text-rose-800 font-bold">
-                    Казусы
+                    За смену
                   </span>
                 </h3>
                 <p className="text-xs font-semibold text-rose-800/70">
-                  Потери инвентаря и поломки за день
+                  Фиксируйте событие прямо в смене
                 </p>
               </div>
             </div>
@@ -415,28 +415,28 @@ export function DynamicCounterSection({
                 ) : (
                   <div className="flex items-center gap-1.5 bg-rose-50/70 p-1 rounded-xl border border-rose-200/50">
                     <button
-                      type="button"
-                      disabled={isLocked || item.count <= 0}
-                      onClick={() => handleCountChange(item.id, -1, 'damage')}
-                      className="w-8 h-8 rounded-lg bg-white text-slate-600 hover:text-slate-900 hover:bg-rose-100/50 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
-                      title="Уменьшить"
-                    >
-                      <Minus size={15} strokeWidth={2.5} />
-                    </button>
+                       type="button"
+                       disabled={isLocked || item.count <= 0}
+                       onClick={() => handleCountChange(item.id, -1, 'damage')}
+                       className="w-11 h-11 rounded-xl bg-white text-slate-600 hover:text-slate-900 hover:bg-rose-100/50 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                       title="Уменьшить"
+                     >
+                       <Minus size={15} strokeWidth={2.5} />
+                     </button>
 
-                    <span className="w-9 text-center font-black text-sm sm:text-base text-rose-950 tabular-nums">
-                      {item.count}
-                    </span>
+                     <span className="w-9 text-center font-black text-sm sm:text-base text-rose-950 tabular-nums">
+                       {item.count}
+                     </span>
 
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => handleCountChange(item.id, 1, 'damage')}
-                      className="w-8 h-8 rounded-lg bg-rose-600 text-white hover:bg-rose-700 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 shadow-xs"
-                      title="Увеличить"
-                    >
-                      <Plus size={16} strokeWidth={2.5} />
-                    </button>
+                     <button
+                       type="button"
+                       disabled={isLocked}
+                       onClick={() => handleCountChange(item.id, 1, 'damage')}
+                       className="w-11 h-11 rounded-xl bg-rose-600 text-white hover:bg-rose-700 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 shadow-xs"
+                       title="Увеличить"
+                     >
+                       <Plus size={16} strokeWidth={2.5} />
+                     </button>
                   </div>
                 )}
               </div>
@@ -450,7 +450,7 @@ export function DynamicCounterSection({
                 <button
                   type="button"
                   onClick={() => setIsAddingIncident(true)}
-                  className="w-full py-3 px-4 rounded-2xl bg-white/80 hover:bg-white text-rose-800 text-xs sm:text-sm font-extrabold border border-rose-200/80 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                  className="w-full min-h-[44px] py-3 px-4 rounded-2xl bg-white/80 hover:bg-white text-rose-800 text-xs sm:text-sm font-extrabold border border-rose-200/80 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2"
                 >
                   <Plus size={16} className="text-rose-600 stroke-[3]" />
                   <span>+ Добавить новый казус</span>
@@ -487,7 +487,7 @@ export function DynamicCounterSection({
                       value={newIncidentTitle}
                       onChange={e => setNewIncidentTitle(e.target.value)}
                       placeholder="Например: Раздавлен таз, Оторван кабель..."
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 placeholder:text-slate-400"
+                      className="min-h-[44px] flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 placeholder:text-slate-400"
                     />
                   </div>
 

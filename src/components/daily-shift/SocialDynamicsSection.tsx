@@ -59,7 +59,7 @@ export function SocialDynamicsSection({
               type="button"
               disabled={isLocked}
               onClick={() => handleTagClick(tag.label)}
-              className={`min-h-[42px] px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-2 active:scale-95 cursor-pointer touch-manipulation shadow-2xs ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 active:scale-95 cursor-pointer touch-manipulation shadow-2xs disabled:cursor-not-allowed disabled:opacity-50 ${
                 isSelected
                   ? 'bg-slate-900 text-white scale-[1.02]'
                   : 'bg-slate-50/90 text-slate-700 hover:bg-white border border-slate-200/80 hover:border-slate-300'

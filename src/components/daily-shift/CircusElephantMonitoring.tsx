@@ -16,14 +16,7 @@ interface CircusElephantMonitoringProps {
   onAddMediaLog?: (logText: string, photoDataUrl: string) => void;
 }
 
-// 1. Зоны замывки
-const WASH_ZONES = [
-  { id: 'side', label: 'Бок' },
-  { id: 'legs', label: 'Ноги' },
-  { id: 'rump', label: 'Круп' },
-];
-
-// 2. Стереотипии по слонам
+// 1. Стереотипии по слонам
 const STEREOTYPY_PRESETS: Record<string, string[]> = {
   margo: ['Круги по вольеру', 'Вертит хоботом'],
   pretty: ['Качает головой'],
@@ -54,9 +47,6 @@ export function CircusElephantMonitoring({
   onAppendLog,
   onAddMediaLog,
 }: CircusElephantMonitoringProps) {
-  // Выбор зоны замывки
-  const [activeWashZone, setActiveWashZone] = useState<string | null>(null);
-
   // Стереотипии: выбранное действие для микро-выбора причины
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
 
@@ -97,17 +87,7 @@ export function CircusElephantMonitoring({
     }
   };
 
-  // 1. Замывка: выбор зоны и логирование
-  const handleSelectWashZone = (zoneLabel: string) => {
-    if (isLocked) return;
-    handleHaptic(12);
-    setActiveWashZone(zoneLabel);
-    const timeStr = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    onAppendLog(`[${timeStr} Замывка]: ${elephant.name} лёг(ла) в навоз/мочу. Замыта зона: ${zoneLabel}`);
-    setTimeout(() => setActiveWashZone(null), 2000);
-  };
-
-  // 2. Стереотипия: фиксация действия и триггера
+  // 1. Стереотипия: фиксация действия и триггера
   const handleSelectStereotypy = (action: string, trigger: string) => {
     if (isLocked) return;
     handleHaptic(15);
@@ -195,44 +175,7 @@ export function CircusElephantMonitoring({
   return (
     <div className="bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-[28px] p-4 sm:p-5 shadow-[0_4px_20px_rgba(15,23,42,0.03)] space-y-4">
       
-      {/* 1. ЗАМЫВКА ИСПАЧКАННЫХ СЛОНОВ */}
-      <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/70 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🚿</span>
-            <span className="font-extrabold text-xs text-slate-800 uppercase tracking-tight">
-              Замывка (лёг в навоз / мочу)
-            </span>
-          </div>
-          <span className="text-[10px] font-semibold text-slate-400">
-            Выбор зоны
-          </span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          {WASH_ZONES.map(zone => {
-            const isJustCleaned = activeWashZone === zone.label;
-            return (
-              <button
-                key={zone.id}
-                type="button"
-                disabled={isLocked}
-                onClick={() => handleSelectWashZone(zone.label)}
-                className={`min-h-[42px] px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer touch-manipulation ${
-                  isJustCleaned
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:border-sky-300 hover:bg-sky-50/50'
-                }`}
-              >
-                {isJustCleaned ? <Check size={14} strokeWidth={3} /> : null}
-                <span>{zone.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 2. ИНДИВИДУАЛЬНЫЕ СТЕРЕОТИПИИ (СВЯЗКА «ФАКТ + ПРИЧИНА») */}
+      {/* 1. ИНДИВИДУАЛЬНЫЕ СТЕРЕОТИПИИ (СВЯЗКА «ФАКТ + ПРИЧИНА») */}
       <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/70 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -259,7 +202,7 @@ export function CircusElephantMonitoring({
                   handleHaptic(10);
                   setSelectedAction(isSelected ? null : action);
                 }}
-                className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer touch-manipulation ${
+                className={`min-h-[44px] px-3.5 py-2 rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 ${
                   isSelected
                     ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300'
                     : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40'
@@ -273,7 +216,7 @@ export function CircusElephantMonitoring({
 
         {/* Микро-выбор причины / триггера при клике на действие */}
         {selectedAction && (
-          <div className="p-3 bg-indigo-50/90 rounded-2xl border border-indigo-200/80 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+           <div className="p-3 bg-indigo-50/90 rounded-2xl border border-indigo-200/80 space-y-2 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between text-[11px] font-black text-indigo-900">
               <span>Причина стереотипии «{selectedAction}»:</span>
               <button
@@ -291,7 +234,7 @@ export function CircusElephantMonitoring({
                   key={trigger}
                   type="button"
                   onClick={() => handleSelectStereotypy(selectedAction, trigger)}
-                  className="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-white text-indigo-950 hover:bg-indigo-600 hover:text-white border border-indigo-200 text-[11px] font-extrabold transition-all active:scale-95 text-center cursor-pointer shadow-2xs"
+                  className="min-h-[44px] px-2.5 py-2 rounded-2xl bg-white text-indigo-950 hover:bg-indigo-600 hover:text-white border border-indigo-200 text-[11px] font-extrabold transition-all active:scale-95 text-center cursor-pointer shadow-2xs"
                 >
                   {trigger}
                 </button>
@@ -321,7 +264,7 @@ export function CircusElephantMonitoring({
                 handleHaptic(15);
                 setIsFootPickerOpen(!isFootPickerOpen);
               }}
-              className={`min-h-[38px] px-3.5 py-1 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer touch-manipulation ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer touch-manipulation disabled:cursor-not-allowed disabled:opacity-50 ${
                 isFootPickerOpen 
                   ? 'bg-rose-700 text-white' 
                   : 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
@@ -378,7 +321,7 @@ export function CircusElephantMonitoring({
                 type="button"
                 disabled={isLocked || isUploadingFeetPhoto}
                 onClick={() => feetFileInputRef.current?.click()}
-                className="min-h-[38px] px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="min-h-[44px] px-3.5 py-2 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 {isUploadingFeetPhoto ? <RefreshCw size={13} className="animate-spin" /> : <Camera size={14} />}
                 <span>+ Фото ног</span>

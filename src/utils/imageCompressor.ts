@@ -1,50 +1,46 @@
+const MAX_BYTES = 800 * 1024;
+const MAX_DIMENSION = 1080;
+
+function canvasBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => canvas.toBlob(
+    blob => blob ? resolve(blob) : reject(new Error('Canvas to Blob failed')),
+    'image/jpeg',
+    quality,
+  ));
+}
+
+/** Compresses camera images to a 1080p JPEG, aiming for an upload below 800 KB. */
 export async function compressImage(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
+  const imageUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 1280;
-        let w = img.width;
-        let h = img.height;
-
-        if (w > maxDim || h > maxDim) {
-          if (w > h) {
-            h = Math.round((h * maxDim) / w);
-            w = maxDim;
-          } else {
-            w = Math.round((w * maxDim) / h);
-            h = maxDim;
-          }
-        }
-
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          return reject(new Error('Canvas context not available'));
-        }
-        
-        ctx.drawImage(img, 0, 0, w, h);
-        
-        // Export to JPEG with 0.7 quality
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('Canvas to Blob failed'));
-            }
-          },
-          'image/jpeg',
-          0.7
-        );
-      };
+      img.onload = () => resolve(img);
       img.onerror = () => reject(new Error('Image load failed'));
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('File read failed'));
-    reader.readAsDataURL(file);
-  });
+      img.src = imageUrl;
+    });
+
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
+    let width = Math.max(1, Math.round(image.width * scale));
+    let height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas context not available');
+
+    let result: Blob | null = null;
+    for (let pass = 0; pass < 3; pass += 1) {
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(image, 0, 0, width, height);
+      for (const quality of [0.78, 0.68, 0.58, 0.48]) {
+        result = await canvasBlob(canvas, quality);
+        if (result.size <= MAX_BYTES) return result;
+      }
+      width = Math.round(width * 0.85);
+      height = Math.round(height * 0.85);
+    }
+    return result || file;
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
 }

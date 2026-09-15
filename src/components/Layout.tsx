@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  X, LogOut, Home, Stethoscope, HeartPulse, 
+  X, LogOut, Home, Stethoscope, HeartPulse, Moon, Sun,
   CheckCircle2, BookOpen, ClipboardList, Users 
 } from 'lucide-react';
 import { useStore } from '../store';
@@ -31,6 +31,15 @@ const ROLE_LABEL: Record<string, string> = {
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('slonovet_theme') === 'dark');
+
+  const toggleTheme = () => {
+    setDarkMode(value => { 
+      const next = !value; 
+      localStorage.setItem('slonovet_theme', next ? 'dark' : 'light'); 
+      return next; 
+    });
+  };
   const { profile, logout } = useStore();
 
   const handleNav = (id: string) => {
@@ -46,7 +55,8 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   return (
     <div
       className="min-h-screen text-slate-800 flex flex-col font-sans antialiased"
-      style={{ background: 'linear-gradient(160deg, #f1f5f9 0%, #e9f0f8 60%, #eff6ff 100%)' }}
+      data-theme={darkMode ? 'dark' : 'light'}
+      style={{ background: darkMode ? '#020617' : 'linear-gradient(160deg, #f1f5f9 0%, #e9f0f8 60%, #eff6ff 100%)' }}
     >
       {/* STICKY HEADER */}
       <Header 
@@ -79,7 +89,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
           drawerOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         style={{
-          background: 'rgba(255,255,255,0.82)',
+          background: darkMode ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.82)',
           backdropFilter: 'blur(32px)',
           WebkitBackdropFilter: 'blur(32px)',
           boxShadow: '-4px 0 40px rgba(15,23,42,0.14)',
@@ -161,6 +171,14 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
               <span className="font-bold text-slate-900 text-sm truncate">{profile.name}</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)]" />
             </div>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="w-full min-h-[44px] mb-2 flex items-center justify-center gap-2 rounded-[14px] bg-slate-100 text-slate-800 font-bold text-sm transition-all active:scale-95"
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+              {darkMode ? 'Светлая тема' : 'Ночной режим'}
+            </button>
             <button
               type="button"
               onClick={() => {

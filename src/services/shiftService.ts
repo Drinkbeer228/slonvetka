@@ -298,7 +298,8 @@ export const shiftService = {
         status: 'completed',
         ended_at: now,
         updated_at: now,
-        handover_to_keeper_id: null
+        handover_to_keeper_id: null,
+        handover_notes: pendingShift.handover_notes
       })
       .eq('id', pendingShift.id);
 

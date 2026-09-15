@@ -5,6 +5,7 @@ import { supabaseService } from '../services/supabaseService';
 import { shiftService } from '../services/shiftService';
 import { SyncManager } from '../services/SyncManager';
 import { getOfflineDb } from '../services/offlineDb';
+import { clearShiftDraft, getShiftDraft, saveShiftDraft } from '../services/shiftDraft';
 import { DailyShift, ElephantDailyMetrics, FeedInventoryItem, FeedInventoryType } from '../types/shift';
 import { Elephant, Assignment, TreatmentRecordWithPhotos } from '../types';
 import { CounterButton } from '../components/common/CounterButton';
@@ -173,30 +174,45 @@ export function DailyShiftPage() {
   // Touch swipe refs for mobile
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const touchEndY = useRef<number>(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0].clientX;
+    touchStartY.current = e.targetTouches[0].clientY;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     touchEndX.current = e.targetTouches[0].clientX;
+    touchEndY.current = e.targetTouches[0].clientY;
   };
 
   const handleTouchEnd = () => {
+    const pullDistance = touchEndY.current - touchStartY.current;
+    // A vertical pull starts only at the top of the page, so ordinary card gestures stay intact.
+    if (touchStartY.current && window.scrollY === 0 && pullDistance > 92 && !isRefreshing) {
+      setIsRefreshing(true);
+      if (typeof window !== 'undefined' && navigator.vibrate) navigator.vibrate(18);
+      loadData().finally(() => setIsRefreshing(false));
+    }
     if (!touchStartX.current || !touchEndX.current) return;
     const distance = touchStartX.current - touchEndX.current;
     const minSwipeDistance = 50;
 
     if (Math.abs(distance) > minSwipeDistance) {
-      const currentIndex = (elephants || []).findIndex(e => e.id === activeElephantId);
-      if (distance > 0 && currentIndex < elephants.length - 1) {
-        setActiveElephantId(elephants[currentIndex + 1].id);
-      } else if (distance < 0 && currentIndex > 0) {
-        setActiveElephantId(elephants[currentIndex - 1].id);
+      const elephantList = elephants || [];
+      const currentIndex = elephantList.findIndex(e => e.id === activeElephantId);
+      const nextIndex = distance > 0 ? currentIndex + 1 : currentIndex - 1;
+      if (nextIndex >= 0 && nextIndex < elephantList.length) {
+        setActiveElephantId(elephantList[nextIndex].id);
+        if (typeof window !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
       }
     }
     touchStartX.current = 0;
     touchEndX.current = 0;
+    touchStartY.current = 0;
+    touchEndY.current = 0;
   };
   
   const [shift, setShift] = useState<DailyShift | null>(null);
@@ -397,17 +413,19 @@ export function DailyShiftPage() {
            });
         }
       }
-      setShift(loadedShift);
-      setMetrics(data.metrics || {});
+      const draft = getShiftDraft(selectedDate);
+      const effectiveShift = draft?.shift || loadedShift;
+      setShift(effectiveShift);
+      setMetrics(draft?.metrics || data.metrics || {});
 
       const inv = await shiftService.getFeedInventory();
       setFeedInventory(inv);
       setHayStockBales(inv.hay_bales.quantity_in_stock);
       setHayStockRolls(inv.hay_rolls.quantity_in_stock);
 
-      const currentBales = loadedShift?.hay_bales_distributed ?? 0;
-      const currentRolls = loadedShift?.hay_bags_distributed ?? 0;
-      const currentBranches = parseDailyRation(loadedShift?.feed_notes).coarse_branches || 0;
+      const currentBales = effectiveShift?.hay_bales_distributed ?? 0;
+      const currentRolls = effectiveShift?.hay_bags_distributed ?? 0;
+      const currentBranches = parseDailyRation(effectiveShift?.feed_notes).coarse_branches || 0;
       
       setInitialAvailable({
         bales: inv.hay_bales.quantity_in_stock + currentBales,
@@ -446,9 +464,11 @@ export function DailyShiftPage() {
     if (minSaveTimeRef.current) clearTimeout(minSaveTimeRef.current);
     
     setGlobalSaveStatus('saving');
+    saveShiftDraft(selectedDate, currentShift, currentMetrics);
     
     try {
       await shiftService.saveShiftData(currentShift, currentMetrics);
+      clearShiftDraft(selectedDate);
     } catch (err) {
       console.error('Autosave error:', err);
       setGlobalSaveStatus('error');
@@ -473,11 +493,13 @@ export function DailyShiftPage() {
     if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
     if (minSaveTimeRef.current) clearTimeout(minSaveTimeRef.current);
     setGlobalSaveStatus('saving');
+    saveShiftDraft(selectedDate, updatedShift, updatedMetrics);
     
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       try {
         await shiftService.saveShiftData(updatedShift, updatedMetrics);
+        clearShiftDraft(selectedDate);
         setGlobalSaveStatus('saved');
         statusTimerRef.current = setTimeout(() => setGlobalSaveStatus('idle'), 3000);
       } catch (err) {
@@ -486,7 +508,7 @@ export function DailyShiftPage() {
         statusTimerRef.current = setTimeout(() => setGlobalSaveStatus('idle'), 3000);
       }
     }, 1200); // Slower debounce to match the slower animations
-  }, []);
+  }, [selectedDate]);
 
   const handleMetricChange = (elephantId: string, field: keyof ElephantDailyMetrics, value: any) => {
     if (isLocked) return;
@@ -932,7 +954,17 @@ export function DailyShiftPage() {
     : [];
 
   return (
-    <div className="pb-44 space-y-6 mt-3 relative">
+    <div
+      className="pb-60 space-y-6 mt-3 relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {isRefreshing && (
+        <div className="sticky top-2 z-30 mx-auto w-fit rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-lg animate-fade-blur">
+          Обновляем смену…
+        </div>
+      )}
       
       {/* VET OBSERVER MODE BANNER */}
       {isVetUser && (

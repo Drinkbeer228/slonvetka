@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, ChevronDown, Menu, X, ChevronLeft, ChevronRight, 
-  Home, Stethoscope, HeartPulse, BookOpen 
+import {
+  Calendar, Menu, X, ChevronLeft, ChevronRight, Wifi, WifiOff,
+  Home, Stethoscope, BookOpen
 } from 'lucide-react';
 import { useStore } from '../store';
 import { shiftService } from '../services/shiftService';
@@ -30,6 +30,17 @@ const getFirstDayOfWeek = (year: number, month: number) => {
 export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
   const { selectedDate, setSelectedDate, profile } = useStore();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
+
+  useEffect(() => {
+    const updateNetwork = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateNetwork);
+    window.addEventListener('offline', updateNetwork);
+    return () => {
+      window.removeEventListener('online', updateNetwork);
+      window.removeEventListener('offline', updateNetwork);
+    };
+  }, []);
 
   const todayStr = getTodayStr();
 
@@ -79,19 +90,6 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     return dateStr;
   };
 
-  const stepDate = (deltaDays: number) => {
-    try {
-      const [y, m, d] = (selectedDate || todayStr).split('-').map(Number);
-      const dateObj = new Date(y, m - 1, d + deltaDays);
-      const ny = dateObj.getFullYear();
-      const nm = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const nd = String(dateObj.getDate()).padStart(2, '0');
-      setSelectedDate(`${ny}-${nm}-${nd}`);
-    } catch {
-      // fallback
-    }
-  };
-
   const generateCalendarDays = () => {
     const daysInMonth = getDaysInMonth(viewYear, viewMonth);
     const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
@@ -131,132 +129,72 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
 
   return (
     <>
-      <header
-        className="h-16 sticky top-0 z-40 w-full bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_2px_12px_rgba(15,23,42,0.04)]"
-      >
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-full flex items-center justify-between gap-2 sm:gap-4">
-          {/* СЛЕВА: Бренд СлоноВет */}
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => onNavigate ? onNavigate('daily_shift') : undefined}
-              className="flex items-center gap-2 group cursor-pointer text-left"
-              title="На главную"
-            >
-              <span className="text-2xl leading-none select-none transition-transform group-hover:scale-110">🐘</span>
-              <div className="flex flex-col">
-                <span className="text-base sm:text-lg font-black tracking-tight text-slate-900 leading-tight">
-                  СлоноВет
-                </span>
-                <span className="hidden sm:inline-block text-[10px] font-bold text-emerald-700 tracking-wider uppercase leading-none">
-                  вет-контроль
-                </span>
-              </div>
-            </button>
+      <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-[0_2px_12px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-2 px-3 py-2 sm:flex-nowrap sm:px-6">
+          <button
+            type="button"
+            onClick={() => onNavigate?.('daily_shift')}
+            className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-1 text-left active:scale-[0.98]"
+            title="На главную"
+          >
+            <span className="text-xl leading-none" aria-hidden="true">🐘</span>
+            <span className="text-base font-black tracking-tight text-slate-950">СлоноВет</span>
+          </button>
 
-            {profile?.role === 'vet' && currentScreen === 'daily_shift' && (
-              <span className="hidden xl:inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wide text-teal-800 bg-teal-100/90 border border-teal-200/80 px-2.5 py-1 rounded-xl shadow-xs">
-                <Stethoscope size={12} className="stroke-[2.5]" />
-                Режим наблюдателя (Ветконтроль)
+          {onNavigate && (
+            <nav className="order-3 flex w-full items-center gap-1 rounded-2xl bg-slate-100 p-1 sm:order-2 sm:mx-auto sm:w-auto" aria-label="Основная навигация">
+              {DESKTOP_NAV.map(item => {
+                const isActive = currentScreen === item.id;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onNavigate(item.id)}
+                    className={`min-h-[44px] min-w-0 flex-1 rounded-xl px-2 text-xs font-extrabold transition-all active:scale-[0.98] sm:flex-none sm:px-3.5 ${
+                      isActive
+                        ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200'
+                        : 'text-slate-700 hover:bg-white/70 hover:text-slate-950'
+                    }`}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <span className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                      <Icon size={15} className={isActive ? 'text-emerald-700' : 'text-slate-500'} />
+                      <span>{item.label}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+
+          <div className="order-2 ml-auto flex items-center gap-1.5 sm:order-3 sm:ml-0">
+            <span className={`flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-black ${isOnline ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`} title={isOnline ? 'Онлайн — синхронизировано' : 'Оффлайн — данные сохранены локально'}>
+              {isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
+              <span className="hidden sm:inline">{isOnline ? 'Онлайн' : 'Оффлайн'}</span>
+            </span>
+            {profile && (
+              <span className="hidden items-center gap-1.5 rounded-xl bg-emerald-50 px-2 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-800 sm:inline-flex" title={profile.name}>
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                {profile.role === 'vet' ? 'Вет' : profile.role === 'admin' ? 'Админ' : 'Кипер'}
               </span>
             )}
-          </div>
-
-          {/* ПО ЦЕНТРУ: Центральная группа табов [Слоновник] | [Вет-Кабинет] | [Журнал] + Выбор даты со стрелками */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Центральная группа табов */}
-            {onNavigate && (
-              <nav className="hidden sm:flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-inner">
-                {DESKTOP_NAV.map(item => {
-                  const isActive = currentScreen === item.id || 
-                    (currentScreen === 'elephant_details' && item.id === 'elephants');
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onNavigate(item.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
-                        isActive
-                          ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80 font-black'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                      }`}
-                    >
-                      <Icon size={14} className={isActive ? 'text-emerald-700' : 'text-slate-400'} />
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            )}
-
-            {/* Быстрый выбор даты: < ДЕНЬ > */}
-            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-inner">
-              <button
-                type="button"
-                onClick={() => stepDate(-1)}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white transition-all active:scale-90 cursor-pointer"
-                title="Предыдущий день"
-              >
-                <ChevronLeft size={15} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsCalendarOpen(true)}
-                className="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-white text-xs font-bold text-slate-800 shadow-xs border border-slate-200/70 hover:bg-slate-50 transition active:scale-95 cursor-pointer whitespace-nowrap"
-                title="Выбрать дату дежурства"
-              >
-                <Calendar size={13} className="text-slate-500 shrink-0" />
-                <span className="whitespace-nowrap font-bold text-[11px] sm:text-xs">
-                  {formatCompactDate(selectedDate || todayStr)}
-                </span>
-                <ChevronDown size={13} className="text-slate-400 shrink-0" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => stepDate(1)}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white transition-all active:scale-90 cursor-pointer"
-                title="Следующий день"
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
-
-            {selectedDate !== todayStr && (
-              <button
-                type="button"
-                onClick={() => setSelectedDate(todayStr)}
-                className="hidden sm:inline-flex px-2.5 py-1 text-[11px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200/80 hover:bg-blue-100 rounded-xl transition cursor-pointer"
-                title="Вернуться к сегодняшнему дню"
-              >
-                К сегодня
-              </button>
-            )}
-          </div>
-
-          {/* СПРАВА: Инфо о сотруднике + Заметная кнопка «Меню» */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {profile && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/60 text-xs text-slate-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]" />
-                <span className="font-bold text-slate-800 max-w-[120px] truncate">{profile.name}</span>
-                <span className="text-[10px] text-slate-400 uppercase font-bold">
-                  {profile.role === 'vet' ? 'Вет' : profile.role === 'admin' ? 'Админ' : 'Кипер'}
-                </span>
-              </div>
-            )}
-
-            {/* Кнопка МЕНЮ — четкая, заметная и на ПК, и на мобильных */}
+            <button
+              type="button"
+              onClick={() => setIsCalendarOpen(true)}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-95"
+              title="Выбрать дату дежурства"
+            >
+              <Calendar size={16} className="text-slate-600" />
+              <span className="hidden sm:inline">{formatCompactDate(selectedDate || todayStr)}</span>
+            </button>
             <button
               type="button"
               onClick={onOpenMenu}
-              className="min-h-[42px] px-3.5 sm:px-4 py-2 rounded-2xl flex items-center gap-2 text-slate-800 bg-white hover:bg-slate-50 border border-slate-200/90 shadow-xs active:scale-95 transition-all cursor-pointer tap-target font-black text-xs"
-              aria-label="Меню навигации"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm transition hover:bg-slate-50 active:scale-95"
+              aria-label="Открыть меню"
             >
-              <Menu size={18} className="text-slate-700 stroke-[2.3]" />
-              <span className="inline font-bold text-xs tracking-tight">Меню</span>
+              <Menu size={19} className="stroke-[2.5]" />
             </button>
           </div>
         </div>
