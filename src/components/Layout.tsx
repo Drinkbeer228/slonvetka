@@ -15,10 +15,10 @@ interface LayoutProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'daily_shift',   label: 'Слоновник',   icon: Home,        role: 'all' },
-  { id: 'vet_dashboard', label: 'Вет-Кабинет', icon: Stethoscope, role: 'all' },
-  { id: 'journal',       label: 'Журнал',      icon: BookOpen,    role: 'all' },
-  { id: 'staff',         label: 'Сотрудники',  icon: Users,       role: 'admin' },
+  { id: 'daily_shift',   label: 'Слоновник',    icon: Home,        role: 'all' },
+  { id: 'vet_dashboard', label: 'Вет-дашборд',  icon: Stethoscope, role: 'all' },
+  { id: 'journal',       label: 'Журнал',       icon: BookOpen,    role: 'all' },
+  { id: 'staff',         label: 'Сотрудники',   icon: Users,       role: 'admin' },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -47,7 +47,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
     setDrawerOpen(false);
   };
 
-  const isVetDashboard = currentScreen === 'vet_dashboard';
+  const isVetDashboard = currentScreen === 'vet_dashboard' || currentScreen === 'vet_cabinet';
   const contentWidthClass = isVetDashboard 
     ? 'max-w-7xl px-2 sm:px-6' 
     : 'max-w-3xl lg:max-w-4xl px-3 sm:px-6';
