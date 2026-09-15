@@ -10,6 +10,7 @@ import { ElephantDetailsScreen } from './screens/ElephantDetailsScreen';
 import { AssignmentsScreen } from './screens/AssignmentsScreen';
 import { StaffScreen } from './screens/StaffScreen';
 import { VetDashboard } from './screens/VetDashboard';
+import { VetCabinetDashboard } from './components/VetCabinetDashboard';
 
 export default function App() {
   const { profile } = useStore();
@@ -39,6 +40,8 @@ export default function App() {
         return <DailyShiftPage />;
       case 'vet_dashboard':
         return <VetDashboard />;
+      case 'vet_cabinet':
+        return <VetCabinetDashboard onNavigate={handleNavigate} />;
       case 'today':
         return <TodayScreen onElephantClick={openElephantDetails} />;
       case 'journal':

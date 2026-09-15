@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, LogOut, Home, Stethoscope, HeartPulse, Moon, Sun,
   CheckCircle2, BookOpen, ClipboardList, Users 
@@ -15,10 +15,11 @@ interface LayoutProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'daily_shift',   label: 'Слоновник',   icon: Home,        role: 'all' },
-  { id: 'vet_dashboard', label: 'Вет-Кабинет', icon: Stethoscope, role: 'all' },
-  { id: 'journal',       label: 'Журнал',      icon: BookOpen,    role: 'all' },
-  { id: 'staff',         label: 'Сотрудники',  icon: Users,       role: 'admin' },
+  { id: 'daily_shift',   label: 'Слоновник',          icon: Home,          role: 'all' },
+  { id: 'vet_cabinet',   label: 'Веткабинет',         icon: Stethoscope,   role: 'all' },
+  { id: 'vet_dashboard', label: 'Назначения врача',   icon: ClipboardList, role: 'all' },
+  { id: 'journal',       label: 'Журнал',             icon: BookOpen,      role: 'all' },
+  { id: 'staff',         label: 'Сотрудники',         icon: Users,         role: 'admin' },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -42,12 +43,25 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   };
   const { profile, logout } = useStore();
 
+  useEffect(() => {
+    const syncTheme = () => {
+      setDarkMode(localStorage.getItem('slonovet_theme') === 'dark');
+    };
+
+    window.addEventListener('storage', syncTheme);
+    window.addEventListener('slonovet-theme-change', syncTheme as EventListener);
+    return () => {
+      window.removeEventListener('storage', syncTheme);
+      window.removeEventListener('slonovet-theme-change', syncTheme as EventListener);
+    };
+  }, []);
+
   const handleNav = (id: string) => {
     onNavigate(id);
     setDrawerOpen(false);
   };
 
-  const isVetDashboard = currentScreen === 'vet_dashboard';
+  const isVetDashboard = currentScreen === 'vet_dashboard' || currentScreen === 'vet_cabinet';
   const contentWidthClass = isVetDashboard 
     ? 'max-w-7xl px-2 sm:px-6' 
     : 'max-w-3xl lg:max-w-4xl px-3 sm:px-6';

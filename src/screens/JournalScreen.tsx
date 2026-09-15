@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import { formatTime, formatDate } from '../utils/dates';
 import { supabaseService } from '../services/supabaseService';
 import { TreatmentRecordWithPhotos } from '../types';
-import { Loader2, Plus } from 'lucide-react';
+import { AlertTriangle, Loader2, Plus, Search, WifiOff } from 'lucide-react';
 import { SyncManager } from '../services/SyncManager';
 import { getOfflineDb, TreatmentRecordQueueItem } from '../services/offlineDb';
 
@@ -19,6 +19,10 @@ export function JournalScreen() {
   const [pendingDrafts, setPendingDrafts] = useState<TreatmentRecordQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [observationModalOpen, setObservationModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [elephantFilter, setElephantFilter] = useState('all');
+  const [entryTypeFilter, setEntryTypeFilter] = useState<'all' | 'observation' | 'assignment'>('all');
+  const [syncFilter, setSyncFilter] = useState<'all' | 'pending' | 'syncing' | 'error' | 'synced'>('all');
   
   // Edit & Delete state for Vet
   const [editingRecord, setEditingRecord] = useState<TreatmentRecordWithPhotos | null>(null);
@@ -104,6 +108,75 @@ export function JournalScreen() {
     }
   };
 
+  const draftSummary = useMemo(() => {
+    return pendingDrafts.reduce<Record<'pending' | 'syncing' | 'error' | 'synced', number>>((acc, draft) => {
+      acc[draft.status] += 1;
+      return acc;
+    }, { pending: 0, syncing: 0, error: 0, synced: 0 });
+  }, [pendingDrafts]);
+
+  const filteredPendingDrafts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return pendingDrafts.filter(draft => {
+      const elephant = elephants.find(e => e.id === draft.payload.elephant_id);
+      const assignment = assignments.find(a => a.id === draft.payload.assignment_id);
+      const matchesQuery = !query || [
+        elephant?.name,
+        assignment?.title,
+        draft.payload.comment,
+        draft.payload.assessment,
+        draft.errorMessage,
+      ].some(value => value?.toLowerCase().includes(query));
+      const matchesElephant = elephantFilter === 'all' || draft.payload.elephant_id === elephantFilter;
+      const matchesType =
+        entryTypeFilter === 'all' ||
+        (entryTypeFilter === 'observation' ? !draft.payload.assignment_id : Boolean(draft.payload.assignment_id));
+      const matchesSync = syncFilter === 'all' || draft.status === syncFilter;
+      return matchesQuery && matchesElephant && matchesType && matchesSync;
+    });
+  }, [assignments, elephants, elephantFilter, entryTypeFilter, pendingDrafts, searchQuery, syncFilter]);
+
+  const filteredRecords = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (syncFilter !== 'all' && syncFilter !== 'synced') {
+      return [];
+    }
+    return [...records]
+      .sort((a, b) => new Date(b.performed_at).getTime() - new Date(a.performed_at).getTime())
+      .filter(record => {
+        const elephant = elephants.find(e => e.id === record.elephant_id);
+        const assignment = assignments.find(a => a.id === record.assignment_id);
+        const keeperName = record.keeper?.name || (record.keeper_id === profile?.id ? profile.name : '');
+        const matchesQuery = !query || [
+          elephant?.name,
+          assignment?.title,
+          record.comment,
+          record.assessment,
+          record.medicine_used,
+          keeperName,
+        ].some(value => value?.toLowerCase().includes(query));
+        const matchesElephant = elephantFilter === 'all' || record.elephant_id === elephantFilter;
+        const matchesType =
+          entryTypeFilter === 'all' ||
+          (entryTypeFilter === 'observation' ? !record.assignment_id : Boolean(record.assignment_id));
+        return matchesQuery && matchesElephant && matchesType;
+      });
+  }, [assignments, elephants, elephantFilter, entryTypeFilter, profile, records, searchQuery]);
+
+  const groupedRecords = useMemo(() => {
+    return filteredRecords.reduce<Array<{ label: string; items: TreatmentRecordWithPhotos[] }>>((acc, record) => {
+      const timestamp = new Date(record.performed_at).getTime();
+      const label = formatDate(timestamp);
+      const existing = acc.find(group => group.label === label);
+      if (existing) {
+        existing.items.push(record);
+      } else {
+        acc.push({ label, items: [record] });
+      }
+      return acc;
+    }, []);
+  }, [filteredRecords]);
+
   return (
     <div className="pb-8 space-y-6 mt-4">
       <div className="flex items-center justify-between mb-6">
@@ -123,6 +196,91 @@ export function JournalScreen() {
         )}
       </div>
 
+      <div className="rounded-3xl border border-white/70 bg-white/75 p-4 shadow-lg backdrop-blur-xl space-y-4">
+        <div className="flex items-center gap-2">
+          <Search size={16} className="text-slate-500" />
+          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Фильтры журнала</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label className="space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Поиск</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Слон, комментарий, препарат…"
+              className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-300"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Слон</span>
+            <select
+              value={elephantFilter}
+              onChange={(e) => setElephantFilter(e.target.value)}
+              className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-300"
+            >
+              <option value="all">Все слоны</option>
+              {elephants.map(elephant => (
+                <option key={elephant.id} value={elephant.id}>{elephant.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Тип записи</span>
+            <select
+              value={entryTypeFilter}
+              onChange={(e) => setEntryTypeFilter(e.target.value as typeof entryTypeFilter)}
+              className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-300"
+            >
+              <option value="all">Все типы</option>
+              <option value="assignment">Назначения</option>
+              <option value="observation">Наблюдения</option>
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Синхронизация</span>
+            <select
+              value={syncFilter}
+              onChange={(e) => setSyncFilter(e.target.value as typeof syncFilter)}
+              className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-300"
+            >
+              <option value="all">Все статусы</option>
+              <option value="pending">Ожидают сеть</option>
+              <option value="syncing">Синхронизация</option>
+              <option value="error">Есть ошибки</option>
+              <option value="synced">Уже синхронизировано</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {(pendingDrafts.length > 0 || draftSummary.error > 0) && (
+        <div className={`rounded-3xl border p-4 shadow-lg backdrop-blur-xl ${draftSummary.error > 0 ? 'border-amber-200 bg-amber-50/90' : 'border-sky-200 bg-sky-50/90'}`}>
+          <div className="flex items-start gap-3">
+            {draftSummary.error > 0 ? (
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" />
+            ) : (
+              <WifiOff size={18} className="mt-0.5 shrink-0 text-sky-700" />
+            )}
+            <div className="space-y-2">
+              <div>
+                <h2 className="text-sm font-black text-slate-900">Состояние офлайн-синхронизации</h2>
+                <p className="text-sm text-slate-600">
+                  {draftSummary.error > 0
+                    ? 'Есть записи, которым нужна повторная синхронизация.'
+                    : 'Часть журнала пока сохранена локально и будет отправлена при появлении сети.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-bold">
+                <span className="rounded-full bg-white/90 px-3 py-1 text-slate-700">Ожидают: {draftSummary.pending}</span>
+                <span className="rounded-full bg-white/90 px-3 py-1 text-slate-700">Синхронятся: {draftSummary.syncing}</span>
+                <span className="rounded-full bg-white/90 px-3 py-1 text-slate-700">Ошибки: {draftSummary.error}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -130,7 +288,7 @@ export function JournalScreen() {
           </div>
         ) : (
           <>
-            {pendingDrafts.map(draft => {
+            {filteredPendingDrafts.map(draft => {
               const elephant = elephants.find(e => e.id === draft.payload.elephant_id);
               const assignment = assignments.find(a => a.id === draft.payload.assignment_id);
               const title = assignment ? assignment.title : 'Внеплановая задача';
@@ -180,7 +338,7 @@ export function JournalScreen() {
 
                   <div className={`text-xs font-bold flex items-center justify-center gap-2 py-2 rounded-xl ${isError ? 'bg-slate-100 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
                     {isError ? (
-                      <>⏳ Сохранено локально (синхронизация...)</>
+                      <>⚠️ Ошибка синхронизации — запись сохранена локально</>
                     ) : isSyncing ? (
                       <><Loader2 size={14} className="animate-spin" />Синхронизация...</>
                     ) : (
@@ -191,21 +349,28 @@ export function JournalScreen() {
               );
             })}
 
-            {records.length === 0 && pendingDrafts.length === 0 ? (
+            {groupedRecords.length === 0 && filteredPendingDrafts.length === 0 ? (
               <div className="text-center py-12 text-zinc-400 font-medium bg-white rounded-3xl border border-zinc-200">
-                Записей пока нет
+                По текущим фильтрам записей не найдено
               </div>
             ) : (
-              records.map(record => (
-                <TreatmentRecordCard
-                  key={record.id}
-                  record={record}
-                  elephants={elephants}
-                  assignments={assignments}
-                  currentProfile={profile}
-                  onEdit={(rec) => setEditingRecord(rec)}
-                  onDelete={(rec) => setDeletingRecord(rec)}
-                />
+              groupedRecords.map(group => (
+                <section key={group.label} className="space-y-3">
+                  <div className="sticky top-[72px] z-10 inline-flex rounded-full border border-white/70 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-500 shadow-sm backdrop-blur-xl">
+                    {group.label}
+                  </div>
+                  {group.items.map(record => (
+                    <TreatmentRecordCard
+                      key={record.id}
+                      record={record}
+                      elephants={elephants}
+                      assignments={assignments}
+                      currentProfile={profile}
+                      onEdit={(rec) => setEditingRecord(rec)}
+                      onDelete={(rec) => setDeletingRecord(rec)}
+                    />
+                  ))}
+                </section>
               ))
             )}
           </>
@@ -242,4 +407,3 @@ export function JournalScreen() {
     </div>
   );
 }
-

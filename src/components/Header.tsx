@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Calendar, Menu, X, ChevronLeft, ChevronRight, Wifi, WifiOff,
-  Home, Stethoscope, BookOpen
+  BookOpen
 } from 'lucide-react';
 import { useStore } from '../store';
 import { shiftService } from '../services/shiftService';
 import { getTodayStr } from '../utils/dates';
+import { VetKeeperViewToggle } from './VetCabinetDashboard';
 
 interface HeaderProps {
   currentScreen: string;
@@ -13,11 +14,7 @@ interface HeaderProps {
   onNavigate?: (screen: string) => void;
 }
 
-const DESKTOP_NAV = [
-  { id: 'daily_shift',   label: 'Слоновник',   icon: Home },
-  { id: 'vet_dashboard', label: 'Вет-Кабинет', icon: Stethoscope },
-  { id: 'journal',       label: 'Журнал',      icon: BookOpen },
-];
+const JOURNAL_NAV = { id: 'journal', label: 'Журнал', icon: BookOpen };
 
 const getDaysInMonth = (year: number, month: number) => {
   return new Date(year, month, 0).getDate();
@@ -127,6 +124,8 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     return 'bg-emerald-600 border border-emerald-700 text-white font-black shadow-xs hover:bg-emerald-700';
   };
 
+  const showViewToggle = currentScreen === 'daily_shift' || currentScreen === 'vet_cabinet';
+
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-[0_2px_12px_rgba(15,23,42,0.06)] backdrop-blur-xl">
@@ -142,29 +141,35 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
           </button>
 
           {onNavigate && (
-            <nav className="order-3 flex w-full items-center gap-1 rounded-2xl bg-slate-100 p-1 sm:order-2 sm:mx-auto sm:w-auto" aria-label="Основная навигация">
-              {DESKTOP_NAV.map(item => {
-                const isActive = currentScreen === item.id;
-                const Icon = item.icon;
+            <nav className="order-3 flex w-full items-center gap-2 sm:order-2 sm:mx-auto sm:w-auto" aria-label="Основная навигация">
+              {showViewToggle && (
+                <VetKeeperViewToggle
+                  value={currentScreen}
+                  onChange={onNavigate}
+                  className="flex-1 sm:flex-none"
+                />
+              )}
+              {(() => {
+                const isActive = currentScreen === JOURNAL_NAV.id;
+                const Icon = JOURNAL_NAV.icon;
                 return (
                   <button
-                    key={item.id}
                     type="button"
-                    onClick={() => onNavigate(item.id)}
-                    className={`min-h-[44px] min-w-0 flex-1 rounded-xl px-2 text-xs font-extrabold transition-all active:scale-[0.98] sm:flex-none sm:px-3.5 ${
+                    onClick={() => onNavigate(JOURNAL_NAV.id)}
+                    className={`min-h-[44px] rounded-2xl border border-white/60 bg-white/70 px-3 text-xs font-extrabold shadow-sm backdrop-blur-xl transition-all active:scale-[0.98] ${
                       isActive
-                        ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200'
-                        : 'text-slate-700 hover:bg-white/70 hover:text-slate-950'
+                        ? 'text-slate-950 ring-1 ring-slate-200'
+                        : 'text-slate-700 hover:bg-white hover:text-slate-950'
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                   >
                     <span className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                       <Icon size={15} className={isActive ? 'text-emerald-700' : 'text-slate-500'} />
-                      <span>{item.label}</span>
+                      <span>{JOURNAL_NAV.label}</span>
                     </span>
                   </button>
                 );
-              })}
+              })()}
             </nav>
           )}
 
