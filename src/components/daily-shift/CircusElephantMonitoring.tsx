@@ -716,7 +716,7 @@ export function CircusElephantMonitoring({
                 checked={Boolean(metrics.dust_bathing)}
                 disabled={isLocked}
                 onChange={(e) => handleBooleanChange('dust_bathing', e.target.checked)}
-                className="h-5 w-5 rounded-md border-slate-300 text-emerald-600"
+                className="h-5 w-5 rounded-md border-slate-300 bg-white text-emerald-600 dark:border-slate-600 dark:bg-slate-900/80 dark:text-emerald-400"
               />
             </span>
           </label>
@@ -770,7 +770,7 @@ export function CircusElephantMonitoring({
                 checked={foreignObjectSuspected}
                 disabled={isLocked}
                 onChange={(e) => handleBooleanChange('foreign_object_suspected', e.target.checked)}
-                className="h-5 w-5 rounded-md border-slate-300 text-rose-600"
+                className="h-5 w-5 rounded-md border-slate-300 bg-white text-rose-600 dark:border-slate-600 dark:bg-slate-900/80 dark:text-rose-400"
               />
             </span>
           </label>
