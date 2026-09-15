@@ -68,6 +68,70 @@ export interface ElephantDailyMetrics {
   notes?: string;
   /** Фотографии за смену (хранятся как base64 dataUrl) */
   photos?: ShiftPhoto[];
+  /** Тонус хобота */
+  trunk_tone?: string | null;
+  /** Дыхание */
+  breathing_observation?: string | null;
+  /** Состояние кончика хобота */
+  trunk_tip_condition?: string | null;
+  /** Носовые выделения */
+  nasal_discharge?: string | null;
+  /** Пылевая/грязевая ванна */
+  dust_bathing?: boolean;
+  /** Работа ушами */
+  ear_flapping?: string | null;
+  /** Состояние височных желез */
+  temporal_glands?: string | null;
+  /** Наблюдения по глазам */
+  eye_observations?: string[];
+  /** Поедаемость */
+  feed_consumption?: string | null;
+  /** Выборочное поедание */
+  selective_eating?: string;
+  /** Подозрение на инородку */
+  foreign_object_suspected?: boolean;
+  /** Примечание по инородке */
+  foreign_object_note?: string;
+  /** Оценка походки */
+  gait_assessment?: string | null;
+  /** Какая нога бережется */
+  favored_leg?: string | null;
+  /** Теплота копытного башмака/венчика */
+  hoof_warmth?: string | null;
+  /** Реакция в манеже / на репетиции */
+  arena_reaction?: string | null;
+}
+
+export function createDefaultElephantMetrics(shiftId: string, elephantId: string): ElephantDailyMetrics {
+  return {
+    shift_id: shiftId,
+    elephant_id: elephantId,
+    poop_count: 0,
+    feces_traits: ['Сформирован (норма)'],
+    urination_count: 0,
+    urination_traits: ['Прозрачная (норма)'],
+    behavior: 'Спокойная / В норме',
+    sleep_minutes: 0,
+    sleep_intervals: [],
+    notes: '',
+    photos: [],
+    trunk_tone: null,
+    breathing_observation: null,
+    trunk_tip_condition: null,
+    nasal_discharge: null,
+    dust_bathing: false,
+    ear_flapping: null,
+    temporal_glands: null,
+    eye_observations: [],
+    feed_consumption: null,
+    selective_eating: '',
+    foreign_object_suspected: false,
+    foreign_object_note: '',
+    gait_assessment: null,
+    favored_leg: null,
+    hoof_warmth: null,
+    arena_reaction: null,
+  };
 }
 
 /** Валидирует счётчик физиологии (не отрицательный, не аномально большой) */

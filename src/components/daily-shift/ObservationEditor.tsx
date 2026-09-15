@@ -107,8 +107,10 @@ export function ObservationEditor({
       <CircusElephantMonitoring
         elephant={elephant}
         selectedDate={selectedDate || new Date().toISOString().split('T')[0]}
+        metrics={metrics}
         notes={metrics.notes || ''}
         isLocked={isLocked}
+        onMetricChange={onMetricChange}
         onAppendLog={handleAppendLogToNotes}
         onAddMediaLog={handleAddMediaLog}
       />

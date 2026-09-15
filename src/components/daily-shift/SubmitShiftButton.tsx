@@ -43,7 +43,10 @@ export function SubmitShiftButton({
   const label = text || defaultText;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-40 pointer-events-none">
+    <div
+      className="fixed left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-40 pointer-events-none"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}
+    >
       <button
         type="button"
         disabled={disabled || isLoading}
