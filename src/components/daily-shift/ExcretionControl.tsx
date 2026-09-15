@@ -516,12 +516,8 @@ export function ExcretionControl({
                           : 'bg-slate-50/80 dark:bg-slate-900/60'
                       }`}
                     >
-                      <span className="text-[10px] font-black tracking-wider text-violet-700 flex items-center justify-center gap-1 uppercase dark:text-violet-300">
-                        🌙 СОН
-                      </span>
-                      <span className="text-2xl font-black text-slate-950 leading-none dark:text-slate-100">
-                        {formatTotalSleepHours(sleepMinutes)}
-                      </span>
+                      
+                      <span className="text-3xl font-mono font-black text-slate-950 leading-none dark:text-slate-100">{formatTotalSleepHours(sleepMinutes)}</span>
                     </div>
 
                     {/* Кнопка [-] */}
@@ -538,6 +534,8 @@ export function ExcretionControl({
                       −
                     </button>
                   </div>
+
+                  
                 </div>
               );
             }
@@ -632,14 +630,8 @@ export function ExcretionControl({
                   <div
                     className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[60px] transition-colors ${displayCardBgClass}`}
                   >
-                    <span
-                      className={`text-[10px] font-black tracking-wider flex items-center justify-center gap-1 uppercase ${labelTextColorClass}`}
-                    >
-                      {activeTab === 'stool' ? '💩 КУЧИ' : '💧 ЛУЖИ'}
-                    </span>
-                    <span className="text-2xl font-black text-slate-950 leading-none dark:text-slate-100">
-                      {count}
-                    </span>
+                    
+                    <span className="text-4xl font-mono font-black text-slate-950 leading-none dark:text-slate-100">{count}</span>
                   </div>
 
                   {/* Кнопка декремента [-] */}
@@ -656,6 +648,8 @@ export function ExcretionControl({
                     −
                   </button>
                 </div>
+
+                
               </div>
             );
           })}
@@ -665,24 +659,9 @@ export function ExcretionControl({
       {/* ─── ХАРАКТЕР И ОСОБЕННОСТИ СТУЛА / МОЧИ / СНА ─── */}
       <div className="px-4 pb-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
         {/* Заголовок секции с бейджем статуса */}
-        <div className="flex items-center justify-between px-0.5 mb-2.5">
-          <span className="text-xs font-black tracking-wider text-slate-900 uppercase flex items-center gap-1.5 dark:text-slate-200">
-            {activeTab === 'stool' && '💩 ХАРАКТЕР И ОСОБЕННОСТИ СТУЛА'}
-            {activeTab === 'urine' && '💧 ХАРАКТЕР И ОСОБЕННОСТИ МОЧИ'}
-            {activeTab === 'sleep' && '🌙 ХАРАКТЕР И ОСОБЕННОСТИ СНА'}
-          </span>
-
-          {/* Синхронный бейдж: показывает выбранный статус перед нажатием '+' */}
-          <span
-            className={`text-[10px] font-black px-2.5 py-0.5 rounded-full transition-all border ${
-              isCurrentTraitAnomaly
-                ? 'bg-rose-100 text-rose-900 border-rose-300 shadow-xs dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800'
-                : 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-            }`}
-          >
-            {isCurrentTraitAnomaly ? 'Внимание ⚠️' : 'Норма'}
-          </span>
-        </div>
+        <div className="font-bold text-slate-900 text-sm tracking-tight px-1 mb-2">
+            Характер и особенности
+          </div>
 
         {/* Сетка из 4 чипсов (2х2, как на скриншоте) */}
         <div className="grid grid-cols-2 gap-2">
@@ -690,17 +669,16 @@ export function ExcretionControl({
             const isSelected = currentSelectedTrait === trait;
             const isWarning = trait.includes('⚠️');
 
-            let chipClasses = 'bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200/70 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700';
+            let chipClasses = 'bg-white text-slate-700 border border-slate-200 shadow-sm';
             if (isSelected) {
               if (isWarning) {
-                chipClasses = 'bg-rose-100 text-rose-950 border-2 border-rose-500 shadow-sm ring-2 ring-rose-400/30 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-500';
+                chipClasses = 'bg-rose-500 text-white shadow-md ring-2 ring-rose-300';
               } else {
-                chipClasses = 'bg-slate-900 text-white border border-slate-900 shadow-md dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100';
+                chipClasses = 'bg-amber-500 text-white shadow-md ring-2 ring-amber-300';
               }
             } else if (isWarning) {
-              chipClasses = 'bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100 dark:bg-slate-800/60 dark:text-rose-300 dark:border-rose-900/60';
+              chipClasses = 'bg-rose-50 text-rose-800 border border-rose-200';
             }
-
             return (
               <button
                 key={trait}

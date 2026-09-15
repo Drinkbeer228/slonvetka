@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  X, LogOut, Home, Stethoscope, HeartPulse, Moon, Sun,
-  CheckCircle2, BookOpen, ClipboardList, Users 
+import { X, LogOut, Home, Stethoscope, HeartPulse, Moon, Sun, Trophy,
+  CheckCircle2, BookOpen, History, ClipboardList, Users 
 } from 'lucide-react';
 import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
 import { Header } from './Header';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { ShiftWheelModal } from './daily-shift/ShiftWheelModal';
 import { canManageUsers } from '../lib/permissions';
 import { ROLE_LABELS } from '../types/roles';
 
@@ -17,16 +17,17 @@ interface LayoutProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'daily_shift',   label: 'Слоновник',          icon: Home,          role: 'all' },
-  { id: 'vet_cabinet',   label: 'Веткабинет',         icon: Stethoscope,   role: 'all' },
-  { id: 'vet_dashboard', label: 'Назначения врача',   icon: ClipboardList, role: 'all' },
-  { id: 'journal',       label: 'Журнал',             icon: BookOpen,      role: 'all' },
-  { id: 'staff',         label: 'Сотрудники',         icon: Users,         role: 'admin' },
+  { id: 'daily_shift',   label: 'Слоновник',              icon: Home,          role: 'all' },
+  { id: 'vet_cabinet',   label: 'Веткабинет',             icon: Stethoscope,   role: 'all' },
+  { id: 'journal',       label: 'Архив смен и хроника',   icon: History,       role: 'all' },
+  { id: 'vet_dashboard', label: 'Назначения врача',       icon: ClipboardList, role: 'all' },
+  { id: 'staff',         label: 'Сотрудники',             icon: Users,         role: 'admin' },
 ];
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  const [wheelOpen, setWheelOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('slonovet_theme') === 'dark');
 
   const toggleTheme = () => {
@@ -75,7 +76,7 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
       />
 
       {/* MAIN CONTENT */}
-      <main className={`flex-1 w-full mx-auto pb-16 transition-all ${contentWidthClass}`}>
+      <main className={`flex-1 w-full mx-auto pt-14 transition-all ${contentWidthClass}`}>
         {children}
       </main>
 
@@ -159,6 +160,15 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
               </button>
             );
           })}
+          <div className="px-4 py-2 mt-2">
+            <button
+              onClick={() => { setWheelOpen(true); setDrawerOpen(false); }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-[16px] font-black text-sm transition-all active:scale-95 shadow-md shadow-amber-500/20 bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              <Trophy size={18} />
+              Жребий смены (Колесо)
+            </button>
+          </div>
         </nav>
 
         {/* Профиль + выход */}

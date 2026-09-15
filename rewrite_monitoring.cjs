@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+const fs = require('fs');
+
+const content = `import React, { useState } from 'react';
 import { Camera, AlertTriangle, Play, Sparkles } from 'lucide-react';
 
 export interface CircusElephantMonitoringProps {
@@ -39,9 +41,9 @@ export function CircusElephantMonitoring({ elephant, metrics, isLocked, onMetric
   ];
 
   return (
-    <div className="space-y-2 pb-12">
+    <div className="space-y-4 pb-12">
       {/* Stereotypies */}
-      <div className="bg-purple-50/50 rounded-[24px] p-2.5 border border-purple-200/60 shadow-sm">
+      <div className="bg-purple-50/50 rounded-[24px] p-4 border border-purple-200/60 shadow-sm">
         <h3 className="font-black text-purple-900 text-sm mb-3">Стереотипии</h3>
         <div className="grid grid-cols-2 gap-2">
           {stereotypies.map(s => (
@@ -83,7 +85,7 @@ export function CircusElephantMonitoring({ elephant, metrics, isLocked, onMetric
       )}
 
       {/* Anxiety Markers */}
-      <div className="bg-rose-50/50 rounded-[24px] p-2.5 border border-rose-200/60 shadow-sm space-y-3">
+      <div className="bg-rose-50/50 rounded-[24px] p-4 border border-rose-200/60 shadow-sm space-y-3">
         <h3 className="font-black text-rose-900 text-sm flex items-center gap-2"><AlertTriangle size={16} /> Тревожные маркеры (Отклонения)</h3>
         
         {/* Lameness */}
@@ -95,7 +97,7 @@ export function CircusElephantMonitoring({ elephant, metrics, isLocked, onMetric
                 key={leg.id}
                 onClick={() => onMetricChange('favored_leg', leg.id)}
                 disabled={isLocked}
-                className={`flex-1 py-2.5 rounded-xl font-black text-xs transition-all active:scale-95 ${metrics.favored_leg === leg.id ? 'bg-rose-500 text-white shadow-md' : 'bg-white border border-rose-200 text-rose-700'}`}
+                className={\`flex-1 py-2.5 rounded-xl font-black text-xs transition-all active:scale-95 \${metrics.favored_leg === leg.id ? 'bg-rose-500 text-white shadow-md' : 'bg-white border border-rose-200 text-rose-700'}\`}
               >
                 {leg.label}
               </button>
@@ -107,10 +109,10 @@ export function CircusElephantMonitoring({ elephant, metrics, isLocked, onMetric
         <div className="space-y-2 pt-2 border-t border-rose-200/50">
            <div className="font-bold text-xs text-rose-800">Дыхание и хобот</div>
            <div className="grid grid-cols-1 gap-2">
-              <button disabled={isLocked} onClick={() => onMetricChange('trunk_tone', 'Вялый / Висит плетью')} className={`py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all active:scale-95 ${metrics.trunk_tone === 'Вялый / Висит плетью' ? 'bg-rose-500 text-white' : 'bg-white border border-rose-200 text-rose-700'}`}>
+              <button disabled={isLocked} onClick={() => onMetricChange('trunk_tone', 'Вялый / Висит плетью')} className={\`py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all active:scale-95 \${metrics.trunk_tone === 'Вялый / Висит плетью' ? 'bg-rose-500 text-white' : 'bg-white border border-rose-200 text-rose-700'}\`}>
                 ⚠️ Хобот плетью
               </button>
-              <button disabled={isLocked} onClick={() => onMetricChange('breathing', 'Сопение / Хрип')} className={`py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all active:scale-95 ${metrics.breathing === 'Сопение / Хрип' ? 'bg-rose-500 text-white' : 'bg-white border border-rose-200 text-rose-700'}`}>
+              <button disabled={isLocked} onClick={() => onMetricChange('breathing', 'Сопение / Хрип')} className={\`py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all active:scale-95 \${metrics.breathing === 'Сопение / Хрип' ? 'bg-rose-500 text-white' : 'bg-white border border-rose-200 text-rose-700'}\`}>
                 ⚠️ Сопение / Хрип
               </button>
               <button disabled={isLocked} className="py-3 rounded-xl font-black text-xs flex items-center justify-center bg-white border border-rose-200 text-rose-700 active:scale-95">
@@ -121,7 +123,7 @@ export function CircusElephantMonitoring({ elephant, metrics, isLocked, onMetric
       </div>
 
       {/* Hoof Day */}
-      <div className="bg-sky-50 rounded-[24px] p-2.5 border border-sky-200 shadow-sm flex items-center justify-between">
+      <div className="bg-sky-50 rounded-[24px] p-4 border border-sky-200 shadow-sm flex items-center justify-between">
         <div>
           <h3 className="font-black text-sky-900 text-sm">День копыт</h3>
           <p className="text-[10px] font-bold text-sky-700/80">Осмотр подошвы и ногтей</p>
@@ -134,3 +136,5 @@ export function CircusElephantMonitoring({ elephant, metrics, isLocked, onMetric
     </div>
   );
 }
+`;
+fs.writeFileSync('src/components/daily-shift/CircusElephantMonitoring.tsx', content);

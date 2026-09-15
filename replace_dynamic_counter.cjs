@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+const fs = require('fs');
+
+const content = `import React, { useState } from 'react';
 import { Plus, Minus, Search, MousePointer2 } from 'lucide-react';
 
 export interface CounterItem {
@@ -11,16 +13,12 @@ export interface CounterItem {
 }
 
 export interface DynamicCounterSectionProps {
-  counters?: CounterItem[];
-  onChange?: (items: CounterItem[]) => void;
+  counters: CounterItem[];
+  onChange: (items: CounterItem[]) => void;
   isLocked?: boolean;
-  selectedDate?: string;
-  dutyKeeperName?: string;
-  onStatsChange?: (stats: any) => void;
-  onAddEvent?: (title: any, icon: any, type: any, id: any) => void;
 }
 
-export function DynamicCounterSection({ counters = [], onChange, isLocked, onStatsChange, onAddEvent }: DynamicCounterSectionProps) {
+export function DynamicCounterSection({ counters, onChange, isLocked }: DynamicCounterSectionProps) {
   const [selectedIncident, setSelectedIncident] = useState('🧹 Метла съедена');
   const [customIncident, setCustomIncident] = useState('');
   const [washZone, setWashZone] = useState<string | null>(null);
@@ -68,7 +66,7 @@ export function DynamicCounterSection({ counters = [], onChange, isLocked, onSta
   const totalDamage = counters.filter(c => incidents.includes(c.id) || !['elephants_washed', 'carpets_cleaned', 'wheelbarrows_dumped', 'wash_legs', 'wash_croup', 'wash_side'].includes(c.id)).reduce((acc, c) => acc + c.count, 0);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {/* 2x2 Grid */}
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-white p-3 rounded-2xl border border-slate-200 flex items-center justify-between shadow-sm">
@@ -110,21 +108,21 @@ export function DynamicCounterSection({ counters = [], onChange, isLocked, onSta
       </div>
 
       {/* Incident Drum Picker */}
-      <div className="bg-rose-50/50 rounded-[24px] p-2.5 border border-rose-200 shadow-sm mt-2.5">
+      <div className="bg-rose-50/50 rounded-[24px] p-4 border border-rose-200 shadow-sm mt-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-black text-rose-900 text-sm">Барабан поломок</h3>
           <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">Инциденты: {totalDamage}</span>
         </div>
         
-        <div className="flex flex-col gap-3">
+        <div className="flex gap-3 h-[140px]">
           {/* Mock iOS Wheel Picker */}
-          <div className="flex-1 bg-white rounded-[20px] shadow-inner border border-slate-200 p-2 flex flex-col gap-2">
-            
+          <div className="flex-1 bg-white rounded-[20px] shadow-inner overflow-y-auto snap-y snap-mandatory border border-slate-200 scrollbar-hide py-[50px] relative">
+            <div className="absolute top-1/2 left-0 right-0 h-[40px] -mt-[20px] bg-rose-50/50 border-y border-rose-200 pointer-events-none"></div>
             {incidents.map((incident, i) => (
               <div 
                 key={i} 
                 onClick={() => setSelectedIncident(incident)}
-                className={`p-2 flex items-center justify-center text-sm font-bold transition-all cursor-pointer rounded-xl ${selectedIncident === incident ? 'text-slate-900 scale-110' : 'text-slate-400 opacity-60'}`}
+                className={\`h-[40px] snap-center flex items-center justify-center text-sm font-bold transition-all cursor-pointer \${selectedIncident === incident ? 'text-slate-900 scale-110' : 'text-slate-400 opacity-60'}\`}
               >
                 {incident}
               </div>
@@ -155,3 +153,5 @@ export function DynamicCounterSection({ counters = [], onChange, isLocked, onSta
     </div>
   );
 }
+`;
+fs.writeFileSync('src/components/daily-shift/DynamicCounterSection.tsx', content);

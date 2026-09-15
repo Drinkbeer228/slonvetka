@@ -33,7 +33,7 @@ export function ShiftActivityFeed({ events, currentUserId, onUndo }: ShiftActivi
         <History size={18} className="text-slate-500" />
         <h3 className="font-bold text-slate-700 text-sm">Лента смены (события)</h3>
       </div>
-      <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto">
+      <div className="p-2 space-y-1 ] overflow-visible">
         {events.map(event => {
           const isAuthor = event.keeper_id === currentUserId;
           const ageMinutes = (now - event.timestamp) / 1000 / 60;

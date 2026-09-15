@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+const fs = require('fs');
+
+const content = `import React, { useState } from 'react';
 import { Users, ArrowRight } from 'lucide-react';
 
 export interface SocialDynamicsSectionProps {
@@ -20,11 +22,11 @@ export function SocialDynamicsSection({ elephantId, onAddEvent, isLocked }: Soci
 
   const handleChipTap = (chip: any) => {
     if (isLocked) return;
-    onAddEvent(`${chip.label}: ${elephantId} ➔ ${targetElephant}`, chip.icon);
+    onAddEvent(\`\${chip.label}: \${elephantId} ➔ \${targetElephant}\`, chip.icon);
   };
 
   return (
-    <div className="bg-fuchsia-50/50 rounded-[24px] p-2.5 border border-fuchsia-200/60 shadow-sm mt-2.5">
+    <div className="bg-fuchsia-50/50 rounded-[24px] p-4 border border-fuchsia-200/60 shadow-sm mt-4">
       <div className="flex flex-col mb-4">
         <h3 className="font-black text-fuchsia-900 text-sm flex items-center gap-2 mb-2">
           <Users size={16} /> Социальная динамика
@@ -61,3 +63,5 @@ export function SocialDynamicsSection({ elephantId, onAddEvent, isLocked }: Soci
     </div>
   );
 }
+`;
+fs.writeFileSync('src/components/daily-shift/SocialDynamicsSection.tsx', content);

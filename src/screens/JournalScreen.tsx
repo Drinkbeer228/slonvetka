@@ -181,8 +181,8 @@ export function JournalScreen() {
     <div className="pb-8 space-y-6 mt-4">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Журнал процедур</h1>
-          <p className="text-zinc-500 font-medium text-sm mt-1">История всех выполненных задач</p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">Архив смен и хроника</h1>
+          <p className="text-zinc-500 font-medium text-sm mt-1">Сквозная хроника по слонам: динамика симптомов, отеки ног, стереотипии и история процедур</p>
         </div>
         {profile && (
           <button 
@@ -194,6 +194,34 @@ export function JournalScreen() {
             <span className="sm:hidden">Наблюдение</span>
           </button>
         )}
+      </div>
+
+      {/* Быстрые фильтры симптомов */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mt-2">
+        {[
+          { label: 'Все записи', query: '' },
+          { label: '🦶 Ноги & Отеки', query: 'ног' },
+          { label: '🌀 Стереотипии', query: 'стереотип' },
+          { label: '💩 ЖКТ & Стул', query: 'стул' },
+          { label: '🥣 Аппетит & Корм', query: 'корм' },
+          { label: '🐘 Тонус хобота', query: 'хобот' },
+        ].map(filter => {
+          const isActive = searchQuery === filter.query;
+          return (
+            <button
+              key={filter.label}
+              type="button"
+              onClick={() => setSearchQuery(filter.query)}
+              className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-black transition-all active:scale-95 whitespace-nowrap border cursor-pointer ${
+                isActive
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200/80 shadow-2xs'
+              }`}
+            >
+              {filter.label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="rounded-3xl border border-white/70 bg-white/75 p-4 shadow-lg backdrop-blur-xl space-y-4">

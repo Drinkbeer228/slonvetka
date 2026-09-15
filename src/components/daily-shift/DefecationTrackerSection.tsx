@@ -407,7 +407,7 @@ export function DefecationTrackerSection({
         </button>
 
         {isHistoryOpen && (
-          <div className="mt-2 space-y-1.5 max-h-56 overflow-y-auto pr-1 thin-scroll animate-fadeIn">
+          <div className="mt-2 space-y-1.5  overflow-visible pr-1 thin-scroll animate-fadeIn">
             {activeEntries.length === 0 ? (
               <div className="py-4 text-center text-xs text-slate-400">
                 За эту смену дефекация еще не отмечалась

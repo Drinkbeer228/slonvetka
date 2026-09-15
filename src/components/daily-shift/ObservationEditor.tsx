@@ -4,7 +4,7 @@ import { Elephant } from '../../types';
 import { X } from 'lucide-react';
 import { ExcretionControl } from './ExcretionControl';
 import { ObservationJournal } from './ObservationJournal';
-import { CircusElephantMonitoring } from './CircusElephantMonitoring';
+
 import { ShiftPhoto } from '../../types/shift';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   metrics: ElephantDailyMetrics;
   selectedDate?: string;
   isLocked: boolean;
+  onSelectElephant?: (id: string) => void;
   onMetricChange: (field: string, value: any) => void;
   onAllMetricChange?: (elephantId: string, field: keyof ElephantDailyMetrics, value: any) => void;
   onTraitToggle: (field: 'feces_traits' | 'urination_traits', trait: string) => void;
@@ -30,6 +31,7 @@ export function ObservationEditor({
   metrics,
   selectedDate,
   isLocked,
+  onSelectElephant,
   onMetricChange,
   onAllMetricChange,
   onTraitToggle,
@@ -104,16 +106,7 @@ export function ObservationEditor({
       })()}
 
       {/* ЦИРКОВАЯ СПЕЦИФИКА НАБЛЮДЕНИЙ ДЛЯ ВЫБРАННОГО СЛОНА: ЗАМЫВКА, СТЕРЕОТИПИИ, МОНИТОРИНГ НОГ */}
-      <CircusElephantMonitoring
-        elephant={elephant}
-        selectedDate={selectedDate || new Date().toISOString().split('T')[0]}
-        metrics={metrics}
-        notes={metrics.notes || ''}
-        isLocked={isLocked}
-        onMetricChange={onMetricChange}
-        onAppendLog={handleAppendLogToNotes}
-        onAddMediaLog={handleAddMediaLog}
-      />
+      
 
       {/* NOTES SECTION */}
       <ObservationJournal

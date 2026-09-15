@@ -139,12 +139,34 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     return 'bg-emerald-600 border border-emerald-700 text-white font-black shadow-xs hover:bg-emerald-700';
   };
 
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY < 10) {
+        setIsVisible(true);
+      } else if (currentScrollY > lastScrollY) {
+        setIsVisible(false);
+      } else {
+        setIsVisible(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
+
   const showViewToggle = currentScreen === 'daily_shift' || currentScreen === 'vet_cabinet';
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-[0_2px_12px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-2 px-3 py-2 sm:flex-nowrap sm:px-6">
+      <header 
+        className={`fixed top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-[0_2px_12px_rgba(15,23,42,0.06)] backdrop-blur-xl transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}
+      >
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-3 sm:px-6">
           <button
             type="button"
             onClick={() => onNavigate?.('daily_shift')}
@@ -155,50 +177,11 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
             <span className="text-base font-black tracking-tight text-slate-950">СлоноВет</span>
           </button>
 
-          {onNavigate && (
-            <nav className="order-3 flex w-full items-center gap-2 sm:order-2 sm:mx-auto sm:w-auto" aria-label="Основная навигация">
-              {showViewToggle && (
-                <VetKeeperViewToggle
-                  value={currentScreen}
-                  onChange={onNavigate}
-                  className="flex-1 sm:flex-none"
-                />
-              )}
-              {(() => {
-                const isActive = currentScreen === JOURNAL_NAV.id;
-                const Icon = JOURNAL_NAV.icon;
-                return (
-                  <button
-                    type="button"
-                    onClick={() => onNavigate(JOURNAL_NAV.id)}
-                    className={`min-h-[44px] rounded-2xl border border-white/60 bg-white/70 px-3 text-xs font-extrabold shadow-sm backdrop-blur-xl transition-all active:scale-[0.98] ${
-                      isActive
-                        ? 'text-slate-950 ring-1 ring-slate-200'
-                        : 'text-slate-700 hover:bg-white hover:text-slate-950'
-                    }`}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <span className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                      <Icon size={15} className={isActive ? 'text-emerald-700' : 'text-slate-500'} />
-                      <span>{JOURNAL_NAV.label}</span>
-                    </span>
-                  </button>
-                );
-              })()}
-            </nav>
-          )}
-
-          <div className="order-2 ml-auto flex items-center gap-1.5 sm:order-3 sm:ml-0">
+          <div className="flex items-center gap-1.5">
             <span className={`flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-black ${isOnline ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`} title={isOnline ? 'Онлайн — синхронизировано' : 'Оффлайн — данные сохранены локально'}>
               {isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
               <span className="hidden sm:inline">{isOnline ? 'Онлайн' : 'Оффлайн'}</span>
             </span>
-            {profile && (
-              <span className={`hidden items-center gap-1.5 rounded-xl px-2 py-1.5 text-[10px] font-black uppercase tracking-wide sm:inline-flex ${roleBadgeClass}`} title={profile.name}>
-                <span className={`h-2 w-2 rounded-full ${roleDotClass}`} />
-                {ROLE_SHORT_LABELS[profile.role] ?? 'Сотр.'}
-              </span>
-            )}
             <button
               type="button"
               onClick={() => setIsCalendarOpen(true)}
@@ -366,8 +349,22 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
                 </div>
               </div>
 
-              {selectedDate !== todayStr && (
-                <div className="flex justify-end pt-1">
+              <div className="flex items-center justify-between pt-1">
+                {onNavigate ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onNavigate('journal');
+                      setIsCalendarOpen(false);
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <BookOpen size={13} className="text-slate-500" />
+                    <span>Архив смен</span>
+                  </button>
+                ) : <div />}
+
+                {selectedDate !== todayStr && (
                   <button
                     type="button"
                     onClick={() => {
@@ -378,8 +375,8 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
                   >
                     К сегодня
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

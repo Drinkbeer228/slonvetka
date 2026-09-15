@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+let code = fs.readFileSync('src/components/daily-shift/SubmitShiftButton.tsx', 'utf8');
+
+const newComponent = `import React, { useState, useEffect } from 'react';
 import { AlertCircle, Check, Loader2, Clock } from 'lucide-react';
 
 export interface SubmitShiftButtonProps {
@@ -29,7 +32,7 @@ export function SubmitShiftButton({
       
       const h = Math.floor(diff / (1000 * 60 * 60));
       const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+      setTimeLeft(\`\${h.toString().padStart(2, '0')}:\${m.toString().padStart(2, '0')}\`);
     };
     
     updateTimer();
@@ -89,3 +92,6 @@ export function SubmitShiftButton({
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/components/daily-shift/SubmitShiftButton.tsx', newComponent);
