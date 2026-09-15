@@ -29,7 +29,7 @@ const tempSupabase = createClient(
 interface StaffProfile {
   id: string;
   name: string;
-  role: UserRole;
+  role: UserRole | 'unknown';
 }
 
 export function StaffScreen() {
@@ -55,8 +55,11 @@ export function StaffScreen() {
         .order('name');
       
       if (error) throw error;
-      const normalizedStaff = (data || [])
-        .filter((member): member is { id: string; name: string; role: UserRole } => isUserRole(member.role));
+      const normalizedStaff: StaffProfile[] = (data || []).map((member) => ({
+        id: member.id,
+        name: member.name,
+        role: isUserRole(member.role) ? member.role : 'unknown',
+      }));
       setStaff(normalizedStaff);
     } catch (err) {
       console.error(err);
@@ -176,9 +179,11 @@ export function StaffScreen() {
                       ? 'bg-blue-50 text-blue-600'
                       : member.role === 'director'
                         ? 'bg-amber-50 text-amber-600'
-                        : 'bg-emerald-50 text-emerald-600'
+                        : member.role === 'keeper'
+                          ? 'bg-emerald-50 text-emerald-600'
+                          : 'bg-zinc-100 text-zinc-600'
                 }`}>
-                {ROLE_LABELS[member.role]}
+                {member.role === 'unknown' ? 'Неизвестная роль' : ROLE_LABELS[member.role]}
                 </span>
               </div>
             </div>

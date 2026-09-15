@@ -22,6 +22,10 @@ create policy "assignments_vet_update" on public.assignments
   for update using (public.current_user_role() in ('vet', 'admin'))
   with check (public.current_user_role() in ('vet', 'admin'));
 
+drop policy if exists "assignments_admin_delete" on public.assignments;
+create policy "assignments_admin_delete" on public.assignments
+  for delete using (public.is_admin_user());
+
 drop policy if exists "records_vet_update_any" on public.treatment_records;
 create policy "records_vet_update_any" on public.treatment_records
   for update using (public.current_user_role() in ('vet', 'admin'))
