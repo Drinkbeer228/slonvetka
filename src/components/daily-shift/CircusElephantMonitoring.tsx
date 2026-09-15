@@ -8,6 +8,22 @@ import { Elephant } from '../../types';
 import { ElephantDailyMetrics } from '../../types/shift';
 import { compressImage } from '../../utils/imageCompressor';
 import { supabaseService } from '../../services/supabaseService';
+import {
+  ARENA_REACTION_OPTIONS,
+  BREATHING_OPTIONS,
+  DISCHARGE_OPTIONS,
+  EAR_OPTIONS,
+  EYE_OPTIONS,
+  FAVORED_GAIT_LABEL,
+  FAVORED_LEG_OPTIONS,
+  FEED_CONSUMPTION_OPTIONS,
+  FEET_LIST,
+  GAIT_OPTIONS,
+  HOOF_WARMTH_OPTIONS,
+  TEMPORAL_OPTIONS,
+  TRUNK_TIP_OPTIONS,
+  TRUNK_TONE_OPTIONS,
+} from '../../constants/elephantObservations';
 
 interface CircusElephantMonitoringProps {
   elephant: Elephant;
@@ -16,6 +32,7 @@ interface CircusElephantMonitoringProps {
   notes: string;
   isLocked?: boolean;
   onMetricChange: (field: keyof ElephantDailyMetrics, value: any) => void;
+  onMetricPatch?: (patch: Partial<ElephantDailyMetrics>) => void;
   onAppendLog: (logText: string) => void;
   onAddMediaLog?: (logText: string, photoDataUrl: string) => void;
 }
@@ -80,27 +97,6 @@ const DURATION_OPTIONS: DurationOption[] = [
     activeClass: 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400'
   },
 ];
-
-// 3. Ноги для мониторинга
-const FEET_LIST = [
-  { id: 'ПП', label: 'ПП (Правая передняя)' },
-  { id: 'ЛП', label: 'ЛП (Левая передняя)' },
-  { id: 'ПЗ', label: 'ПЗ (Правая задняя)' },
-  { id: 'ЛЗ', label: 'ЛЗ (Левая задняя)' },
-];
-const FAVORED_LEG_OPTIONS = FEET_LIST.map((foot) => foot.id);
-
-const EYE_OPTIONS = ['Ясные', 'Прищур', 'Слезотечение', 'Отек век'];
-const TRUNK_TONE_OPTIONS = ['Активный / поднятый', 'Пассивный ("плетью")'];
-const BREATHING_OPTIONS = ['Чистое дыхание', 'Сопение / храп'];
-const TRUNK_TIP_OPTIONS = ['Кончик в норме', 'Сухой кончик', 'Влажный кончик'];
-const DISCHARGE_OPTIONS = ['Нет', 'Серозные', 'Гнойные', 'Пылевые пробки'];
-const EAR_OPTIONS = ['Активный обмах', 'Уши прижаты'];
-const TEMPORAL_OPTIONS = ['Сухие', 'Активная секреция'];
-const FEED_CONSUMPTION_OPTIONS = ['Жадно', 'Норма', 'Вяло', 'Отказ'];
-const GAIT_OPTIONS = ['Шаг уверенный', 'Бережет ногу', 'Шарканье'];
-const HOOF_WARMTH_OPTIONS = ['Норма', 'Теплее обычного'];
-const ARENA_REACTION_OPTIONS = ['Стабильная работа', 'Сопротивление', 'Возбудимость', 'Пугливость'];
 
 interface ChoiceChipGroupProps {
   options: string[];
@@ -175,6 +171,7 @@ export function CircusElephantMonitoring({
   notes,
   isLocked = false,
   onMetricChange,
+  onMetricPatch,
   onAppendLog,
   onAddMediaLog,
 }: CircusElephantMonitoringProps) {
@@ -223,7 +220,7 @@ export function CircusElephantMonitoring({
 
   const eyeObservations = metrics.eye_observations || [];
   const foreignObjectSuspected = Boolean(metrics.foreign_object_suspected);
-  const needsFavoredLeg = metrics.gait_assessment === 'Бережет ногу';
+  const needsFavoredLeg = metrics.gait_assessment === FAVORED_GAIT_LABEL;
 
   const handleChoiceChange = (field: keyof ElephantDailyMetrics, value: string) => {
     if (isLocked) return;
@@ -240,6 +237,18 @@ export function CircusElephantMonitoring({
     if (isLocked) return;
     handleHaptic(10);
     onMetricChange(field, value);
+  };
+
+  const handleMetricPatchChange = (patch: Partial<ElephantDailyMetrics>) => {
+    if (isLocked) return;
+    handleHaptic(10);
+    if (onMetricPatch) {
+      onMetricPatch(patch);
+      return;
+    }
+    Object.entries(patch).forEach(([field, value]) => {
+      onMetricChange(field as keyof ElephantDailyMetrics, value);
+    });
   };
 
   const handleEyeToggle = (value: string) => {
@@ -799,7 +808,15 @@ export function CircusElephantMonitoring({
           </div>
           <div className="space-y-2">
             <div className="text-[11px] font-bold text-slate-600">Походка</div>
-            <ChoiceChipGroup options={GAIT_OPTIONS} value={metrics.gait_assessment} onChange={(value) => handleChoiceChange('gait_assessment', value)} disabled={isLocked} />
+            <ChoiceChipGroup
+              options={GAIT_OPTIONS as unknown as string[]}
+              value={metrics.gait_assessment}
+              onChange={(value) => handleMetricPatchChange({
+                gait_assessment: value,
+                favored_leg: value === FAVORED_GAIT_LABEL ? (metrics.favored_leg ?? null) : null,
+              })}
+              disabled={isLocked}
+            />
           </div>
           {needsFavoredLeg && (
             <div className="space-y-2">
