@@ -1,8 +1,73 @@
+# Dependencies
 node_modules/
-build/
-dist/
+package-lock.json
+bun.lock
+.pnp
+.pnp.js
+
+# Testing
 coverage/
+*.lcov
+.nyc_output
+
+# Production build artifacts
+dist/
+dev-dist/
+build/
+*.js.map
+*.css.map
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.example
+
+# Vite specific
+.vite/
+.eslintcache
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Editor & IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+*.cab
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.patch
+*.diff
+
+# Logs
+logs/
 *.log
-.env*
-!.env.example
+
+# Cache
+.cache/
+.eslint-cache
+
+# Supabase (local dev)
+.supabase/
+supabase/.branches/
+supabase/.temp/
+
+# PWA
+.workbox/
+sw.js.map
