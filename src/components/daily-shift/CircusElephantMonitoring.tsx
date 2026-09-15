@@ -709,13 +709,16 @@ export function CircusElephantMonitoring({
           </div>
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/85 px-3 py-2.5">
             <span className="text-sm font-semibold text-slate-700">Пылевая / грязевая ванна</span>
-            <input
-              type="checkbox"
-              checked={Boolean(metrics.dust_bathing)}
-              disabled={isLocked}
-              onChange={(e) => handleBooleanChange('dust_bathing', e.target.checked)}
-              className="h-5 w-5 rounded-md border-slate-300 text-emerald-600"
-            />
+            <span className="flex items-center gap-2 text-xs font-black text-slate-600">
+              <span>{metrics.dust_bathing ? 'Да' : 'Нет'}</span>
+              <input
+                type="checkbox"
+                checked={Boolean(metrics.dust_bathing)}
+                disabled={isLocked}
+                onChange={(e) => handleBooleanChange('dust_bathing', e.target.checked)}
+                className="h-5 w-5 rounded-md border-slate-300 text-emerald-600"
+              />
+            </span>
           </label>
         </div>
 
@@ -760,13 +763,16 @@ export function CircusElephantMonitoring({
           </label>
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/85 px-3 py-2.5">
             <span className="text-sm font-semibold text-slate-700">Подозрение на инородку</span>
-            <input
-              type="checkbox"
-              checked={foreignObjectSuspected}
-              disabled={isLocked}
-              onChange={(e) => handleBooleanChange('foreign_object_suspected', e.target.checked)}
-              className="h-5 w-5 rounded-md border-slate-300 text-rose-600"
-            />
+            <span className="flex items-center gap-2 text-xs font-black text-slate-600">
+              <span>{foreignObjectSuspected ? 'Да' : 'Нет'}</span>
+              <input
+                type="checkbox"
+                checked={foreignObjectSuspected}
+                disabled={isLocked}
+                onChange={(e) => handleBooleanChange('foreign_object_suspected', e.target.checked)}
+                className="h-5 w-5 rounded-md border-slate-300 text-rose-600"
+              />
+            </span>
           </label>
           {foreignObjectSuspected && (
             <label className="block space-y-1">
@@ -790,12 +796,7 @@ export function CircusElephantMonitoring({
           </div>
           <div className="space-y-2">
             <div className="text-[11px] font-bold text-slate-600">Походка</div>
-            <ChoiceChipGroup options={GAIT_OPTIONS} value={metrics.gait_assessment} onChange={(value) => {
-              handleChoiceChange('gait_assessment', value);
-              if (value !== 'Бережет ногу') {
-                onMetricChange('favored_leg', null);
-              }
-            }} disabled={isLocked} />
+            <ChoiceChipGroup options={GAIT_OPTIONS} value={metrics.gait_assessment} onChange={(value) => handleChoiceChange('gait_assessment', value)} disabled={isLocked} />
           </div>
           {needsFavoredLeg && (
             <div className="space-y-2">

@@ -48,6 +48,7 @@ function parseBranchesFromNotes(feedNotes?: string | null): number {
 
 function normalizeMetric(rawMetric: Partial<ElephantDailyMetrics> & Pick<ElephantDailyMetrics, 'shift_id' | 'elephant_id'>): ElephantDailyMetrics {
   const baseMetric = createDefaultElephantMetrics(rawMetric.shift_id, rawMetric.elephant_id);
+  const gaitAssessment = rawMetric.gait_assessment ?? baseMetric.gait_assessment;
 
   return {
     ...baseMetric,
@@ -70,6 +71,8 @@ function normalizeMetric(rawMetric: Partial<ElephantDailyMetrics> & Pick<Elephan
     dust_bathing: Boolean(rawMetric.dust_bathing),
     foreign_object_suspected: Boolean(rawMetric.foreign_object_suspected),
     foreign_object_note: rawMetric.foreign_object_note ?? '',
+    gait_assessment: gaitAssessment,
+    favored_leg: gaitAssessment === 'Бережет ногу' ? (rawMetric.favored_leg ?? null) : null,
   };
 }
 
@@ -558,7 +561,7 @@ export const shiftService = {
           foreign_object_suspected: Boolean(m.foreign_object_suspected),
           foreign_object_note: m.foreign_object_note ?? '',
           gait_assessment: m.gait_assessment ?? null,
-          favored_leg: m.favored_leg ?? null,
+          favored_leg: m.gait_assessment === 'Бережет ногу' ? (m.favored_leg ?? null) : null,
           hoof_warmth: m.hoof_warmth ?? null,
           arena_reaction: m.arena_reaction ?? null,
         };
