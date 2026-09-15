@@ -271,19 +271,28 @@ const riskLabelMap: Record<VetDashboardState['giRiskLevel'], string> = {
   HIGH: '🔴 Критический / Угроза колик',
 };
 
-const toShiftDate = (selectedDate: string, hours: number, minutes: number) => {
-  return new Date(`${selectedDate}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+const buildLocalTimestamp = (selectedDate: string, hours: number, minutes: number) => {
+  return `${selectedDate}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 };
 
 const parsePhotoTimestamp = (selectedDate: string, timestamp?: string) => {
   if (!timestamp) return null;
-  const direct = new Date(timestamp);
-  if (!Number.isNaN(direct.getTime())) return direct;
-  if (/^\d{2}:\d{2}/.test(timestamp)) {
-    const [hours, minutes] = timestamp.slice(0, 5).split(':').map(Number);
-    return toShiftDate(selectedDate, hours, minutes);
+
+  if (/^\d{2}:\d{2}$/.test(timestamp)) {
+    const [hours, minutes] = timestamp.split(':').map(Number);
+    return buildLocalTimestamp(selectedDate, hours, minutes);
   }
-  return null;
+
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(timestamp)) {
+    return timestamp.replace(' ', 'T').length === 16 ? `${timestamp.replace(' ', 'T')}:00` : timestamp.replace(' ', 'T');
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/.test(timestamp)) {
+    return timestamp.length === 16 ? `${timestamp}:00` : timestamp;
+  }
+
+  const direct = new Date(timestamp);
+  return Number.isNaN(direct.getTime()) ? null : timestamp;
 };
 
 const buildSyntheticTimestamps = (selectedDate: string, count: number): string[] => {
@@ -295,7 +304,7 @@ const buildSyntheticTimestamps = (selectedDate: string, count: number): string[]
     const totalMinutes = Math.round(SHIFT_START_MINUTES + step * (index + 1));
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    return toShiftDate(selectedDate, hours, minutes).toISOString();
+    return buildLocalTimestamp(selectedDate, hours, minutes);
   });
 };
 
@@ -310,8 +319,8 @@ const buildDefecationLogs = (
   const stoolPhotos = (metric?.photos ?? [])
     .filter((photo: ShiftPhoto) => photo.section === 'stool')
     .map(photo => parsePhotoTimestamp(selectedDate, photo.timestamp))
-    .filter((date): date is Date => Boolean(date))
-    .sort((a, b) => a.getTime() - b.getTime());
+    .filter((timestamp): timestamp is string => Boolean(timestamp))
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
   const mappedTraits = (metric?.feces_traits ?? []).map(trait => ({
     trait,
@@ -321,7 +330,7 @@ const buildDefecationLogs = (
 
   const logs = Array.from({ length: poopCount }, (_, index) => {
     const traitInfo = mappedTraits[index] ?? mappedTraits[mappedTraits.length - 1];
-    const timestamp = stoolPhotos[index]?.toISOString() ?? syntheticTimestamps[index];
+    const timestamp = stoolPhotos[index] ?? syntheticTimestamps[index];
     return {
       id: `${elephant.id}-${selectedDate}-${index}`,
       timestamp,
@@ -408,12 +417,10 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
     setDietOverride(rationData.diet_override?.active ? rationData.diet_override : { active: false, ...rationData.diet_override });
   }, [rationData]);
 
-  const riskRefusedFood = elephants.length === 1 ? refusedFood : false;
-
   const dashboardStates = useMemo(() => {
     return elephants.map(elephant => {
       const defecationLogs = buildDefecationLogs(elephant, metricsMap[elephant.id], selectedDate);
-      const risk = computeGiRisk(defecationLogs, riskRefusedFood);
+      const risk = computeGiRisk(defecationLogs, refusedFood);
       return {
         elephant,
         state: {
@@ -427,7 +434,7 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
         metric: metricsMap[elephant.id],
       };
     });
-  }, [dietOverride, elephants, metricsMap, riskRefusedFood, selectedDate]);
+  }, [dietOverride, elephants, metricsMap, refusedFood, selectedDate]);
 
   const handleDietOverrideSave = useCallback(async () => {
     if (!shift) return;

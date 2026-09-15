@@ -124,8 +124,7 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     return 'bg-emerald-600 border border-emerald-700 text-white font-black shadow-xs hover:bg-emerald-700';
   };
 
-  const showViewToggle = currentScreen === 'daily_shift' || currentScreen === 'vet_cabinet' || currentScreen === 'vet_dashboard';
-  const toggleValue = currentScreen === 'daily_shift' ? 'daily_shift' : 'vet_cabinet';
+  const showViewToggle = currentScreen === 'daily_shift' || currentScreen === 'vet_cabinet';
 
   return (
     <>
@@ -145,7 +144,7 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
             <nav className="order-3 flex w-full items-center gap-2 sm:order-2 sm:mx-auto sm:w-auto" aria-label="Основная навигация">
               {showViewToggle && (
                 <VetKeeperViewToggle
-                  value={toggleValue}
+                  value={currentScreen}
                   onChange={onNavigate}
                   className="flex-1 sm:flex-none"
                 />
