@@ -64,9 +64,13 @@ export function StaffScreen() {
   };
 
   useEffect(() => {
-    if (canManageUsers(profile)) {
-      fetchStaff();
+    if (!profile || !canManageUsers(profile)) {
+      setStaff([]);
+      setLoading(false);
+      return;
     }
+
+    fetchStaff();
   }, [profile]);
 
   const handleCreateStaff = async (e: React.FormEvent) => {

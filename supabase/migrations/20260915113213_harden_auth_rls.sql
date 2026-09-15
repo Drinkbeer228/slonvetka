@@ -115,6 +115,7 @@ end;
 $$;
 
 revoke update (role) on public.profiles from anon, authenticated;
+revoke all on function public.admin_set_user_role(uuid, text) from public, anon, authenticated;
 grant execute on function public.admin_set_user_role(uuid, text) to authenticated;
 
 drop policy if exists "profiles_update_self" on public.profiles;

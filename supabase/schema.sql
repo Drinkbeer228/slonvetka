@@ -517,4 +517,5 @@ insert into public.feed_inventory (item_type, quantity_in_stock, unit) values
   on conflict (item_type) do nothing;
 
 revoke update (role) on public.profiles from anon, authenticated;
+revoke all on function public.admin_set_user_role(uuid, text) from public, anon, authenticated;
 grant execute on function public.admin_set_user_role(uuid, text) to authenticated;

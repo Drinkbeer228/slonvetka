@@ -336,7 +336,7 @@ export function DailyShiftPage() {
     )
   );
                          
-  const isVetUser = canCreateMedicalAssignment(profile);
+  const canManageMedicalAssignments = canCreateMedicalAssignment(profile);
   const isEditingDisabled = isLocked || isArchiveOrOtherKeeper || (!canEditCurrentShift && !(isAdminUser && isEditOverride));
   const isFeedEditingDisabled = isEditingDisabled;
 
@@ -403,7 +403,7 @@ export function DailyShiftPage() {
       }
 
       if (loadedShift && (!loadedShift.duty_keeper_id || loadedShift.duty_keeper_id !== profile?.id)) {
-        const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && !canCreateMedicalAssignment(profile);
+        const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && !canManageMedicalAssignments;
         // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null) и это не передача и пользователь не ветврач
         if (!isThisShiftLocked && profile?.id && canClaimShift(profile, loadedShift) && !loadedShift.duty_keeper_id) {
            loadedShift = { ...loadedShift, duty_keeper_id: profile.id };
@@ -1357,7 +1357,7 @@ export function DailyShiftPage() {
                 key={assignment.id}
                 assignment={assignment}
                 isCompletedToday={isCompletedToday}
-                isLocked={isLocked || isVetUser}
+                isLocked={isLocked || canManageMedicalAssignments}
                 completedAt={completedTime}
                 completedByKeeperName={keeperName}
                 onExecute={() => setSelectedTask({ assignment, elephant: activeElephant, existingRecord: relatedRecord })}
