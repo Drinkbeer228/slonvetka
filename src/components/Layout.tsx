@@ -15,13 +15,10 @@ interface LayoutProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'daily_shift',   label: 'Слоновник (Смена)', icon: Home,          role: 'all' },
-  { id: 'vet_dashboard', label: 'ВетПанель',         icon: Stethoscope,   role: 'all' },
-  { id: 'elephants',     label: 'Слоны',             icon: HeartPulse,    role: 'all' },
-  { id: 'today',         label: 'Задачи на сегодня', icon: CheckCircle2,  role: 'all' },
-  { id: 'journal',       label: 'Журнал дежурств',   icon: BookOpen,      role: 'all' },
-  { id: 'assignments',   label: 'Вет-назначения',    icon: ClipboardList, role: 'all' },
-  { id: 'staff',         label: 'Сотрудники',        icon: Users,         role: 'admin' },
+  { id: 'daily_shift',   label: 'Слоновник',   icon: Home,        role: 'all' },
+  { id: 'vet_dashboard', label: 'Вет-Кабинет', icon: Stethoscope, role: 'all' },
+  { id: 'journal',       label: 'Журнал',      icon: BookOpen,    role: 'all' },
+  { id: 'staff',         label: 'Сотрудники',  icon: Users,       role: 'admin' },
 ];
 
 const ROLE_LABEL: Record<string, string> = {

@@ -84,7 +84,7 @@ export function StaffScreen() {
     setCreateLoading(true);
     try {
       const normalizedLogin = regLogin.trim().toLowerCase();
-      const email = `${normalizedLogin}@mail.ru`;
+      const email = `${normalizedLogin}@slonovet.local`;
 
       const { data, error: signUpError } = await tempSupabase.auth.signUp({
         email,

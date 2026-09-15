@@ -534,57 +534,6 @@ export function DynamicCounterSection({
 
       </div>
 
-      {/* 2. АВТОРСТВО И ТАЙМСТАМПЫ ДЕЙСТВИЙ (МИКРО-ЛОГ СМЕНЫ) */}
-      <div className="bg-white/70 backdrop-blur-2xl border border-white/60 rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <div className="flex items-center gap-2">
-            <History size={17} className="text-slate-500" />
-            <h4 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
-              Живой микро-лог смены
-            </h4>
-            <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-              {logs.length} записей
-            </span>
-          </div>
-          <span className="text-[11px] font-semibold text-slate-400">
-            Авторство киперов бригады
-          </span>
-        </div>
-
-        {logs.length === 0 ? (
-          <div className="text-center py-4 text-xs font-semibold text-slate-400">
-            В этой смене действий пока не зафиксировано
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto no-scrollbar pt-1">
-            {logs.slice(0, 15).map(log => (
-              <div
-                key={log.id}
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
-                  log.type === 'merit'
-                    ? 'bg-emerald-50/80 border-emerald-200/70 text-emerald-900'
-                    : log.type === 'damage'
-                    ? 'bg-rose-50/80 border-rose-200/70 text-rose-900'
-                    : 'bg-amber-50/80 border-amber-200/70 text-amber-900'
-                }`}
-              >
-                {/* Micro Avatar Icon */}
-                <div className="w-5 h-5 rounded-full bg-white text-slate-700 font-black text-[10px] flex items-center justify-center shadow-xs uppercase">
-                  {log.authorName.slice(0, 1)}
-                </div>
-
-                <span>{log.text}</span>
-
-                <span className="text-[10px] font-semibold opacity-60 flex items-center gap-1 border-l pl-1.5">
-                  <Clock size={10} />
-                  {log.timestamp}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }

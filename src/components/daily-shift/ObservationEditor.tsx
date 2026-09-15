@@ -4,6 +4,7 @@ import { Elephant } from '../../types';
 import { X } from 'lucide-react';
 import { ExcretionControl } from './ExcretionControl';
 import { ObservationJournal } from './ObservationJournal';
+import { CircusElephantMonitoring } from './CircusElephantMonitoring';
 import { ShiftPhoto } from '../../types/shift';
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
   elephants?: Elephant[];
   allMetrics?: Record<string, ElephantDailyMetrics>;
   metrics: ElephantDailyMetrics;
+  selectedDate?: string;
   isLocked: boolean;
   onMetricChange: (field: string, value: any) => void;
   onAllMetricChange?: (elephantId: string, field: keyof ElephantDailyMetrics, value: any) => void;
@@ -26,6 +28,7 @@ export function ObservationEditor({
   elephants,
   allMetrics,
   metrics,
+  selectedDate,
   isLocked,
   onMetricChange,
   onAllMetricChange,
@@ -51,6 +54,22 @@ export function ObservationEditor({
     } else if (elephantId === elephant.id) {
       onMetricChange(field as string, value);
     }
+  };
+
+  const handleAppendLogToNotes = (logText: string) => {
+    const current = (metrics.notes || '').trim();
+    const nextNotes = current ? `${current}\n${logText}` : logText;
+    onMetricChange('notes', nextNotes);
+  };
+
+  const handleAddMediaLog = (_caption: string, photoUrl: string) => {
+    const newPhoto: ShiftPhoto = {
+      id: `circus_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      section: 'general',
+      storage_path: photoUrl,
+    };
+    onMetricChange('photos', [...photos, newPhoto]);
   };
 
   return (
@@ -83,6 +102,16 @@ export function ObservationEditor({
           />
         );
       })()}
+
+      {/* ЦИРКОВАЯ СПЕЦИФИКА НАБЛЮДЕНИЙ ДЛЯ ВЫБРАННОГО СЛОНА: ЗАМЫВКА, СТЕРЕОТИПИИ, МОНИТОРИНГ НОГ */}
+      <CircusElephantMonitoring
+        elephant={elephant}
+        selectedDate={selectedDate || new Date().toISOString().split('T')[0]}
+        notes={metrics.notes || ''}
+        isLocked={isLocked}
+        onAppendLog={handleAppendLogToNotes}
+        onAddMediaLog={handleAddMediaLog}
+      />
 
       {/* NOTES SECTION */}
       <ObservationJournal

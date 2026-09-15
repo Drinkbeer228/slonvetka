@@ -11,19 +11,19 @@ import { CounterButton } from '../components/common/CounterButton';
 import { 
   Calendar as CalendarIcon, CheckCircle2, Loader2, Save, UserCheck, 
   Check, Camera, PackagePlus, Package, X, History, Bell, Plus, Trash2, Image as ImageIcon, FileText, AlertTriangle, Edit2, ShieldAlert,
-  Lock, Unlock, LogOut } from 'lucide-react';
+  Lock, Unlock, LogOut, Stethoscope } from 'lucide-react';
 import { ExecutionModal } from '../components/ExecutionModal';
 import { VeterinaryAssignmentCard } from '../components/daily-shift/VeterinaryAssignmentCard';
 import { FeedControl, DailyRationData } from '../components/daily-shift/FeedControl';
 import { ExcretionControl } from '../components/daily-shift/ExcretionControl';
 import { ObservationEditor } from '../components/daily-shift/ObservationEditor';
+import { SocialDynamicsSection } from '../components/daily-shift/SocialDynamicsSection';
 import { SubmitShiftButton } from '../components/daily-shift/SubmitShiftButton';
 import { DynamicCounterSection, CounterItem } from '../components/daily-shift/DynamicCounterSection';
 import { ShiftSummaryModal } from '../components/daily-shift/ShiftSummaryModal';
 import { ArchiveBanner } from '../components/daily-shift/ArchiveBanner';
 import { ShiftHandoverModal } from '../components/daily-shift/ShiftHandoverModal';
 import { useShiftEvents, ShiftEvent } from '../hooks/useShiftEvents';
-import { ShiftActivityFeed } from '../components/daily-shift/ShiftActivityFeed';
 import { HandoverAcceptBanner } from '../components/daily-shift/HandoverAcceptBanner';
 
 export const ELEPHANT_MOODS = [
@@ -317,7 +317,9 @@ export function DailyShiftPage() {
     )
   );
                          
-  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper;
+  const isVetUser = profile?.role === 'vet';
+  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper || isVetUser;
+  const isFeedEditingDisabled = isEditingDisabled;
 
   useEffect(() => {
     setIsEditOverride(false);
@@ -383,8 +385,8 @@ export function DailyShiftPage() {
 
       if (loadedShift && (!loadedShift.duty_keeper_id || loadedShift.duty_keeper_id !== profile?.id)) {
         const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && profile?.role !== 'vet';
-        // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null) и это не передача
-        if (!isThisShiftLocked && profile?.id && !loadedShift.duty_keeper_id && loadedShift.status !== 'handover_pending') {
+        // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null) и это не передача и пользователь не ветврач
+        if (!isThisShiftLocked && profile?.id && !isVetUser && !loadedShift.duty_keeper_id && loadedShift.status !== 'handover_pending') {
            loadedShift = { ...loadedShift, duty_keeper_id: profile.id };
            setDutyKeeperName(profile.name);
            // Trigger immediate save in background so it's locked to this user
@@ -930,8 +932,32 @@ export function DailyShiftPage() {
     : [];
 
   return (
-    <div className="pb-40 space-y-6 mt-3 relative">
+    <div className="pb-44 space-y-6 mt-3 relative">
       
+      {/* VET OBSERVER MODE BANNER */}
+      {isVetUser && (
+        <div className="mb-4 bg-teal-500/10 border-2 border-teal-500/30 rounded-[24px] p-3.5 sm:p-4 shadow-sm mx-4 sm:mx-0 flex items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Stethoscope size={20} strokeWidth={2.4} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-teal-950 font-black text-sm tracking-tight">
+                  Режим наблюдателя (Ветконтроль)
+                </p>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full border border-teal-200">
+                  Read-Only
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-teal-800/80 mt-0.5">
+                Ввод смены киперов отключен. Управление назначениями и процедурами доступно в разделе «Вет-Кабинет».
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOP NOTIFICATION BANNERS */}
       {isArchiveOrOtherKeeper && !isEditOverride && (
         <div className="mb-4 bg-amber-50 border border-amber-200/60 rounded-[24px] p-3 shadow-sm mx-4 sm:mx-0 flex items-center justify-between">
@@ -1033,20 +1059,22 @@ export function DailyShiftPage() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setModalBales(feedInventory.hay_bales.quantity_in_stock);
-                setModalRolls(feedInventory.hay_rolls.quantity_in_stock);
-                setModalBranches(feedInventory.branches.quantity_in_stock);
-                setReplenishModalOpen(true);
-              }}
-              className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
-              title="Управление остатками на складе feed_inventory"
-            >
-              <Package size={13} className="text-amber-600" />
-              <span>Склад</span>
-            </button>
+            {profile?.role !== 'vet' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setModalBales(feedInventory.hay_bales.quantity_in_stock);
+                  setModalRolls(feedInventory.hay_rolls.quantity_in_stock);
+                  setModalBranches(feedInventory.branches.quantity_in_stock);
+                  setReplenishModalOpen(true);
+                }}
+                className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                title="Управление остатками на складе feed_inventory"
+              >
+                <Package size={13} className="text-amber-600" />
+                <span>Склад</span>
+              </button>
+            )}
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-lime-700 bg-lime-100/70 border border-lime-200/80 px-2 py-0.5 rounded-full">
               Без ограничений
             </span>
@@ -1063,7 +1091,7 @@ export function DailyShiftPage() {
             <CounterButton
               value={hayBalesDistributed}
               onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
-              disabled={isEditingDisabled}
+              disabled={isFeedEditingDisabled}
               variant="vertical"
               unit="тюков"
             />
@@ -1093,7 +1121,7 @@ export function DailyShiftPage() {
             <CounterButton
               value={hayBagsDistributed}
               onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
-              disabled={isEditingDisabled}
+              disabled={isFeedEditingDisabled}
               variant="vertical"
               unit="рулонов"
             />
@@ -1150,7 +1178,7 @@ export function DailyShiftPage() {
       <div>
         <FeedControl
           ration={currentRation}
-          isLocked={isLocked}
+          isLocked={isFeedEditingDisabled}
           dutyKeeperName={dutyKeeper?.name}
           onPorridgeFieldChange={handlePorridgeFieldChange}
           hayBalesDistributed={hayBalesDistributed}
@@ -1201,7 +1229,7 @@ export function DailyShiftPage() {
                 key={assignment.id}
                 assignment={assignment}
                 isCompletedToday={isCompletedToday}
-                isLocked={isLocked}
+                isLocked={isLocked || isVetUser}
                 completedAt={completedTime}
                 completedByKeeperName={keeperName}
                 onExecute={() => setSelectedTask({ assignment, elephant: activeElephant, existingRecord: relatedRecord })}
@@ -1214,28 +1242,35 @@ export function DailyShiftPage() {
         </div>
       )}
 
-      {/* 5.5. ЛЕНТА СОБЫТИЙ */}
-      <section className="mb-6 mx-4 sm:mx-0">
-        <ShiftActivityFeed
-          events={shiftEvents}
-          currentUserId={profile?.id}
-          onUndo={handleUndoEvent}
-        />
-      </section>
+
 
       {/* 6. ЖУРНАЛ НАБЛЮДЕНИЙ: <ObservationEditor ... /> (СВОБОДНЫЕ ЗАМЕТКИ, ПОЛЕ ВВОДА ТЕКСТА, ФОТО) */}
       {activeElephant && m && (
-        <ObservationEditor
-          isLocked={isEditingDisabled}
-          elephant={activeElephant}
-          elephants={elephants}
-          allMetrics={metrics}
-          metrics={m}
-          onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
-          onAllMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
-          onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
-          onNotesBlur={() => shift && persistChanges(shift, metrics)}
-        />
+        <div className="space-y-4">
+          <ObservationEditor
+            isLocked={isEditingDisabled}
+            elephant={activeElephant}
+            elephants={elephants}
+            allMetrics={metrics}
+            metrics={m}
+            selectedDate={selectedDate}
+            onMetricChange={(field, val) => handleMetricChange(activeElephant.id, field as any, val)}
+            onAllMetricChange={(elephantId, field, val) => handleMetricChange(elephantId, field, val)}
+            onTraitToggle={(field, trait) => handleTraitToggle(activeElephant.id, field, trait)}
+            onNotesBlur={() => shift && persistChanges(shift, metrics)}
+          />
+
+          {/* СОЦИАЛЬНАЯ ДИНАМИКА ГРУППЫ (БЫСТРЫЕ ЧИПСЫ) */}
+          <SocialDynamicsSection
+            isLocked={isEditingDisabled}
+            onAppendSocialLog={(tagText) => {
+              if (!activeElephant) return;
+              const currentNotes = (m.notes || '').trim();
+              const nextNotes = currentNotes ? `${currentNotes}\n${tagText}` : tagText;
+              handleMetricChange(activeElephant.id, 'notes', nextNotes);
+            }}
+          />
+        </div>
       )}
 
       {/* 7. НИЖНЯЯ ПАНЕЛЬ: КНОПКА [ ЗАВЕРШИТЬ СМЕНУ ] */}

@@ -2,100 +2,128 @@ const fs = require('fs');
 const file = 'src/screens/DailyShiftPage.tsx';
 let code = fs.readFileSync(file, 'utf8');
 
-// 1. Fix read-only mode and auto-capture
-const readOnlyRegex = /\/\/ Режим только чтения: если смена в прогрессе, но назначена ДРУГОМУ киперу\s+const isReadOnlyMode = shift\?\.status === 'in_progress' && \s+shift\.duty_keeper_id && \s+shift\.duty_keeper_id !== profile\?\.id && \s+!isAdmin && profile\?\.role !== 'vet';\s+const isEditingDisabled = isLocked \|\| isReadOnlyMode;/;
+// 1. Remove ShiftActivityFeed import
+code = code.replace(
+  /import \{ ShiftActivityFeed \} from '\.\.\/components\/daily-shift\/ShiftActivityFeed';\n/,
+  ''
+);
 
-const newReadOnly = `// Режим только чтения: архив или чужая смена
-  const isArchiveOrOtherKeeper = Boolean(
-    shift && (
-      shift.status === 'completed' || 
-      (shift.duty_keeper_id && shift.duty_keeper_id !== profile?.id && !isAdmin && profile?.role !== 'vet')
-    )
-  );
-                         
-  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper;`;
-  
-if (readOnlyRegex.test(code)) {
-  code = code.replace(readOnlyRegex, newReadOnly);
-} else {
-  console.log("Could not find readOnlyRegex");
-}
+// 2. Define isFeedEditingDisabled
+const targetIsEditingDisabled = "  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper;";
+const replacementIsEditingDisabled = "  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper;\n  const isFeedEditingDisabled = isEditingDisabled || profile?.role === 'vet';";
+code = code.replace(targetIsEditingDisabled, replacementIsEditingDisabled);
 
-const autoCaptureRegex = /\/\/ ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного \(duty_keeper_id === null\)\s+if \(!isThisShiftLocked && profile\?\.id && !loadedShift\.duty_keeper_id\) \{/;
+// 3. Hide Склад button for vet
+const targetSkaldButton = `            <button
+              type="button"
+              onClick={() => {
+                setModalBales(feedInventory.hay_bales.quantity_in_stock);
+                setModalRolls(feedInventory.hay_rolls.quantity_in_stock);
+                setModalBranches(feedInventory.branches.quantity_in_stock);
+                setReplenishModalOpen(true);
+              }}
+              className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              title="Управление остатками на складе feed_inventory"
+            >
+              <Package size={13} className="text-amber-600" />
+              <span>Склад</span>
+            </button>`;
 
-const newAutoCapture = `// ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null) и это не передача
-        if (!isThisShiftLocked && profile?.id && !loadedShift.duty_keeper_id && loadedShift.status !== 'handover_pending') {`;
-
-if (autoCaptureRegex.test(code)) {
-  code = code.replace(autoCaptureRegex, newAutoCapture);
-} else {
-  console.log("Could not find autoCaptureRegex");
-}
-
-// 2. Insert HandoverAcceptBanner component rendering
-const bannerContainerRegex = /(<div className="flex justify-between items-center bg-white\/80 backdrop-blur-md sticky top-0 z-50 p-4 border-b border-zinc-200">)/;
-
-const newBannerContainer = `{/* HANDOVER ACCEPT BANNER */}
-      {shift?.status === 'handover_pending' && shift?.handover_to_keeper_id === profile?.id && (
-        <HandoverAcceptBanner 
-          pendingShift={shift} 
-          currentUserId={profile.id}
-          onAccept={loadShiftData}
-          onReject={loadShiftData}
-        />
-      )}
-      $1`;
-
-if (bannerContainerRegex.test(code)) {
-  code = code.replace(bannerContainerRegex, newBannerContainer);
-} else {
-  console.log("Could not find bannerContainerRegex");
-}
-
-// Ensure HandoverAcceptBanner is imported
-if (!code.includes('import { HandoverAcceptBanner }')) {
-  code = code.replace(
-    `import { DynamicCounterSection, CounterItem } from '../components/daily-shift/DynamicCounterSection';`,
-    `import { DynamicCounterSection, CounterItem } from '../components/daily-shift/DynamicCounterSection';\nimport { HandoverAcceptBanner } from '../components/daily-shift/HandoverAcceptBanner';`
-  );
-}
-
-// 3. Add Read-Only Badge in Header
-const headerBadgeRegex = /(\{isEditOverride && isAdmin && \(\s+<div className="bg-red-100 text-red-800 px-3 py-1\.5 rounded-full flex items-center gap-2 mb-2 sm:mb-0 shadow-sm border border-red-200">\s+<ShieldAlert size=\{14\} \/>\s+<div className="text-xs font-bold">Режим редактирования архива \(Админ\)<\/div>\s+<\/div>\s+\)\})/;
-
-const newHeaderBadge = `$1
-            {isArchiveOrOtherKeeper && !isEditOverride && (
-              <div className="bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full flex items-center gap-2 mb-2 sm:mb-0 shadow-sm border border-amber-200">
-                <Archive size={14} className="opacity-75" />
-                <div className="text-xs font-bold uppercase tracking-wider">Режим просмотра (Архив / Чужая смена)</div>
-              </div>
+const replacementSkaldButton = `            {profile?.role !== 'vet' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setModalBales(feedInventory.hay_bales.quantity_in_stock);
+                  setModalRolls(feedInventory.hay_rolls.quantity_in_stock);
+                  setModalBranches(feedInventory.branches.quantity_in_stock);
+                  setReplenishModalOpen(true);
+                }}
+                className="px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/90 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                title="Управление остатками на складе feed_inventory"
+              >
+                <Package size={13} className="text-amber-600" />
+                <span>Склад</span>
+              </button>
             )}`;
 
-if (headerBadgeRegex.test(code)) {
-  code = code.replace(headerBadgeRegex, newHeaderBadge);
-} else {
-  console.log("Could not find headerBadgeRegex");
-}
+code = code.replace(targetSkaldButton, replacementSkaldButton);
 
-// 4. Add DynamicCounterSection
-const dynamicCounterRegex = /(<FeedControl \s*shift=\{shift\}\s*onUpdate=\{handleShiftFieldChange\}\s*isReadOnly=\{isEditingDisabled\}\s*\/>\s*<\/section>)/;
+// 4. Update Feed controls to use isFeedEditingDisabled
+// Hay Bales CounterButton
+const targetBalesDisabled = `            <CounterButton
+              value={hayBalesDistributed}
+              onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
+              disabled={isEditingDisabled}
+              variant="vertical"
+              unit="тюков"
+            />`;
+const replacementBalesDisabled = `            <CounterButton
+              value={hayBalesDistributed}
+              onChange={(val) => handleShiftFieldChange('hay_bales_distributed', val, true)}
+              disabled={isFeedEditingDisabled}
+              variant="vertical"
+              unit="тюков"
+            />`;
+code = code.replace(targetBalesDisabled, replacementBalesDisabled);
 
-const newDynamicCounter = `$1
+// Hay Rolls CounterButton
+const targetRollsDisabled = `            <CounterButton
+              value={hayBagsDistributed}
+              onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
+              disabled={isEditingDisabled}
+              variant="vertical"
+              unit="рулонов"
+            />`;
+const replacementRollsDisabled = `            <CounterButton
+              value={hayBagsDistributed}
+              onChange={(val) => handleShiftFieldChange('hay_bags_distributed', val, true)}
+              disabled={isFeedEditingDisabled}
+              variant="vertical"
+              unit="рулонов"
+            />`;
+code = code.replace(targetRollsDisabled, replacementRollsDisabled);
 
-        {/* ХОЗЯЙСТВЕННЫЙ БЛОК */}
-        <section className="mb-6">
-          <DynamicCounterSection 
-            selectedDate={selectedDate}
-            isLocked={isEditingDisabled}
-            dutyKeeperName={dutyKeeperName || dutyKeeper?.name}
-          />
-        </section>`;
+// Branches CounterButton
+const targetBranchesDisabled = `            <CounterButton
+              value={currentRation.branches_distributed}
+              onChange={handleBranchesChange}
+              disabled={isEditingDisabled}
+              variant="vertical"
+              unit="веников"
+            />`;
+const replacementBranchesDisabled = `            <CounterButton
+              value={currentRation.branches_distributed}
+              onChange={handleBranchesChange}
+              disabled={isFeedEditingDisabled}
+              variant="vertical"
+              unit="веников"
+            />`;
+code = code.replace(targetBranchesDisabled, replacementBranchesDisabled);
 
-if (dynamicCounterRegex.test(code)) {
-  code = code.replace(dynamicCounterRegex, newDynamicCounter);
-} else {
-  console.log("Could not find dynamicCounterRegex");
-}
+// FeedControl Component
+const targetFeedControl = `      <div>
+        <FeedControl
+          ration={currentRation}
+          isLocked={isLocked}
+          dutyKeeperName={dutyKeeper?.name}`;
+const replacementFeedControl = `      <div>
+        <FeedControl
+          ration={currentRation}
+          isLocked={isFeedEditingDisabled}
+          dutyKeeperName={dutyKeeper?.name}`;
+code = code.replace(targetFeedControl, replacementFeedControl);
+code = code.replace(/isLocked=\{isEditingDisabled\}\n          dutyKeeperName=\{dutyKeeper\?.name\}/g, "isLocked={isFeedEditingDisabled}\n          dutyKeeperName={dutyKeeper?.name}"); // Just in case it was written differently
+
+
+// 5. Remove ShiftActivityFeed usage
+const targetActivityFeed = `      {/* 5.5. ЛЕНТА СОБЫТИЙ */}
+      <section className="mb-6 mx-4 sm:mx-0">
+        <ShiftActivityFeed
+          events={shiftEvents}
+          currentUserId={profile?.id}
+          onUndo={handleUndoEvent}
+        />
+      </section>`;
+code = code.replace(targetActivityFeed, '');
 
 fs.writeFileSync(file, code);
-console.log('Patched DailyShiftPage.tsx');

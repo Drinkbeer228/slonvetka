@@ -16,6 +16,7 @@ export function LoginPage({ children }: LoginPageProps) {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -113,11 +114,37 @@ export function LoginPage({ children }: LoginPageProps) {
     setError(null);
 
     const cleanLogin = login.trim().toLowerCase();
-    // Если введен короткий логин (adk, dima), приклеиваем домен:
     const email = cleanLogin.includes('@') ? cleanLogin : `${cleanLogin}@slonovet.local`;
     const cleanPassword = password.trim();
 
-    console.log('Попытка входа с email:', email);
+    if (isRegisterMode) {
+      if (cleanPassword.length < 6) {
+        setError('Пароль должен быть не менее 6 символов');
+        setAuthLoading(false);
+        return;
+      }
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password: cleanPassword,
+        options: {
+          data: {
+            name: cleanLogin.split('@')[0],
+            role: cleanLogin === 'admin' ? 'admin' : 'keeper'
+          }
+        }
+      });
+      if (signUpError) {
+        setError(signUpError.message);
+        setAuthLoading(false);
+        return;
+      }
+      if (data.user) {
+        alert('Регистрация успешна! Теперь вы можете войти (если настроены триггеры БД).');
+        setIsRegisterMode(false);
+      }
+      setAuthLoading(false);
+      return;
+    }
 
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
@@ -125,7 +152,6 @@ export function LoginPage({ children }: LoginPageProps) {
     });
 
     if (signInError) {
-      console.error('Ошибка входа:', signInError.message);
       setError(signInError.message);
       setAuthLoading(false);
       return;

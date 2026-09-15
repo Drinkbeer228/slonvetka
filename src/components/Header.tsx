@@ -13,23 +13,10 @@ interface HeaderProps {
   onNavigate?: (screen: string) => void;
 }
 
-const SCREEN_TITLES: Record<string, string> = {
-  daily_shift: 'Слоновник',
-  vet_dashboard: 'ВетПанель',
-  elephants: 'Слоны',
-  elephant_details: 'Карточка слона',
-  today: 'Задачи на сегодня',
-  journal: 'Журнал дежурств',
-  assignments: 'Вет-назначения',
-  staff: 'Сотрудники',
-  settings: 'Настройки',
-};
-
 const DESKTOP_NAV = [
-  { id: 'daily_shift',   label: 'Слоновник', icon: Home },
-  { id: 'vet_dashboard', label: 'ВетПанель', icon: Stethoscope },
-  { id: 'elephants',     label: 'Слоны',     icon: HeartPulse },
-  { id: 'journal',       label: 'Журнал',    icon: BookOpen },
+  { id: 'daily_shift',   label: 'Слоновник',   icon: Home },
+  { id: 'vet_dashboard', label: 'Вет-Кабинет', icon: Stethoscope },
+  { id: 'journal',       label: 'Журнал',      icon: BookOpen },
 ];
 
 const getDaysInMonth = (year: number, month: number) => {
@@ -105,8 +92,6 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     }
   };
 
-  const title = SCREEN_TITLES[currentScreen] || 'Слоновник';
-
   const generateCalendarDays = () => {
     const daysInMonth = getDaysInMonth(viewYear, viewMonth);
     const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
@@ -150,7 +135,7 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
         className="h-16 sticky top-0 z-40 w-full bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_2px_12px_rgba(15,23,42,0.04)]"
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-full flex items-center justify-between gap-2 sm:gap-4">
-          {/* СЛЕВА: Бренд СлоноВет + Название текущего раздела */}
+          {/* СЛЕВА: Бренд СлоноВет */}
           <div className="flex items-center gap-3 shrink-0">
             <button
               type="button"
@@ -169,18 +154,19 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
               </div>
             </button>
 
-            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
-            
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100/70 border border-slate-200/60 text-xs font-bold text-slate-700">
-              <span>{title}</span>
-            </div>
+            {profile?.role === 'vet' && currentScreen === 'daily_shift' && (
+              <span className="hidden xl:inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wide text-teal-800 bg-teal-100/90 border border-teal-200/80 px-2.5 py-1 rounded-xl shadow-xs">
+                <Stethoscope size={12} className="stroke-[2.5]" />
+                Режим наблюдателя (Ветконтроль)
+              </span>
+            )}
           </div>
 
-          {/* ПО ЦЕНТРУ: Десктопные табы навигации + Выбор даты со стрелками */}
+          {/* ПО ЦЕНТРУ: Центральная группа табов [Слоновник] | [Вет-Кабинет] | [Журнал] + Выбор даты со стрелками */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Быстрые вкладки для ПК (lg+) */}
+            {/* Центральная группа табов */}
             {onNavigate && (
-              <nav className="hidden lg:flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-inner">
+              <nav className="hidden sm:flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-inner">
                 {DESKTOP_NAV.map(item => {
                   const isActive = currentScreen === item.id || 
                     (currentScreen === 'elephant_details' && item.id === 'elephants');

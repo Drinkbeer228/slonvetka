@@ -1,925 +1,999 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  ShieldAlert, AlertTriangle, HeartPulse, Activity, Utensils, Moon, 
+  HeartPulse, Activity, Utensils, Moon, 
   Calendar as CalendarIcon, Camera, FileText, CheckCircle2, ChevronLeft, 
-  ChevronRight, Sparkles, Stethoscope, Clock, User, Eye, X, ZoomIn
+  ChevronRight, Sparkles, Stethoscope, Clock, User, Check, X,
+  AlertTriangle, Plus, Edit3, Trash2, Pill, ShieldCheck, Eye, 
+  CheckCircle, AlertCircle, Circle, ArrowRight
 } from 'lucide-react';
 import { useStore } from '../store';
-import { supabase } from '../lib/supabase';
 import { shiftService } from '../services/shiftService';
-import { DailyShift, ElephantDailyMetrics, ShiftPhoto } from '../types/shift';
+import { supabaseService } from '../services/supabaseService';
+import { SyncManager } from '../services/SyncManager';
+import { DailyShift, ElephantDailyMetrics } from '../types/shift';
+import { Assignment, TreatmentRecordWithPhotos, Elephant } from '../types';
 import { DailyRationData } from '../components/daily-shift/FeedControl';
 import { formatDuration } from '../components/daily-shift/ExcretionControl';
+import { AssignmentModal } from '../components/AssignmentModal';
+import { ExecutionModal } from '../components/ExecutionModal';
 
-interface PathologyAlert {
-  id: string;
-  elephantId: string;
-  elephantName: string;
-  icon: string;
-  title: string;
-  description: string;
-  severity: 'critical' | 'warning' | 'info';
-  timestamp?: string;
-  photoUrl?: string;
-  section?: 'stool' | 'feed' | 'sleep' | 'general';
-}
-
-const DEFAULT_ELEPHANTS = [
-  { id: 'margo', name: 'Марго' },
-  { id: 'audrey', name: 'Одри' },
-  { id: 'pretty', name: 'Прэтти' },
-];
+const ELEPHANT_EMOJI: Record<string, string> = {
+  margo: '👑',
+  odri: '🎀',
+  pretty: '🌸',
+};
 
 export function VetDashboard() {
-  const { elephants: storeElephants, profile, activeElephantId } = useStore();
-  const elephants = storeElephants && storeElephants.length > 0 ? storeElephants : DEFAULT_ELEPHANTS;
-  const [staffList, setStaffList] = useState<{ id: string; name: string; role: string }[]>([]);
+  const { 
+    elephants: storeElephants, 
+    profile, 
+    selectedDate, 
+    setSelectedDate, 
+    refreshAssignments 
+  } = useStore();
 
-  // Selected date state
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    return new Date().toISOString().split('T')[0];
-  });
+  const elephants = useMemo(() => {
+    return storeElephants && storeElephants.length > 0 ? storeElephants : [];
+  }, [storeElephants]);
+  
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const [filterElephantId, setFilterElephantId] = useState<string>('all');
+  
   const [shift, setShift] = useState<DailyShift | null>(null);
   const [metrics, setMetrics] = useState<Record<string, ElephantDailyMetrics>>({});
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [records, setRecords] = useState<TreatmentRecordWithPhotos[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal Lightbox
+  // RBAC permissions
+  const isVetOrAdmin = profile?.role === 'vet' || profile?.role === 'admin' || profile?.role === 'director';
+  const isKeeper = profile?.role === 'keeper';
+
+  // Modal states
+  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [selectedTaskForExecution, setSelectedTaskForExecution] = useState<{
+    assignment: Assignment;
+    elephant: Elephant;
+    existingRecord?: TreatmentRecordWithPhotos;
+  } | null>(null);
+
+  // Lightbox photo preview
   const [lightboxPhoto, setLightboxPhoto] = useState<{
     url: string;
     title: string;
-    section?: string;
     elephantName?: string;
+    performedAt?: string;
+    keeperName?: string;
+    assessment?: string;
+    comment?: string;
   } | null>(null);
+
+  // Filter between active and all assignments (for Vet)
+  const [showOnlyActive, setShowOnlyActive] = useState(true);
 
   // Format date display
   const formattedDate = useMemo(() => {
     try {
       const [y, m, d] = selectedDate.split('-').map(Number);
       const dateObj = new Date(y, m - 1, d);
-      return dateObj.toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        weekday: 'long'
+      return dateObj.toLocaleDateString('ru-RU', { 
+        day: 'numeric', 
+        month: 'long', 
+        weekday: 'long' 
       });
     } catch {
       return selectedDate;
     }
   }, [selectedDate]);
 
-  // Load shift data
-  useEffect(() => {
-    let isMounted = true;
+  const loadData = useCallback(async () => {
     setLoading(true);
-
-    shiftService.getShiftData(selectedDate)
-      .then(async ({ shift: loadedShift, metrics: loadedMetrics }) => {
-        if (!isMounted) return;
-        setShift(loadedShift);
-        setMetrics(loadedMetrics || {});
-
-        try {
-          const { data: staffData } = await supabase.from('profiles').select('id, name, role');
-          if (isMounted && staffData) {
-            setStaffList(staffData);
-          }
-        } catch {
-          // ignore
-        }
-
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Failed to load shift data for vet dashboard:', err);
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedDate]);
-
-  // Parse feed notes
-  const rationData: DailyRationData = useMemo(() => {
-    const defaultRation: DailyRationData = {
-      morning_porridge: 'all',
-      evening_salad_chips: ['Морковь', 'Свёкла', 'Картофель', 'Яблоки'],
-      salad_notes: '',
-      coarse_branches: 4,
-      salad_base_included: true,
-      salad_photo_url: '',
-      salad_appetite: 'all',
-      salad_base_time: '18:30'
-    };
-
-    if (!shift?.feed_notes) return defaultRation;
     try {
-      const parsed = JSON.parse(shift.feed_notes);
-      return {
-        ...defaultRation,
-        ...parsed,
-        evening_salad_chips: parsed.evening_salad_chips || defaultRation.evening_salad_chips
-      };
-    } catch {
-      return {
-        ...defaultRation,
-        salad_notes: shift.feed_notes
-      };
+      const [shiftData, assignmentsList, dayRecords] = await Promise.all([
+        shiftService.getShiftData(selectedDate),
+        isVetOrAdmin ? supabaseService.getAllAssignments() : supabaseService.getActiveAssignments(),
+        supabaseService.getRecordsByDate(selectedDate),
+      ]);
+
+      setShift(shiftData.shift);
+      setMetrics(shiftData.metrics || {});
+      setAssignments(assignmentsList || []);
+      setRecords(dayRecords || []);
+    } catch (err) {
+      console.error('Error loading VetDashboard data:', err);
+    } finally {
+      setLoading(false);
     }
-  }, [shift?.feed_notes]);
+  }, [selectedDate, isVetOrAdmin]);
 
-  // Duty keeper info
-  const dutyKeeper = useMemo(() => {
-    if (!shift?.duty_keeper_id) return profile?.name || 'Иван Смирнов (старший кипер)';
-    const staff = staffList.find(p => p.id === shift.duty_keeper_id);
-    return staff ? staff.name : (profile?.name || 'Иван Смирнов (старший кипер)');
-  }, [shift?.duty_keeper_id, staffList, profile]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  // Navigate date
-  const handleDateShift = (deltaDays: number) => {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
-    dateObj.setDate(dateObj.getDate() + deltaDays);
-    const yStr = dateObj.getFullYear();
-    const mStr = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const dStr = String(dateObj.getDate()).padStart(2, '0');
-    setSelectedDate(`${yStr}-${mStr}-${dStr}`);
-  };
+  const rationData: DailyRationData = useMemo(() => {
+    if (!shift?.feed_notes) return {} as DailyRationData;
+    try { return JSON.parse(shift.feed_notes); } catch { return {} as DailyRationData; }
+  }, [shift]);
 
-  const setDateToToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
-  };
-
-  // Extract all photos across all elephants and shift
-  const allPhotos = useMemo(() => {
-    const list: Array<{
-      id: string;
-      url: string;
-      section: string;
-      elephantId?: string;
-      elephantName?: string;
-      timestamp?: string;
-    }> = [];
-
-    // Salad photo if present
-    if (rationData.salad_photo_url) {
-      list.push({
-        id: 'salad-photo',
-        url: rationData.salad_photo_url,
-        section: '🥣 Вечерний салат',
-        timestamp: rationData.salad_base_time || '18:30'
-      });
-    }
-
-    // Photos from elephant metrics
-    Object.entries(metrics).forEach(([eId, metric]) => {
-      const elephant = elephants.find(e => e.id === eId);
-      const eName = elephant ? elephant.name : 'Слон';
-
-      if (metric.photos && metric.photos.length > 0) {
-        metric.photos.forEach(p => {
-          let sectionLabel = '📷 Наблюдение';
-          if (p.section === 'stool') sectionLabel = '💩 Стул';
-          else if (p.section === 'urine') sectionLabel = '💧 Моча';
-          else if (p.section === 'sleep') sectionLabel = '🌙 Ночной сон';
-
-          list.push({
-            id: p.id,
-            url: p.dataUrl,
-            section: sectionLabel,
-            elephantId: eId,
-            elephantName: eName,
-            timestamp: p.timestamp
-          });
-        });
-      }
-    });
-
-    // If no real photos uploaded, provide illustrative medical reference entries for demonstration
-    if (list.length === 0) {
-      list.push(
-        {
-          id: 'demo-1',
-          url: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=600&q=80',
-          section: '💩 Стул (Слизь)',
-          elephantId: 'pretty',
-          elephantName: 'Прэтти',
-          timestamp: '07:20'
-        },
-        {
-          id: 'demo-2',
-          url: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80',
-          section: '🥣 Рацион (Остаток)',
-          elephantId: 'margo',
-          elephantName: 'Марго',
-          timestamp: '19:15'
-        }
-      );
-    }
-
-    return list;
-  }, [metrics, rationData, elephants]);
-
-  // Filtered photos
-  const filteredPhotos = useMemo(() => {
-    if (!activeElephantId) return allPhotos;
-    return allPhotos.filter(p => !p.elephantId || p.elephantId === activeElephantId);
-  }, [allPhotos, activeElephantId]);
-
-  // 2. RED FLAGS / PATHOLOGIES DETECTION
-  const detectedAlerts = useMemo<PathologyAlert[]>(() => {
-    const alerts: PathologyAlert[] = [];
-
-    // Check each elephant
-    elephants.forEach(elephant => {
-      const metric = metrics[elephant.id];
-      const name = elephant.name;
-
-      // 1. Food refusals / appetite issues
-      if (rationData.salad_appetite === 'refused') {
-        alerts.push({
-          id: `food-refuse-${elephant.id}`,
-          elephantId: elephant.id,
-          elephantName: name,
-          icon: '⚠️',
-          title: `${name}: Отказ от вечернего салата`,
-          description: 'Оставила 100% сочной порции. Требуется осмотр ротовой полости и зубов.',
-          severity: 'critical',
-          timestamp: '19:00',
-          section: 'feed',
-          photoUrl: rationData.salad_photo_url || allPhotos.find(p => p.section.includes('Рацион'))?.url
-        });
-      } else if (rationData.salad_appetite === 'partial') {
-        alerts.push({
-          id: `food-partial-${elephant.id}`,
-          elephantId: elephant.id,
-          elephantName: name,
-          icon: '🥣',
-          title: `${name}: Неполный аппетит на ужине`,
-          description: 'Салат съеден лишь частично (остаток около 30-50%).',
-          severity: 'warning',
-          timestamp: '19:00',
-          section: 'feed'
-        });
-      }
-
-      // 2. Stool & Gastrointestinal pathologies
-      if (metric) {
-        const traits = metric.feces_traits || [];
-        const hasWarningStool = traits.some(t => 
-          t.includes('⚠️') || t.toLowerCase().includes('слиз') || t.toLowerCase().includes('жидк') || t.toLowerCase().includes('понос')
-        );
-
-        if (hasWarningStool) {
-          const stoolPhoto = metric.photos?.find(p => p.section === 'stool');
-          alerts.push({
-            id: `stool-${elephant.id}`,
-            elephantId: elephant.id,
-            elephantName: name,
-            icon: '💩',
-            title: `${name}: Зафиксирована аномалия в стуле`,
-            description: `Свойства: ${traits.join(', ')}. Риск бродильных процессов в толстом отделе ЖКТ.`,
-            severity: 'critical',
-            timestamp: '07:30',
-            section: 'stool',
-            photoUrl: stoolPhoto ? stoolPhoto.dataUrl : allPhotos.find(p => p.section.includes('Стул'))?.url
-          });
-        }
-
-        // Low poop count
-        if (metric.poop_count !== undefined && metric.poop_count <= 2 && metric.poop_count > 0) {
-          alerts.push({
-            id: `poop-low-${elephant.id}`,
-            elephantId: elephant.id,
-            elephantName: name,
-            icon: '⚠️',
-            title: `${name}: Снижение моторики ЖКТ`,
-            description: `Всего ${metric.poop_count} куч за смену (норма 5-8). Вероятный признак гиподинамии или дегидратации.`,
-            severity: 'warning',
-            timestamp: '07:45',
-            section: 'stool'
-          });
-        }
-
-        // 3. Sleep deficiency
-        const sleepMins = metric.sleep_minutes ?? 0;
-        const sleepCount = metric.sleep_intervals?.length ?? 0;
-        if (sleepMins > 0 && sleepMins < 120) {
-          alerts.push({
-            id: `sleep-low-${elephant.id}`,
-            elephantId: elephant.id,
-            elephantName: name,
-            icon: '🌙',
-            title: `${name}: Выраженный дефицит ночного сна`,
-            description: `Суммарное время укладок составило всего ${formatDuration(sleepMins)} (${sleepCount} раз). Возможный дискомфорт опорно-двигательного аппарата.`,
-            severity: 'warning',
-            timestamp: '06:00',
-            section: 'sleep'
-          });
-        }
-      }
-    });
-
-    // Provide default clinical example alerts if none detected so vet can test real alerts
-    if (alerts.length === 0) {
-      alerts.push(
-        {
-          id: 'example-alert-1',
-          elephantId: 'margo',
-          elephantName: 'Марго',
-          icon: '⚠️',
-          title: 'Марго: Отказ от вечернего салата (Оставила 100%)',
-          description: 'Базовый замес не тронут. Слониха пила воду, но овощи проигнорировала.',
-          severity: 'critical',
-          timestamp: '19:10',
-          section: 'feed',
-          photoUrl: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=600&q=80'
-        },
-        {
-          id: 'example-alert-2',
-          elephantId: 'pretty',
-          elephantName: 'Прэтти',
-          icon: '💩',
-          title: 'Прэтти: Зафиксирована слизь в стуле (Прикреплено фото 📷)',
-          description: 'Поверхностная глянцевая слизь на 2 кучах из 6. Консистенция умеренно плотная.',
-          severity: 'critical',
-          timestamp: '07:20',
-          section: 'stool',
-          photoUrl: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=600&q=80'
-        }
-      );
-    }
-
-    return alerts;
-  }, [elephants, metrics, rationData, allPhotos]);
-
-  // Filter alerts by selected elephant
-  const filteredAlerts = useMemo(() => {
-    if (!activeElephantId) return detectedAlerts;
-    return detectedAlerts.filter(a => a.elephantId === activeElephantId);
-  }, [detectedAlerts, activeElephantId]);
-
-  // 3. AGGREGATED METRICS
-  const summaryMetrics = useMemo(() => {
-    // If specific elephant is selected, calculate for them; otherwise sum across herd
-    let totalPoopCount = 0;
-    let totalSleepMinutes = 0;
-    let totalSleepLaydowns = 0;
-    let dominantStoolTrait = 'Сформирован (норма)';
-    let totalElephantsCounted = 0;
-
-    const targetElephants = activeElephantId 
-      ? elephants.filter(e => e.id === activeElephantId)
-      : elephants;
-
+  // Target elephants based on tab filter
+  const targetElephants = useMemo(() => {
+    if (filterElephantId === 'all') return elephants;
+    return elephants.filter(e => e.id === filterElephantId);
+  }, [elephants, filterElephantId]);
+  
+  // High-level physiological status summary
+  const displayMetrics = useMemo(() => {
+    let totalPoop = 0;
+    let totalSleepMins = 0;
+    let totalLaydowns = 0;
+    let hasDiarrhea = false;
+    let hasDry = false;
+    
     targetElephants.forEach(e => {
       const m = metrics[e.id];
       if (m) {
-        totalPoopCount += (m.poop_count || 0);
-        totalSleepMinutes += (m.sleep_minutes || 0);
-        totalSleepLaydowns += (m.sleep_intervals?.length || 0);
-        if (m.feces_traits && m.feces_traits.length > 0) {
-          dominantStoolTrait = m.feces_traits[0];
+        totalPoop += (m.poop_count || 0);
+        totalSleepMins += (m.sleep_minutes || 0);
+        totalLaydowns += (m.sleep_intervals?.length || 0);
+        const traits = m.feces_traits || [];
+        if (traits.some(t => t.toLowerCase().includes('жидк') || t.toLowerCase().includes('понос'))) {
+          hasDiarrhea = true;
         }
-        totalElephantsCounted++;
+        if (traits.some(t => t.toLowerCase().includes('сух') || t.toLowerCase().includes('твёрд'))) {
+          hasDry = true;
+        }
       }
     });
-
-    // Provide default fallback values if empty shift
-    if (totalPoopCount === 0) totalPoopCount = !activeElephantId ? 18 : 6;
-    if (totalSleepMinutes === 0) totalSleepMinutes = !activeElephantId ? 600 : 200;
-    if (totalSleepLaydowns === 0) totalSleepLaydowns = !activeElephantId ? 9 : 3;
-
-    const estimatedWeightKg = totalPoopCount * 20; // 20 kg per standard pile
+    
+    const appetiteStatus = rationData.salad_appetite === 'refused' 
+      ? 'Отказ ⚠️' 
+      : rationData.salad_appetite === 'partial' 
+        ? 'Частично' 
+        : '100% съедено';
 
     return {
-      totalPoopCount,
-      estimatedWeightKg,
-      dominantStoolTrait,
-      totalSleepMinutes,
-      totalSleepLaydowns,
-      porridgeStatus: rationData.morning_porridge === 'all' 
-        ? 'Выдана (съедена 100%)' 
+      poopCount: totalPoop,
+      stoolStatus: hasDiarrhea ? 'Понос/Жидкий ⚠️' : hasDry ? 'Сухой' : 'Норма (сформирован)',
+      hasDiarrhea,
+      hasDry,
+      sleepTime: formatDuration(totalSleepMins),
+      laydowns: totalLaydowns,
+      appetite: appetiteStatus,
+      porridgeText: rationData.morning_mash_fed || rationData.morning_porridge === 'all' 
+        ? 'Каша съедена без остатка' 
         : rationData.morning_porridge === 'partial' 
-        ? 'Съедена частично' 
-        : rationData.morning_porridge === 'refused' 
-        ? 'Отказ от каши' 
-        : 'Выдана в норме',
-      saladStatus: rationData.salad_base_included !== false
-        ? `База 60 кг выдана (${rationData.salad_base_time || '18:30'})`
-        : 'Базовый замес не выдавался',
-      hayBales: shift?.hay_bales_distributed ?? 12,
-      hayBags: shift?.hay_bags_distributed ?? 8,
-      branchesCount: rationData.coarse_branches ?? 4
+          ? 'Остаток каши в кормушке' 
+          : 'Выдача рациона',
     };
-  }, [elephants, metrics, activeElephantId, rationData, shift]);
-
-  // Combined keeper observation notes
-  const observationNotes = useMemo(() => {
-    const notesList: Array<{ author: string; text: string; time: string }> = [];
-
-    if (shift?.handover_notes) {
-      notesList.push({
-        author: dutyKeeper,
-        text: shift.handover_notes,
-        time: '20:15'
-      });
-    }
-
-    Object.entries(metrics).forEach(([eId, m]) => {
-      if (m.notes && m.notes.trim()) {
-        const elephant = elephants.find(e => e.id === eId);
-        notesList.push({
-          author: `${dutyKeeper} (${elephant ? elephant.name : 'Слон'})`,
-          text: m.notes,
-          time: '21:00'
-        });
-      }
+  }, [targetElephants, metrics, rationData]);
+  
+  // Filter assignments by elephant and active state
+  const displayedAssignments = useMemo(() => {
+    return assignments.filter(a => {
+      const matchElephant = filterElephantId === 'all' || a.elephant_id === filterElephantId;
+      const matchActive = isVetOrAdmin && !showOnlyActive ? true : a.is_active;
+      return matchElephant && matchActive;
     });
+  }, [assignments, filterElephantId, isVetOrAdmin, showOnlyActive]);
 
-    if (rationData.salad_notes) {
-      notesList.push({
-        author: `${dutyKeeper} (Кормокухня)`,
-        text: rationData.salad_notes,
-        time: '18:45'
-      });
+  // Photo URL helper
+  const getPhotoUrl = (storagePath?: string) => {
+    if (!storagePath) return '';
+    if (storagePath.startsWith('http://') || storagePath.startsWith('https://') || storagePath.startsWith('blob:') || storagePath.startsWith('data:')) {
+      return storagePath;
+    }
+    return supabaseService.getPublicUrl(storagePath);
+  };
+
+  // Execution flow for assignment (both Keeper and Vet)
+  const handleCompleteTask = async (data: {
+    assessment: string | null;
+    medicineUsed: string | null;
+    comment: string | null;
+    photoBlob: Blob | null;
+  }) => {
+    if (!selectedTaskForExecution || !profile) return;
+    const nowIso = new Date().toISOString();
+    
+    if (selectedTaskForExecution.existingRecord) {
+      try {
+        await supabaseService.deleteTreatmentRecord(selectedTaskForExecution.existingRecord.id);
+      } catch (err) {
+        console.warn('Could not delete old record during edit:', err);
+      }
     }
 
-    if (notesList.length === 0) {
-      notesList.push({
-        author: `${dutyKeeper} (Дежурство)`,
-        text: 'Марго и Прэтти конфликтовали из-за свежих березовых веток у поилки около 17:30. Одри ела спокойно. Вечерний салат замешан строго по техкарте (картофель + свёкла + морковь по 20 кг), мел смыт без осадка.',
-        time: '19:40'
-      });
+    const tempId = crypto.randomUUID();
+    const optimisticRecord: TreatmentRecordWithPhotos = {
+      id: tempId,
+      assignment_id: selectedTaskForExecution.assignment.id,
+      elephant_id: selectedTaskForExecution.elephant.id,
+      keeper_id: profile.id,
+      performed_at: nowIso,
+      assessment: data.assessment,
+      medicine_used: data.medicineUsed,
+      comment: data.comment,
+      created_at: nowIso,
+      photos: data.photoBlob ? [{
+        id: crypto.randomUUID(),
+        treatment_record_id: tempId,
+        storage_path: URL.createObjectURL(data.photoBlob),
+        photo_type: 'single',
+        created_at: nowIso,
+      }] : [],
+      keeper: {
+        id: profile.id,
+        name: profile.name,
+      },
+    };
+
+    setRecords(prev => [
+      ...prev.filter(r => r.assignment_id !== selectedTaskForExecution.assignment.id),
+      optimisticRecord,
+    ]);
+    setSelectedTaskForExecution(null);
+
+    try {
+      await SyncManager.saveRecordLocally({
+        assignment_id: selectedTaskForExecution.assignment.id,
+        elephant_id: selectedTaskForExecution.elephant.id,
+        keeper_id: profile.id,
+        performed_at: nowIso,
+        assessment: data.assessment,
+        medicine_used: data.medicineUsed,
+        comment: data.comment,
+      }, data.photoBlob);
+
+      const dayRecords = await supabaseService.getRecordsByDate(selectedDate);
+      setRecords(dayRecords);
+    } catch (err) {
+      console.error('Failed to complete task:', err);
+      const dayRecords = await supabaseService.getRecordsByDate(selectedDate);
+      setRecords(dayRecords);
+    }
+  };
+
+  // Unmark task (Vet or Admin)
+  const handleUnmarkTask = async (recordId: string, assignmentId?: string) => {
+    if (!confirm('Снять отметку о выполнении этой процедуры?')) return;
+    if (typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10);
     }
 
-    return notesList;
-  }, [shift, metrics, dutyKeeper, rationData, elephants]);
+    setRecords(prev => prev.filter(r => r.id !== recordId && (!assignmentId || r.assignment_id !== assignmentId)));
+    try {
+      await supabaseService.deleteTreatmentRecord(recordId);
+      const dayRecords = await supabaseService.getRecordsByDate(selectedDate);
+      setRecords(dayRecords);
+    } catch (err) {
+      console.error('Failed to unmark task:', err);
+    }
+  };
+
+  // Toggle active/inactive (Vet or Admin)
+  const handleToggleActive = async (assignment: Assignment) => {
+    try {
+      setAssignments(prev => prev.map(a => 
+        a.id === assignment.id ? { ...a, is_active: !a.is_active } : a
+      ));
+      await supabaseService.updateAssignment(assignment.id, {
+        is_active: !assignment.is_active
+      });
+      refreshAssignments();
+    } catch (err) {
+      console.error('Failed to toggle assignment active state:', err);
+      loadData();
+    }
+  };
+
+  const handleAssignmentSaved = async () => {
+    setAssignmentModalOpen(false);
+    setEditingAssignment(null);
+    await loadData();
+    refreshAssignments();
+  };
+
+  const stepDate = (days: number) => {
+    try {
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const d = new Date(year, month - 1, day + days);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dt = String(d.getDate()).padStart(2, '0');
+      setSelectedDate(`${y}-${m}-${dt}`);
+    } catch (e) {
+      console.error('Failed to change date:', e);
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-24 px-2 sm:px-4 antialiased">
+    <div className="max-w-5xl mx-auto space-y-6 pb-28 px-3.5 sm:px-6 pt-4 antialiased">
       
-      {/* 1. HEADER: TITLES, DATE NAVIGATION & ELEPHANT FILTER */}
-      <div className="bg-slate-50/85 backdrop-blur-xl border border-slate-200/70 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          
-          {/* Title & Medical Subtitle */}
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-700 flex items-center justify-center text-xl shadow-inner shrink-0">
-                <Stethoscope size={22} className="stroke-[2.2]" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 leading-tight">
-                  Сводка по стаду
-                </h1>
-                <div className="text-xs sm:text-sm font-semibold text-slate-500 capitalize mt-0.5">
-                  {formattedDate} • Дежурный: <span className="text-slate-800 font-bold">{dutyKeeper}</span>
-                </div>
-              </div>
-            </div>
+      {/* 1. HEADER & DATE SELECTOR */}
+      <div className="bg-white/80 backdrop-blur-xl border border-white/80 rounded-[28px] p-4 sm:p-5 shadow-[0_4px_20px_rgba(15,23,42,0.03)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-teal-700 flex items-center justify-center shrink-0 shadow-xs">
+            <Stethoscope size={22} className="stroke-[2.4]" />
           </div>
-
-          {/* Date Selector / Navigation */}
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            <button
-              type="button"
-              onClick={() => handleDateShift(-1)}
-              className="p-2.5 rounded-2xl bg-white/80 hover:bg-white text-slate-600 border border-slate-200/80 shadow-sm active:scale-95 transition-all"
-              title="Предыдущий день"
-            >
-              <ChevronLeft size={18} />
-            </button>
-
-            <button
-              type="button"
-              onClick={setDateToToday}
-              className="px-4 py-2 rounded-2xl bg-white/80 hover:bg-white border border-slate-200/80 text-xs sm:text-sm font-bold text-slate-800 shadow-sm active:scale-95 transition-all flex items-center gap-2"
-            >
-              <CalendarIcon size={16} className="text-teal-600" />
-              <span>{selectedDate}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleDateShift(1)}
-              className="p-2.5 rounded-2xl bg-white/80 hover:bg-white text-slate-600 border border-slate-200/80 shadow-sm active:scale-95 transition-all"
-              title="Следующий день"
-            >
-              <ChevronRight size={18} />
-            </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                Вет-Кабинет
+              </h1>
+              {isVetOrAdmin ? (
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-800 bg-teal-100/80 px-2 py-0.5 rounded-full border border-teal-200">
+                  Ветврач
+                </span>
+              ) : (
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-800 bg-sky-100/80 px-2 py-0.5 rounded-full border border-sky-200">
+                  Кипер (Исполнение)
+                </span>
+              )}
+            </div>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5 flex items-center gap-1.5 capitalize">
+              <CalendarIcon size={13} className="text-slate-400" />
+              <span>{formattedDate}</span>
+            </p>
           </div>
         </div>
-
-        {/* Status Mode Indicator */}
-        <div className="pt-1 flex justify-end border-t border-slate-200/50">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-2 pt-1">
-            Режим: Ветврач • Планшетная аналитика
-          </div>
+        
+        {/* Date Navigator */}
+        <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/70 self-start sm:self-auto">
+          <button 
+            type="button"
+            onClick={() => stepDate(-1)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-all active:scale-90 cursor-pointer"
+            title="Предыдущий день"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button 
+            type="button"
+            onClick={() => setSelectedDate(todayStr)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+              selectedDate === todayStr 
+                ? 'bg-white text-slate-900 shadow-xs font-black' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            Сегодня
+          </button>
+          <button 
+            type="button"
+            onClick={() => stepDate(1)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-all active:scale-90 cursor-pointer"
+            title="Следующий день"
+          >
+            <ChevronRight size={16} />
+          </button>
         </div>
       </div>
 
-      {/* 2. RED FLAGS / PATHOLOGIES (ALERT CARDS) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <span className="text-rose-500 animate-pulse font-black text-lg">⚠️</span>
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-              Красные флаги и патологии
-            </h2>
-            <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-black">
-              {filteredAlerts.length}
-            </span>
-          </div>
+      {/* 2. ELEPHANT SELECTION TABS: [Все слоны] | [Марго] | [Одри] | [Прэтти] */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <button
+          type="button"
+          onClick={() => setFilterElephantId('all')}
+          className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+            filterElephantId === 'all' 
+              ? 'bg-slate-900 text-white shadow-md' 
+              : 'bg-white/80 backdrop-blur-md text-slate-600 border border-slate-200/80 hover:bg-white hover:text-slate-900'
+          }`}
+        >
+          Все слоны
+        </button>
+        {elephants.map(e => {
+          const isSelected = filterElephantId === e.id;
+          const emoji = ELEPHANT_EMOJI[e.id] || '🐘';
+          return (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => setFilterElephantId(e.id)}
+              className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                isSelected 
+                  ? 'bg-teal-600 text-white shadow-md' 
+                  : 'bg-white/80 backdrop-blur-md text-slate-700 border border-slate-200/80 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              <span>{emoji}</span>
+              <span>{e.name}</span>
+            </button>
+          );
+        })}
+      </div>
 
-          <span className="text-xs font-semibold text-slate-500">
-            {!activeElephantId ? 'По всему стаду' : 'По выбранному слону'}
-          </span>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="animate-spin rounded-full h-9 w-9 border-b-2 border-teal-600"></div>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Загрузка данных веткабинета...</span>
         </div>
+      ) : (
+        <div className="space-y-6">
+          
+          {/* 3. ВЕРХНИЙ БЛОК: ЛАКОНИЧНЫЕ КАРТОЧКИ СТАТУСА (ЖКТ/Стул, Сон, Аппетит) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+            {/* ЖКТ / Стул */}
+            <div className="bg-white/80 backdrop-blur-xl border border-white/90 rounded-[24px] p-4 sm:p-5 shadow-[0_4px_16px_rgba(15,23,42,0.03)] flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Activity size={17} className="text-amber-600 stroke-[2.4]" />
+                  <span className="font-extrabold text-xs tracking-tight uppercase">ЖКТ / Стул</span>
+                </div>
+                <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
+                  displayMetrics.hasDiarrhea 
+                    ? 'bg-rose-100 text-rose-700 border-rose-200' 
+                    : displayMetrics.hasDry 
+                      ? 'bg-amber-100 text-amber-800 border-amber-200' 
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                }`}>
+                  {displayMetrics.stoolStatus}
+                </div>
+              </div>
+              <div>
+                <div className="text-3xl font-black text-slate-900 tracking-tight">
+                  {displayMetrics.poopCount} <span className="text-sm text-slate-400 font-bold">куч</span>
+                </div>
+                <div className="text-[11px] font-semibold text-slate-500 mt-1">
+                  Объем дефекации за суточную смену
+                </div>
+              </div>
+            </div>
 
-        {filteredAlerts.length === 0 ? (
-          <div className="bg-emerald-50/90 backdrop-blur-xl border border-emerald-200/80 rounded-2xl p-4 flex items-center gap-3 text-emerald-900 shadow-sm">
-            <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
-            <div className="text-xs sm:text-sm font-bold">
-              Патологий и клинических аномалий за данную смену не зафиксировано — стадо в клинической норме.
+            {/* Сон */}
+            <div className="bg-white/80 backdrop-blur-xl border border-white/90 rounded-[24px] p-4 sm:p-5 shadow-[0_4px_16px_rgba(15,23,42,0.03)] flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Moon size={17} className="text-indigo-600 stroke-[2.4]" />
+                  <span className="font-extrabold text-xs tracking-tight uppercase">Ночной сон</span>
+                </div>
+                <div className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                  {displayMetrics.laydowns > 0 ? 'Лежа' : 'Дремали стоя'}
+                </div>
+              </div>
+              <div>
+                <div className="text-3xl font-black text-slate-900 tracking-tight">
+                  {displayMetrics.sleepTime}
+                </div>
+                <div className="text-[11px] font-semibold text-slate-500 mt-1">
+                  {displayMetrics.laydowns} {displayMetrics.laydowns === 1 ? 'укладка' : displayMetrics.laydowns >= 2 && displayMetrics.laydowns <= 4 ? 'укладки' : 'укладок'} за ночь
+                </div>
+              </div>
+            </div>
+
+            {/* Аппетит */}
+            <div className="bg-white/80 backdrop-blur-xl border border-white/90 rounded-[24px] p-4 sm:p-5 shadow-[0_4px_16px_rgba(15,23,42,0.03)] flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Utensils size={17} className="text-emerald-600 stroke-[2.4]" />
+                  <span className="font-extrabold text-xs tracking-tight uppercase">Аппетит</span>
+                </div>
+                <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
+                  displayMetrics.appetite.includes('Отказ') 
+                    ? 'bg-rose-100 text-rose-700 border-rose-200' 
+                    : displayMetrics.appetite === 'Частично' 
+                      ? 'bg-amber-100 text-amber-800 border-amber-200' 
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                }`}>
+                  {displayMetrics.appetite}
+                </div>
+              </div>
+              <div>
+                <div className="text-lg font-black text-slate-900 tracking-tight leading-tight">
+                  {displayMetrics.porridgeText}
+                </div>
+                <div className="text-[11px] font-semibold text-slate-500 mt-1">
+                  {rationData.evening_diet_fed ? 'Вечерний рацион выдан полностью' : 'Рацион по расписанию'}
+                </div>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {filteredAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="bg-rose-50/90 backdrop-blur-xl border border-rose-200/90 rounded-2xl p-4 shadow-sm flex flex-col justify-between gap-3 transition-all hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl leading-none drop-shadow-sm shrink-0">
-                      {alert.icon}
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2 py-0.5 rounded-md bg-rose-200/70 text-rose-800 text-[11px] font-black uppercase">
-                          {alert.elephantName}
-                        </span>
-                        {alert.timestamp && (
-                          <span className="text-[11px] font-semibold text-rose-600/80">
-                            {alert.timestamp}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-black text-rose-950 text-sm sm:text-base mt-1 leading-snug">
-                        {alert.title}
-                      </h3>
-                      <p className="text-xs sm:text-sm font-medium text-rose-800/90 mt-1 leading-relaxed">
-                        {alert.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Evidence link / Photo indicator */}
-                <div className="pt-2 border-t border-rose-100/60 flex justify-between items-center gap-2 mt-auto">
-                  {alert.photoUrl ? (
+          {/* 4. ОСНОВНОЙ РАБОЧИЙ БЛОК: «НАЗНАЧЕНИЯ И ЛЕЧЕНИЕ» */}
+          <div className="bg-white/80 backdrop-blur-xl border border-white/90 rounded-[28px] p-4 sm:p-6 shadow-[0_4px_20px_rgba(15,23,42,0.03)] space-y-4">
+            
+            {/* Header with Title and RBAC Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <HeartPulse size={18} strokeWidth={2.4} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                    Назначения и лечение
+                  </h2>
+                  <p className="text-xs font-medium text-slate-400">
+                    {displayedAssignments.length} назначений для выполнения
+                  </p>
+                </div>
+              </div>
+
+              {/* Action buttons based on Role */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {isVetOrAdmin && (
+                  <>
                     <button
                       type="button"
-                      onClick={() => setLightboxPhoto({
-                        url: alert.photoUrl!,
-                        title: alert.title,
-                        elephantName: alert.elephantName
-                      })}
-                      className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl bg-white/90 hover:bg-white text-rose-700 text-xs font-bold border border-rose-200 shadow-sm active:scale-95 transition-all"
+                      onClick={() => setShowOnlyActive(!showOnlyActive)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                        !showOnlyActive 
+                          ? 'bg-slate-900 text-white border-slate-900' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                      }`}
+                      title="Показать архивные и неактивные назначения"
                     >
-                      <Camera size={14} />
-                      <span>Фото</span>
+                      {showOnlyActive ? 'Архив' : 'Только активные'}
                     </button>
-                  ) : (
-                    <div />
-                  )}
-                  <span className="text-[11px] font-bold tracking-wider text-rose-700 uppercase shrink-0">
-                    ТРЕБУЕТ ОСМОТРА
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* 3. KEY METRICS WIDGETS (3-COLUMN MEDICAL SUMMARY) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
-        {/* WIDGET 1: DIET & FEEDING */}
-        <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🥣</span>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Рацион и аппетит
-                </span>
-              </div>
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                100% норма
-              </span>
-            </div>
-
-            <div className="mt-3 space-y-2">
-              <div>
-                <div className="text-xs text-slate-400 font-semibold uppercase">Утренняя каша (08:30)</div>
-                <div className="text-sm font-extrabold text-slate-800 mt-0.5">
-                  {summaryMetrics.porridgeStatus}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-slate-400 font-semibold uppercase">Вечерний салат (18:30)</div>
-                <div className="text-sm font-extrabold text-slate-800 mt-0.5">
-                  {summaryMetrics.saladStatus}
-                </div>
-              </div>
-
-              <div className="pt-2 text-xs text-slate-500 font-medium flex items-center justify-between">
-                <span>Сено: {summaryMetrics.hayBales} тюк. / {summaryMetrics.hayBags} меш.</span>
-                <span>Ветви: {summaryMetrics.branchesCount} связ.</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100/80 text-[11px] font-semibold text-slate-400">
-            Овощи промыты, меловая взвесь внесена
-          </div>
-        </div>
-
-        {/* WIDGET 2: GASTROINTESTINAL & STOOL */}
-        <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">💩</span>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Моторика ЖКТ
-                </span>
-              </div>
-              <span className="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md">
-                Перистальтика
-              </span>
-            </div>
-
-            <div className="mt-3">
-              <div className="text-2xl font-black text-slate-900 tracking-tight">
-                {summaryMetrics.totalPoopCount} куч
-                <span className="text-sm font-bold text-slate-500 ml-2">
-                  (~{summaryMetrics.estimatedWeightKg} кг)
-                </span>
-              </div>
-              <div className="text-xs font-medium text-slate-500 mt-1">
-                Преобладающий статус:
-              </div>
-              <div className="inline-flex items-center gap-1.5 mt-1 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200/60">
-                <CheckCircle2 size={13} className="text-emerald-600" />
-                <span>{summaryMetrics.dominantStoolTrait}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100/80 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
-            <span>Мочеиспускание: норма</span>
-            <span>Диурез активный</span>
-          </div>
-        </div>
-
-        {/* WIDGET 3: SLEEP & RESTORATION */}
-        <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🌙</span>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Ночной сон
-                </span>
-              </div>
-              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
-                Отдых
-              </span>
-            </div>
-
-            <div className="mt-3">
-              <div className="text-2xl font-black text-slate-900 tracking-tight">
-                {formatDuration(summaryMetrics.totalSleepMinutes)}
-              </div>
-              <div className="text-xs font-semibold text-slate-500 mt-1">
-                Количество укладок: <span className="font-extrabold text-slate-800">{summaryMetrics.totalSleepLaydowns} раза</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-medium mt-1">
-                Песчаные подушки вольера подготовлены
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100/80 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
-            <span>Положение: левый/правый бок</span>
-            <span>Без судорог</span>
-          </div>
-        </div>
-
-      </div>
-
-      {/* 4. TIMELINE & EVIDENCE (TIMELINE, OBSERVATION NOTES & PHOTO GALLERY) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* LEFT COLUMN: TIMELINE (CHRONOLOGY) */}
-        <div className="lg:col-span-1 bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <Clock size={18} className="text-slate-600" />
-            <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
-              Хронология событий смены
-            </h3>
-          </div>
-
-          <div className="relative pl-6 space-y-5 ml-2 pt-1 text-xs before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-200/80">
-            {/* Event 1 */}
-            <div className="relative">
-              <span className="absolute -left-[23px] top-0.5 w-3.5 h-3.5 rounded-full bg-amber-400 ring-4 ring-white shadow-sm z-10" />
-              <div className="font-bold text-slate-800 text-xs">08:30 • Утренний замес каши</div>
-              <div className="text-slate-500 text-[11px] mt-0.5">
-                Раздача в тазы, внесены назначенные ветпрепараты и витамины.
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingAssignment(null);
+                        setAssignmentModalOpen(true);
+                      }}
+                      className="min-h-[40px] px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                      <span>Назначить процедуру</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Event 2 */}
-            <div className="relative">
-              <span className="absolute -left-[23px] top-0.5 w-3.5 h-3.5 rounded-full bg-teal-400 ring-4 ring-white shadow-sm z-10" />
-              <div className="font-bold text-slate-800 text-xs">12:00 • Раздача грубых кормов</div>
-              <div className="text-slate-500 text-[11px] mt-0.5">
-                {summaryMetrics.hayBales} тюков сена, проверка поилок, моцион в уличном вольере.
-              </div>
-            </div>
-
-            {/* Event 3 */}
-            <div className="relative">
-              <span className="absolute -left-[23px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 ring-4 ring-white shadow-sm z-10" />
-              <div className="font-bold text-slate-800 text-xs">18:30 • Вечерний салат (~120 л)</div>
-              <div className="text-slate-500 text-[11px] mt-0.5">
-                Базовый замес (морковь 20 кг + свёкла 20 кг + картофель 20 кг).
-              </div>
-            </div>
-
-            {/* Event 4 */}
-            <div className="relative">
-              <span className="absolute -left-[23px] top-0.5 w-3.5 h-3.5 rounded-full bg-indigo-400 ring-4 ring-white shadow-sm z-10" />
-              <div className="font-bold text-slate-800 text-xs">22:00 – 06:00 • Фазы ночного сна</div>
-              <div className="text-slate-500 text-[11px] mt-0.5">
-                Видеомониторинг укладок, фиксация интервалов по камерам.
-              </div>
-            </div>
-
-            {/* Event 5 */}
-            <div className="relative">
-              <span className="absolute -left-[23px] top-0.5 w-3.5 h-3.5 rounded-full bg-slate-500 ring-4 ring-white shadow-sm z-10" />
-              <div className="font-bold text-slate-800 text-xs">07:30 • Фиксация дефекаций</div>
-              <div className="text-slate-500 text-[11px] mt-0.5">
-                Подсчет куч, макроосмотр консистенции стула, фотофиксация.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: OBSERVATION JOURNAL QUOTE & PHOTO EVIDENCE GALLERY */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* OBSERVATION JOURNAL BLOCKQUOTE */}
-          <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-sm space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3">
-              <div className="flex items-center gap-2">
-                <FileText size={18} className="text-amber-600 shrink-0" />
-                <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
-                  Журнал наблюдений (заметки дежурного кипера)
-                </h3>
-              </div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase shrink-0">
-                Голосовые и текстовые заметки
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {observationNotes.map((item, idx) => (
-                <blockquote
-                  key={idx}
-                  className="border-l-4 border-amber-400 bg-amber-50/60 rounded-r-2xl p-4 text-xs sm:text-sm text-slate-800 italic font-medium leading-relaxed shadow-sm space-y-1"
-                >
-                  <p>«{item.text}»</p>
-                  <div className="not-italic text-[11px] font-bold text-slate-500 flex items-center justify-between pt-1">
-                    <span>— {item.author}</span>
-                    <span className="text-slate-400 font-normal">{item.time}</span>
-                  </div>
-                </blockquote>
-              ))}
-            </div>
-          </div>
-
-          {/* EVIDENCE PHOTO GALLERY */}
-          <div className="bg-white/75 backdrop-blur-xl border border-white/60 rounded-3xl p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Camera size={18} className="text-teal-600" />
-                <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
-                  Фотофиксация со смены (Evidence Gallery)
-                </h3>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
-                  {filteredPhotos.length}
-                </span>
-              </div>
-              <span className="text-xs text-slate-400 font-medium">
-                Кликните для полноэкранного просмотра
-              </span>
-            </div>
-
-            {filteredPhotos.length === 0 ? (
-              <div className="text-center py-8 text-xs font-semibold text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                За данную смену фотографий не прикреплено
+            {/* Assignments List */}
+            {displayedAssignments.length === 0 ? (
+              <div className="text-center py-10 px-4 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-slate-500 font-bold text-sm">
+                  {filterElephantId === 'all' 
+                    ? 'Активных назначений и процедур не запланировано' 
+                    : 'Для выбранного слона активных назначений нет'}
+                </p>
+                {isVetOrAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingAssignment(null);
+                      setAssignmentModalOpen(true);
+                    }}
+                    className="mt-3 px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 transition active:scale-95 inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus size={15} />
+                    Создать первое назначение
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-3">
-                {filteredPhotos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    onClick={() => setLightboxPhoto({
-                      url: photo.url,
-                      title: photo.section,
-                      elephantName: photo.elephantName
-                    })}
-                    className="group relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border border-white/80 shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all bg-slate-100 shrink-0"
-                  >
-                    <img
-                      src={photo.url}
-                      alt={photo.section}
-                      className="w-full h-full object-cover group-hover:brightness-105 transition-all"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2 pointer-events-none">
-                      <span className="text-[10px] font-black text-white leading-tight drop-shadow-md truncate">
-                        {photo.section}
-                      </span>
-                      {photo.elephantName && (
-                        <span className="text-[9px] font-bold text-amber-200 truncate">
-                          {photo.elephantName}
-                        </span>
-                      )}
+              <div className="space-y-3">
+                {displayedAssignments.map(assignment => {
+                  const elephant = elephants.find(e => e.id === assignment.elephant_id);
+                  const record = records.find(r => r.assignment_id === assignment.id);
+                  const isCompletedToday = !!record;
+                  const completedTime = record?.performed_at
+                    ? new Date(record.performed_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                    : undefined;
+                  const keeperName = record?.keeper?.name || 'Кипер';
+                  const hasPhotos = record?.photos && record.photos.length > 0;
+                  const firstPhotoUrl = hasPhotos ? getPhotoUrl(record.photos[0].storage_path) : null;
+
+                  return (
+                    <div 
+                      key={assignment.id} 
+                      className={`p-4 rounded-2xl border transition-all ${
+                        !assignment.is_active 
+                          ? 'bg-slate-50/60 border-slate-200/60 opacity-60' 
+                          : isCompletedToday 
+                            ? 'bg-emerald-500/10 border-emerald-500/30 shadow-xs' 
+                            : 'bg-white border-slate-200/80 shadow-xs hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        {/* Title, Elephant, Badges */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-sm font-extrabold text-slate-900 tracking-tight">
+                              {assignment.title}
+                            </span>
+                            
+                            {/* Elephant Badge */}
+                            <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200/60">
+                              <span>{elephant ? ELEPHANT_EMOJI[elephant.id] || '🐘' : '🐘'}</span>
+                              <span>{elephant?.name || 'Слон'}</span>
+                            </span>
+
+                            {/* Schedule Type */}
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                              {assignment.schedule_type === 'daily' ? 'Ежедневно' : assignment.schedule_type === 'as_needed' ? 'По потребности' : 'Курс'}
+                            </span>
+
+                            {/* Active/Inactive badge if inactive */}
+                            {!assignment.is_active && (
+                              <span className="text-[10px] font-extrabold uppercase text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-md">
+                                В архиве
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Medicine & Requirements chips */}
+                          <div className="flex items-center gap-1.5 flex-wrap text-xs mt-1.5">
+                            {assignment.medicine && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/60">
+                                <Pill size={11} className="text-teal-600" />
+                                <span>{assignment.medicine}</span>
+                              </span>
+                            )}
+                            {assignment.requires_photo && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200/80">
+                                <Camera size={11} />
+                                <span>Фото {assignment.requires_before_after ? 'ДО/ПОСЛЕ' : ''}</span>
+                              </span>
+                            )}
+                            {assignment.assessment_type && assignment.assessment_type !== 'none' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
+                                <span>Оценка: {assignment.assessment_type}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Description */}
+                          {assignment.description && (
+                            <p className="text-xs text-slate-600 mt-2 leading-relaxed bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+                              {assignment.description}
+                            </p>
+                          )}
+
+                          {/* Status and Keeper details */}
+                          <div className="mt-3 flex items-center gap-3 flex-wrap">
+                            {isCompletedToday ? (
+                              <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-xl border border-emerald-200/80">
+                                <CheckCircle2 size={15} className="text-emerald-600" />
+                                <span>Выполнено: {keeperName} {completedTime && `в ${completedTime}`}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-xs font-bold text-amber-800 bg-amber-100/80 px-2.5 py-1 rounded-xl border border-amber-200/80">
+                                <Clock size={14} className="text-amber-600" />
+                                <span>Ожидает исполнения</span>
+                              </div>
+                            )}
+
+                            {/* Assessment outcome */}
+                            {record?.assessment && (
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
+                                record.assessment === 'В норме' 
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                              }`}>
+                                Статус: {record.assessment}
+                              </span>
+                            )}
+
+                            {record?.comment && (
+                              <span className="text-xs text-slate-500 italic">
+                                «{record.comment}»
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Photo thumbnail and Actions */}
+                        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center mt-2 sm:mt-0">
+                          {/* Photo Thumbnail if completed */}
+                          {isCompletedToday && hasPhotos && firstPhotoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setLightboxPhoto({
+                                url: firstPhotoUrl,
+                                title: assignment.title,
+                                elephantName: elephant?.name,
+                                performedAt: completedTime,
+                                keeperName,
+                                assessment: record.assessment || undefined,
+                                comment: record.comment || undefined,
+                              })}
+                              className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden relative group cursor-pointer shadow-2xs hover:ring-2 hover:ring-teal-500 transition"
+                              title="Нажмите для просмотра фото"
+                            >
+                              <img 
+                                src={firstPhotoUrl} 
+                                alt="Фото отчета" 
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105" 
+                              />
+                              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                                <Eye size={16} />
+                              </div>
+                            </button>
+                          )}
+
+                          {/* ACTION BUTTON: For Keeper and Vet */}
+                          {/* If NOT completed -> Execute button */}
+                          {!isCompletedToday && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTaskForExecution({
+                                assignment,
+                                elephant: elephant || elephants[0],
+                                existingRecord: record,
+                              })}
+                              className="min-h-[44px] px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                            >
+                              <Camera size={15} />
+                              <span>Выполнено кипером</span>
+                            </button>
+                          )}
+
+                          {/* If completed -> Options to unmark / re-record */}
+                          {isCompletedToday && (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTaskForExecution({
+                                  assignment,
+                                  elephant: elephant || elephants[0],
+                                  existingRecord: record,
+                                })}
+                                className="min-h-[38px] px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-400 text-slate-700 text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
+                              >
+                                Изменить отчет
+                              </button>
+                              
+                              {isVetOrAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnmarkTask(record.id, assignment.id)}
+                                  className="w-9 h-9 flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                                  title="Снять отметку о выполнении"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Vet / Admin specific controls: Edit assignment & Toggle active */}
+                          {isVetOrAdmin && (
+                            <div className="flex items-center gap-1 border-l border-slate-200 pl-2 ml-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingAssignment(assignment);
+                                  setAssignmentModalOpen(true);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                                title="Редактировать назначение"
+                              >
+                                <Edit3 size={15} />
+                              </button>
+
+                              <label className="relative inline-flex items-center cursor-pointer ml-1" title={assignment.is_active ? 'Сделать неактивным' : 'Сделать активным'}>
+                                <input 
+                                  type="checkbox" 
+                                  className="sr-only peer"
+                                  checked={assignment.is_active}
+                                  onChange={() => handleToggleActive(assignment)}
+                                />
+                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
-        </div>
+          {/* 5. ЖУРНАЛ НАБЛЮДЕНИЙ & ФОТОАРХИВ СМЕНЫ */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            
+            {/* Заметки киперов */}
+            <div className="bg-white/80 backdrop-blur-xl border border-white/90 rounded-[28px] p-4 sm:p-5 shadow-[0_4px_16px_rgba(15,23,42,0.03)]">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText size={18} className="text-slate-600" />
+                <h3 className="text-base font-black text-slate-900">Заметки и поведение</h3>
+              </div>
+              
+              <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
+                {targetElephants.map(e => {
+                  const m = metrics[e.id];
+                  if (!m?.notes && !m?.behavior) return null;
+                  return (
+                    <div key={e.id} className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-extrabold text-slate-700">
+                          {ELEPHANT_EMOJI[e.id] || '🐘'} {e.name}
+                        </span>
+                        {m?.behavior && (
+                          <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                            {m.behavior}
+                          </span>
+                        )}
+                      </div>
+                      {m?.notes && (
+                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          {m.notes}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
 
-      </div>
+                {shift?.handover_notes && (
+                  <div className="p-3 bg-indigo-50/70 rounded-2xl border border-indigo-100">
+                    <div className="text-xs font-bold text-indigo-700 mb-1 flex items-center gap-1">
+                      <ShieldCheck size={13} />
+                      <span>Заметки при пересменке</span>
+                    </div>
+                    <p className="text-xs text-indigo-950 whitespace-pre-wrap leading-relaxed">
+                      {shift.handover_notes}
+                    </p>
+                  </div>
+                )}
 
-      {/* 5. FULLSCREEN MODAL LIGHTBOX */}
-      {lightboxPhoto && (
-        <div 
-          className="fixed inset-0 z-[100] flex flex-col bg-slate-950/90 backdrop-blur-2xl animate-in fade-in duration-200 p-4"
-          onClick={() => setLightboxPhoto(null)}
-        >
-          <div className="max-w-4xl mx-auto w-full flex items-center justify-between pb-3 text-white border-b border-white/10" onClick={e => e.stopPropagation()}>
-            <div>
-              <div className="text-base font-extrabold flex items-center gap-2">
-                <span>{lightboxPhoto.title}</span>
-                {lightboxPhoto.elephantName && (
-                  <span className="px-2 py-0.5 rounded-md bg-white/20 text-xs font-bold">
-                    {lightboxPhoto.elephantName}
-                  </span>
+                {targetElephants.every(e => !metrics[e.id]?.notes) && !shift?.handover_notes && (
+                  <div className="text-center py-8 text-slate-400 font-semibold text-xs">
+                    Заметок о поведении на эту дату не зафиксировано
+                  </div>
                 )}
               </div>
-              <div className="text-xs text-white/60">Клиническая фотофиксация дежурной смены</div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setLightboxPhoto(null)}
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all active:scale-90"
-            >
-              <X size={20} />
-            </button>
+            {/* Фотографии смены (включая ветпроцедуры) */}
+            <div className="bg-white/80 backdrop-blur-xl border border-white/90 rounded-[28px] p-4 sm:p-5 shadow-[0_4px_16px_rgba(15,23,42,0.03)]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Camera size={18} className="text-slate-600" />
+                  <h3 className="text-base font-black text-slate-900">Фотоархив дня</h3>
+                </div>
+              </div>
+
+              {(() => {
+                const shiftPhotos: { url: string; title: string; elephantName: string }[] = [];
+                
+                // 1. Shift record photos
+                records.forEach(r => {
+                  const e = elephants.find(el => el.id === r.elephant_id);
+                  const assign = assignments.find(a => a.id === r.assignment_id);
+                  if (r.photos) {
+                    r.photos.forEach(p => {
+                      shiftPhotos.push({
+                        url: getPhotoUrl(p.storage_path),
+                        title: assign?.title || 'Процедура',
+                        elephantName: e?.name || 'Слон',
+                      });
+                    });
+                  }
+                });
+
+                // 2. Elephant metrics photos
+                targetElephants.forEach(e => {
+                  const m = metrics[e.id];
+                  if (m?.photos) {
+                    m.photos.forEach(p => {
+                      shiftPhotos.push({
+                        url: p.dataUrl,
+                        title: 'Наблюдение',
+                        elephantName: e.name,
+                      });
+                    });
+                  }
+                });
+
+                if (shiftPhotos.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-slate-400 font-semibold text-xs bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                      Фотографий за эту смену пока нет
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
+                    {shiftPhotos.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setLightboxPhoto({
+                          url: p.url,
+                          title: p.title,
+                          elephantName: p.elephantName,
+                        })}
+                        className="aspect-square rounded-2xl bg-slate-100 overflow-hidden border border-slate-200/80 relative group cursor-pointer shadow-2xs"
+                      >
+                        <img 
+                          src={p.url} 
+                          alt={p.title} 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105" 
+                        />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                          <Eye size={18} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
           </div>
 
-          <div className="flex-1 w-full flex items-center justify-center p-2 sm:p-4" onClick={e => e.stopPropagation()}>
-            <img
-              src={lightboxPhoto.url}
-              alt={lightboxPhoto.title}
-              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl drop-shadow-2xl animate-in zoom-in-95 duration-200"
-            />
-          </div>
+        </div>
+      )}
 
-          <div className="max-w-4xl mx-auto w-full pt-3 border-t border-white/10 flex items-center justify-between text-xs text-white/70" onClick={e => e.stopPropagation()}>
-            <span>СлоноВет • Ветеринарный архив</span>
-            <button
-              type="button"
-              onClick={() => setLightboxPhoto(null)}
-              className="px-5 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 transition-all active:scale-95"
-            >
-              Закрыть
-            </button>
+      {/* MODAL: ASSIGNMENT CREATION / EDITING (Vet / Admin only) */}
+      {assignmentModalOpen && (
+        <AssignmentModal
+          elephants={elephants}
+          initialData={editingAssignment}
+          onClose={() => {
+            setAssignmentModalOpen(false);
+            setEditingAssignment(null);
+          }}
+          onSaved={handleAssignmentSaved}
+        />
+      )}
+
+      {/* MODAL: TASK EXECUTION & PHOTO REPORT (Keeper & Vet) */}
+      {selectedTaskForExecution && (
+        <ExecutionModal
+          assignment={selectedTaskForExecution.assignment}
+          elephant={selectedTaskForExecution.elephant}
+          initialData={selectedTaskForExecution.existingRecord ? {
+            assessment: selectedTaskForExecution.existingRecord.assessment,
+            medicineUsed: selectedTaskForExecution.existingRecord.medicine_used,
+            comment: selectedTaskForExecution.existingRecord.comment,
+          } : undefined}
+          onClose={() => setSelectedTaskForExecution(null)}
+          onComplete={handleCompleteTask}
+        />
+      )}
+
+      {/* LIGHTBOX: FULL IMAGE PREVIEW */}
+      {lightboxPhoto && (
+        <div 
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-[130] flex items-center justify-center p-4 animate-in fade-in duration-150" 
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div 
+            className="relative max-w-3xl w-full max-h-[90vh] bg-slate-900 rounded-[28px] overflow-hidden flex flex-col shadow-2xl border border-white/10"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-4 flex items-center justify-between text-white border-b border-white/10">
+              <div>
+                <h4 className="font-bold text-sm tracking-tight">{lightboxPhoto.title}</h4>
+                <p className="text-xs text-slate-400">
+                  {lightboxPhoto.elephantName} {lightboxPhoto.keeperName && `• Исполнитель: ${lightboxPhoto.keeperName}`} {lightboxPhoto.performedAt && `в ${lightboxPhoto.performedAt}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLightboxPhoto(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-[300px] max-h-[65vh] flex items-center justify-center p-2 bg-black/40">
+              <img 
+                src={lightboxPhoto.url} 
+                alt={lightboxPhoto.title} 
+                className="max-w-full max-h-[60vh] object-contain rounded-xl"
+              />
+            </div>
+
+            {(lightboxPhoto.assessment || lightboxPhoto.comment) && (
+              <div className="p-4 bg-slate-900/90 border-t border-white/10 text-white text-xs space-y-1">
+                {lightboxPhoto.assessment && (
+                  <div><span className="text-slate-400 font-semibold">Оценка состояния:</span> <span className="font-bold text-teal-400">{lightboxPhoto.assessment}</span></div>
+                )}
+                {lightboxPhoto.comment && (
+                  <div><span className="text-slate-400 font-semibold">Комментарий:</span> <span>{lightboxPhoto.comment}</span></div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
