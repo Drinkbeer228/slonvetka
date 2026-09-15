@@ -1000,7 +1000,7 @@ export function DailyShiftPage() {
     : [];
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return;
+    if (typeof window === 'undefined' || typeof document === 'undefined' || typeof IntersectionObserver === 'undefined') return;
 
     const sections = SHIFT_SECTION_TABS
       .map(tab => document.getElementById(`shift-section-${tab.id}`))
@@ -1117,7 +1117,7 @@ export function DailyShiftPage() {
         </div>
       )}
 
-      <div className="sticky top-18 z-20 -mx-1 px-1">
+      <div className="sticky top-[4.5rem] z-20 -mx-1 px-1">
         <div className="flex gap-2 overflow-x-auto rounded-[22px] border border-white/80 bg-white/80 p-2 shadow-sm backdrop-blur-xl thin-scroll">
           {SHIFT_SECTION_TABS.map((tab) => (
             <button

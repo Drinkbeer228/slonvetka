@@ -77,7 +77,7 @@ create table public.treatment_photos (
 
 -- DAILY SHIFTS (смены дежурства)
 create table public.daily_shifts (
-  id uuid primary key,
+  id text primary key, -- client stores a UUID string here
   date date not null unique,
   duty_keeper_id uuid references public.profiles(id),
   status text check (status in ('in_progress', 'completed', 'submitted', 'handover_pending')) default 'in_progress',
@@ -96,8 +96,8 @@ create table public.daily_shifts (
 
 -- ELEPHANT DAILY METRICS (физиология per слон per смена)
 create table public.elephant_daily_metrics (
-  id text primary key, -- format: 'metric_<shift_uuid>_<elephant_id>_<random>'
-  shift_id uuid references public.daily_shifts(id) on delete cascade not null,
+  id text primary key, -- format: 'metric_<shift_id>_<elephant_id>_<random>'
+  shift_id text references public.daily_shifts(id) on delete cascade not null,
   elephant_id uuid references public.elephants(id) not null,
   poop_count integer default 0 check (poop_count >= 0),
   feces_traits jsonb default '["Сформирован (норма)"]',
