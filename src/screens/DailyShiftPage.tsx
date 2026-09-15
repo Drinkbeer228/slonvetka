@@ -26,6 +26,7 @@ import { ArchiveBanner } from '../components/daily-shift/ArchiveBanner';
 import { ShiftHandoverModal } from '../components/daily-shift/ShiftHandoverModal';
 import { useShiftEvents, ShiftEvent } from '../hooks/useShiftEvents';
 import { HandoverAcceptBanner } from '../components/daily-shift/HandoverAcceptBanner';
+import { canAdjustInventory, canClaimShift, canCreateMedicalAssignment, canEditShift, canManageUsers } from '../lib/permissions';
 
 export const ELEPHANT_MOODS = [
   { 
@@ -167,7 +168,7 @@ const serializeDailyRation = (ration: DailyRationData): string => {
 };
 
 export function DailyShiftPage() {
-  const { profile, isAdmin, elephants, assignments, selectedDate, setSelectedDate, activeElephantId, setActiveElephantId, setGlobalSaveStatus, globalSaveStatus, logout } = useStore();
+  const { profile, elephants, assignments, selectedDate, setSelectedDate, activeElephantId, setActiveElephantId, setGlobalSaveStatus, globalSaveStatus, logout } = useStore();
   
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -312,7 +313,6 @@ export function DailyShiftPage() {
 
   const [selectedTask, setSelectedTask] = useState<{ assignment: Assignment; elephant: Elephant; existingRecord?: TreatmentRecordWithPhotos } | null>(null);
 
-  const isVet = profile?.role === 'vet' || profile?.role === 'director';
   const isToday = selectedDate === todayStr;
   const isFutureDate = selectedDate > todayStr;
   const isArchiveMode = selectedDate < todayStr || shift?.status === 'completed' || (shift?.status as string) === 'submitted';
@@ -320,11 +320,14 @@ export function DailyShiftPage() {
   const [pendingHandover, setPendingHandover] = useState<DailyShift | null>(null);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [dutyKeeperName, setDutyKeeperName] = useState<string>('');
-  const isLocked = isFutureDate || (isArchiveMode && (!isAdmin || !isEditOverride));
+  const isAdminUser = canManageUsers(profile);
+  const canEditCurrentShift = canEditShift(profile, shift);
+  const canManageShiftInventory = canAdjustInventory(profile, shift);
+  const isLocked = isFutureDate || (isArchiveMode && (!isAdminUser || !isEditOverride));
   
   // Режим только чтения: архив или чужая смена
   // Режим только чтения: архив или чужая смена
-  const isSupervisor = profile?.role === 'admin' || profile?.role === 'director';
+  const isSupervisor = isAdminUser;
   const isOtherKeeper = shift?.duty_keeper_id && shift.duty_keeper_id !== profile?.id;
   const isArchiveOrOtherKeeper = Boolean(
     shift && (
@@ -333,8 +336,8 @@ export function DailyShiftPage() {
     )
   );
                          
-  const isVetUser = profile?.role === 'vet';
-  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper || isVetUser;
+  const isVetUser = canCreateMedicalAssignment(profile);
+  const isEditingDisabled = isLocked || isArchiveOrOtherKeeper || (!canEditCurrentShift && !(isAdminUser && isEditOverride));
   const isFeedEditingDisabled = isEditingDisabled;
 
   useEffect(() => {
@@ -400,9 +403,9 @@ export function DailyShiftPage() {
       }
 
       if (loadedShift && (!loadedShift.duty_keeper_id || loadedShift.duty_keeper_id !== profile?.id)) {
-        const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && profile?.role !== 'vet';
+        const isThisShiftLocked = (loadedShift.status === 'completed' || selectedDate < todayStr || selectedDate > todayStr) && !canCreateMedicalAssignment(profile);
         // ИСПРАВЛЕНО: Забираем смену ТОЛЬКО если у нее вообще нет дежурного (duty_keeper_id === null) и это не передача и пользователь не ветврач
-        if (!isThisShiftLocked && profile?.id && !isVetUser && !loadedShift.duty_keeper_id && loadedShift.status !== 'handover_pending') {
+        if (!isThisShiftLocked && profile?.id && canClaimShift(profile, loadedShift) && !loadedShift.duty_keeper_id) {
            loadedShift = { ...loadedShift, duty_keeper_id: profile.id };
            setDutyKeeperName(profile.name);
            // Trigger immediate save in background so it's locked to this user
@@ -1041,7 +1044,7 @@ export function DailyShiftPage() {
         <div className="mb-4 bg-blue-50 border border-blue-200/60 rounded-[24px] p-3 shadow-sm mx-4 sm:mx-0 flex items-center justify-between">
           <p className="text-blue-800 font-bold text-sm flex items-center gap-2">
             <ShieldAlert size={16} className="shrink-0" />
-            Режим супервизора / директора
+            Режим администратора
           </p>
           <div className="text-xs font-black uppercase tracking-wider text-blue-600 bg-blue-100/50 px-2 py-1 rounded-lg">Супервизор</div>
         </div>
@@ -1050,14 +1053,14 @@ export function DailyShiftPage() {
       {/* ARCHIVE GUARD BANNER */}
       {isArchiveMode && !isEditOverride && !isArchiveOrOtherKeeper && (
         <ArchiveBanner
-          isAdmin={isAdmin}
+          isAdmin={isAdminUser}
           onReturnToToday={() => setSelectedDate(todayStr)}
           onUnlockAdmin={() => setIsEditOverride(true)}
         />
       )}
 
       {/* ADMIN ACTIVE EDIT BANNER */}
-      {isAdmin && isEditOverride && isArchiveMode && (
+      {isAdminUser && isEditOverride && isArchiveMode && (
         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-950 px-4 py-3 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2.5">
             <Unlock className="text-amber-700 shrink-0" size={18} />
@@ -1183,7 +1186,7 @@ export function DailyShiftPage() {
             </span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {profile?.role !== 'vet' && (
+            {canManageShiftInventory && (
               <button
                 type="button"
                 onClick={() => {

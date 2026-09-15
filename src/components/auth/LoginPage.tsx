@@ -129,7 +129,6 @@ export function LoginPage({ children }: LoginPageProps) {
         options: {
           data: {
             name: cleanLogin.split('@')[0],
-            role: cleanLogin === 'admin' ? 'admin' : 'keeper'
           }
         }
       });

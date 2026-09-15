@@ -3,6 +3,7 @@ import { supabaseService } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { Profile, Elephant, Assignment } from '../types';
 import { cacheElephants, cacheAssignments, getCachedElephants, getCachedAssignments } from '../services/offlineDb';
+import { canManageUsers } from '../lib/permissions';
 
 interface StoreState {
   profile: Profile | null;
@@ -115,10 +116,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isAdmin = Boolean(
-    profile?.role === 'admin' ||
-    (profile as any)?.is_admin === true
-  );
+  const isAdmin = canManageUsers(profile);
 
   return (
     <StoreContext.Provider value={{
@@ -134,4 +132,3 @@ export function useStore() {
   if (!context) throw new Error('useStore must be used within a StoreProvider');
   return context;
 }
-

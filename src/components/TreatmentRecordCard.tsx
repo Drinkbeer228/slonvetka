@@ -3,6 +3,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { TreatmentRecordWithPhotos, Elephant, Assignment, Profile } from '../types';
 import { formatDate, formatTime } from '../utils/dates';
 import { PhotoPreview } from './PhotoPreview';
+import { canCreateMedicalAssignment } from '../lib/permissions';
 
 interface TreatmentRecordCardProps {
   key?: React.Key;
@@ -36,7 +37,7 @@ export function TreatmentRecordCard({
     : (record.keeper_id === currentProfile?.id ? currentProfile.name : 'Сотрудник');
 
   const performedAt = new Date(record.performed_at).getTime();
-  const isVet = currentProfile?.role === 'vet';
+  const canEditMedicalRecords = canCreateMedicalAssignment(currentProfile);
 
   return (
     <div className="bg-white rounded-2xl p-4 shadow-xs border border-zinc-200 transition hover:border-zinc-300">
@@ -55,7 +56,7 @@ export function TreatmentRecordCard({
           </div>
 
           {/* Action buttons visible ONLY for vet */}
-          {isVet && (
+          {canEditMedicalRecords && (
             <div className="flex items-center gap-1 pl-1 border-l border-zinc-200 ml-1">
               {onEdit && (
                 <button

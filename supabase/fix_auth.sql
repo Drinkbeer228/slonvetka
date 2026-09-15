@@ -5,13 +5,12 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, name, role, active, is_admin)
+  insert into public.profiles (id, name, role, active)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    coalesce(new.raw_user_meta_data->>'role', 'keeper'),
-    true,
-    coalesce((new.raw_user_meta_data->>'role') = 'admin', false)
+    'keeper',
+    true
   );
   return new;
 end;
@@ -26,4 +25,5 @@ create trigger on_auth_user_created
 -- 3. Allow users to update their own profiles
 drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self" on public.profiles
-  for update using (id = auth.uid());
+  for update using (id = auth.uid())
+  with check (id = auth.uid() and role = (select role from public.profiles where id = auth.uid()));

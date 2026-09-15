@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { useStore } from '../store';
 import { Plus, X, Loader2, User } from 'lucide-react';
+import { canManageUsers } from '../lib/permissions';
+import { ROLE_LABELS, UserRole } from '../types/roles';
 
 // Create a separate Supabase client that doesn't persist the session.
 // This allows us to sign up a new user without logging out the current admin.
@@ -27,7 +29,7 @@ const tempSupabase = createClient(
 interface StaffProfile {
   id: string;
   name: string;
-  role: 'vet' | 'keeper' | 'director';
+  role: UserRole;
 }
 
 export function StaffScreen() {
@@ -39,7 +41,7 @@ export function StaffScreen() {
   const [regName, setRegName] = useState('');
   const [regLogin, setRegLogin] = useState('');
   const [regPin, setRegPin] = useState('');
-  const [regRole, setRegRole] = useState<'keeper' | 'vet' | 'director'>('keeper');
+  const [regRole, setRegRole] = useState<UserRole>('keeper');
   
   const [createLoading, setCreateLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,7 +64,7 @@ export function StaffScreen() {
   };
 
   useEffect(() => {
-    if (profile?.role === 'vet') {
+    if (canManageUsers(profile)) {
       fetchStaff();
     }
   }, [profile]);
@@ -92,12 +94,20 @@ export function StaffScreen() {
         options: {
           data: {
             name: regName.trim(),
-            role: regRole,
           },
         },
       });
 
       if (signUpError) throw signUpError;
+
+      if (data.user && regRole !== 'keeper') {
+        const { error: roleError } = await supabase.rpc('admin_set_user_role', {
+          target_user_id: data.user.id,
+          new_role: regRole,
+        });
+
+        if (roleError) throw roleError;
+      }
 
       // Close modal and refresh list
       setModalOpen(false);
@@ -114,12 +124,12 @@ export function StaffScreen() {
     }
   };
 
-  if (profile?.role !== 'vet') {
+  if (!canManageUsers(profile)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
         <span className="text-4xl mb-4">⛔</span>
         <h2 className="text-xl font-black text-zinc-900 mb-2">Доступ запрещен</h2>
-        <p className="text-zinc-500 font-medium text-sm">Этот раздел доступен только ветврачам.</p>
+        <p className="text-zinc-500 font-medium text-sm">Этот раздел доступен только администраторам.</p>
       </div>
     );
   }
@@ -154,9 +164,15 @@ export function StaffScreen() {
               <div>
                 <h3 className="font-black text-lg text-zinc-900">{member.name}</h3>
                 <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider ${
-                  member.role === 'vet' ? 'bg-blue-50 text-blue-600' : member.role === 'director' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                  member.role === 'admin'
+                    ? 'bg-rose-50 text-rose-600'
+                    : member.role === 'vet'
+                      ? 'bg-blue-50 text-blue-600'
+                      : member.role === 'director'
+                        ? 'bg-amber-50 text-amber-600'
+                        : 'bg-emerald-50 text-emerald-600'
                 }`}>
-                  {member.role === 'vet' ? 'Ветврач' : member.role === 'director' ? 'Дрессировщик' : 'Кипер'}
+                {ROLE_LABELS[member.role]}
                 </span>
               </div>
             </div>
@@ -223,12 +239,13 @@ export function StaffScreen() {
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Роль</label>
                   <select
                     value={regRole}
-                    onChange={(e) => setRegRole(e.target.value as 'keeper' | 'vet' | 'director')}
+                    onChange={(e) => setRegRole(e.target.value as UserRole)}
                     className="w-full px-4 py-3 bg-zinc-100 border-2 border-transparent focus:bg-white rounded-xl font-bold focus:outline-none focus:border-zinc-900 transition"
                   >
                     <option value="keeper">Кипер</option>
                     <option value="vet">Ветврач</option>
                     <option value="director">Дрессировщик</option>
+                    <option value="admin">Администратор</option>
                   </select>
                 </div>
 

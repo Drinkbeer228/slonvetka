@@ -1,10 +1,11 @@
+import { UserRole } from './roles';
+
 export interface Profile {
   id: string;
   name: string;
-  role: 'keeper' | 'vet' | 'director' | 'admin' | string;
+  role: UserRole;
   active: boolean;
   created_at: string;
-  is_admin?: boolean;
   invite_code?: string;
   birth_date?: string;
   avatar_url?: string;
@@ -64,4 +65,3 @@ export interface TreatmentRecordWithPhotos extends TreatmentRecord {
     name: string;
   } | null;
 }
-

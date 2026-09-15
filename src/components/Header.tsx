@@ -4,6 +4,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useStore } from '../store';
+import { ROLE_SHORT_LABELS } from '../types/roles';
 import { shiftService } from '../services/shiftService';
 import { getTodayStr } from '../utils/dates';
 import { VetKeeperViewToggle } from './VetCabinetDashboard';
@@ -181,7 +182,7 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
             {profile && (
               <span className="hidden items-center gap-1.5 rounded-xl bg-emerald-50 px-2 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-800 sm:inline-flex" title={profile.name}>
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                {profile.role === 'vet' ? 'Вет' : profile.role === 'admin' ? 'Админ' : 'Кипер'}
+                {ROLE_SHORT_LABELS[profile.role] ?? 'Сотр.'}
               </span>
             )}
             <button
@@ -372,4 +373,3 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     </>
   );
 }
-

@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { ChevronRight, Plus } from 'lucide-react';
 import { AssignmentModal } from '../components/AssignmentModal';
 import { Assignment } from '../types';
+import { canCreateMedicalAssignment } from '../lib/permissions';
 
 interface ElephantsScreenProps {
   onElephantClick: (id: string) => void;
@@ -44,7 +45,7 @@ export function ElephantsScreen({ onElephantClick }: ElephantsScreenProps) {
               <ChevronRight className="text-zinc-400" />
             </div>
             
-            {profile?.role === 'vet' && (
+            {canCreateMedicalAssignment(profile) && (
               <button
                 onClick={(e) => handleOpenModal(e, elephant.id)}
                 className="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition text-sm border border-blue-100"
@@ -72,4 +73,3 @@ export function ElephantsScreen({ onElephantClick }: ElephantsScreenProps) {
     </div>
   );
 }
-
