@@ -41,7 +41,7 @@ export interface VetDashboardState {
   dietOverride: DietOverride;
 }
 
-export type VetKeeperViewValue = 'daily_shift' | 'vet_cabinet' | 'vet_dashboard';
+export type VetKeeperViewValue = 'daily_shift' | 'vet_cabinet';
 
 interface VetKeeperViewToggleProps {
   value: VetKeeperViewValue;
@@ -408,10 +408,12 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
     setDietOverride(rationData.diet_override?.active ? rationData.diet_override : { active: false, ...rationData.diet_override });
   }, [rationData]);
 
+  const riskRefusedFood = elephants.length === 1 ? refusedFood : false;
+
   const dashboardStates = useMemo(() => {
     return elephants.map(elephant => {
       const defecationLogs = buildDefecationLogs(elephant, metricsMap[elephant.id], selectedDate);
-      const risk = computeGiRisk(defecationLogs, false);
+      const risk = computeGiRisk(defecationLogs, riskRefusedFood);
       return {
         elephant,
         state: {
@@ -425,7 +427,7 @@ export function VetCabinetDashboard({ onNavigate }: VetCabinetDashboardProps) {
         metric: metricsMap[elephant.id],
       };
     });
-  }, [dietOverride, elephants, metricsMap, refusedFood, selectedDate]);
+  }, [dietOverride, elephants, metricsMap, riskRefusedFood, selectedDate]);
 
   const handleDietOverrideSave = useCallback(async () => {
     if (!shift) return;
