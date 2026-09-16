@@ -5,6 +5,11 @@ export interface SleepInterval {
   end: string;   // HH:MM
 }
 
+export interface ElephantSleepState {
+  duration: '❌ Не легла' | '⏱️ 1-2ч' | '🟢 3-4ч (норма)' | '⚠️ >4ч' | null;
+  posture: 'left' | 'right' | 'standing' | null;
+}
+
 export interface ShiftPhoto {
   id: string;
   timestamp: string;
@@ -60,8 +65,8 @@ export interface ElephantDailyMetrics {
   urination_traits: string[];
   /** Поведенческое состояние (строка-идентификатор из ELEPHANT_MOODS) */
   behavior?: string;
-  /** Общее время сна в минутах (0..720 = 0..12ч) */
-  sleep_minutes?: number;
+  /** Состояние сна */
+  sleep_state?: ElephantSleepState;
   /** Детализированные интервалы укладок */
   sleep_intervals?: SleepInterval[];
   /** Текстовые заметки по слону */
@@ -111,7 +116,7 @@ export function createDefaultElephantMetrics(shiftId: string, elephantId: string
     urination_count: 0,
     urination_traits: ['Прозрачная (норма)'],
     behavior: 'Спокойная / В норме',
-    sleep_minutes: 0,
+    sleep_state: { duration: null, posture: null },
     sleep_intervals: [],
     notes: '',
     photos: [],
@@ -140,9 +145,6 @@ export function clampCount(value: number, max = 50): number {
 }
 
 /** Валидирует sleep_minutes (0..720 минут = 12ч) */
-export function clampSleepMinutes(value: number): number {
-  return Math.max(0, Math.min(Math.round(value), 720));
-}
 
 /** Типы грубых кормов на складе feed_inventory */
 export type FeedInventoryType = 'hay_bales' | 'hay_rolls' | 'branches';

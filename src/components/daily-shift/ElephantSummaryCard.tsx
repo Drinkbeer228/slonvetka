@@ -17,7 +17,7 @@ export function ElephantSummaryCard({ elephant, metrics, onEdit, assignmentsCont
   const poopColor = isPoopWarn ? 'text-amber-500' : 'text-slate-600';
   const urineColor = isUrineWarn ? 'text-amber-500' : 'text-slate-600';
 
-  const sleepText = metrics.sleep_minutes ? formatDuration(metrics.sleep_minutes) : 'Не указан';
+  const sleepText = metrics.sleep_state?.duration || 'Нет данных';
 
   return (
     <div className="bg-white/72 backdrop-blur-2xl border border-white/85 p-5 rounded-[26px] shadow-[0_10px_28px_rgba(15,23,42,0.055),inset_0_1px_0_rgba(255,255,255,0.9)] flex flex-col gap-4 relative">

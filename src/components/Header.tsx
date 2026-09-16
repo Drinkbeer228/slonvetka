@@ -7,7 +7,6 @@ import { useStore } from '../store';
 import { ROLE_SHORT_LABELS } from '../types/roles';
 import { shiftService } from '../services/shiftService';
 import { getTodayStr } from '../utils/dates';
-import { VetKeeperViewToggle } from './VetCabinetDashboard';
 
 interface HeaderProps {
   currentScreen: string;

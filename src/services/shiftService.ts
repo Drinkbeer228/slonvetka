@@ -5,8 +5,7 @@ import {
   FeedInventoryItem, 
   FeedInventoryType, 
   createDefaultElephantMetrics,
-  clampCount, 
-  clampSleepMinutes 
+  clampCount 
 } from '../types/shift';
 import { 
   getOfflineDb, 
@@ -381,14 +380,14 @@ export const shiftService = {
         const metricsMap: Record<string, ElephantDailyMetrics> = {};
         if (!metricsError && metricsData) {
           for (const m of metricsData) {
-            const sleepMinutes = m.sleep_minutes != null ? m.sleep_minutes : 0;
+            
 
             metricsMap[m.elephant_id] = normalizeMetric({
               ...m,
               id: m.id,
               shift_id: m.shift_id,
               elephant_id: m.elephant_id,
-              sleep_minutes: sleepMinutes,
+              sleep_state: m.sleep_state,
             });
             await db.put('elephant_daily_metrics', metricsMap[m.elephant_id]);
           }
@@ -481,7 +480,7 @@ export const shiftService = {
       // Валидация перед сохранением
       metric.poop_count = clampCount(metric.poop_count ?? 0);
       metric.urination_count = clampCount(metric.urination_count ?? 0);
-      metric.sleep_minutes = clampSleepMinutes(metric.sleep_minutes ?? 0);
+      
       await db.put('elephant_daily_metrics', metric);
     }
 
@@ -503,7 +502,7 @@ export const shiftService = {
       if (shiftError) throw shiftError;
 
       // ИСПРАВЛЕНО: правильное маппирование полей
-      // sleep_minutes сохраняется в sleep_minutes (не в behavior_score!)
+      
       const metricsArray = Object.values(metricsMap).map(m => {
         const normalized = normalizeMetric({
           ...m,
@@ -519,7 +518,7 @@ export const shiftService = {
           urination_count: normalized.urination_count,
           urination_traits: normalized.urination_traits,
           behavior: normalized.behavior,
-          sleep_minutes: normalized.sleep_minutes,
+          sleep_state: normalized.sleep_state,
           sleep_intervals: normalized.sleep_intervals ?? [],
           notes: normalized.notes ?? '',
           photos: normalized.photos ?? [],
@@ -575,13 +574,13 @@ export const shiftService = {
         const shiftIds = shifts.map(s => s.id);
         const { data: metricsData } = await supabase
           .from('elephant_daily_metrics')
-          .select('shift_id, poop_count, urination_count, sleep_minutes, notes, photos')
+          .select('shift_id, poop_count, urination_count, sleep_state, notes, photos')
           .in('shift_id', shiftIds);
 
         const metricsByShift: Record<string, Array<{
           poop_count?: number;
           urination_count?: number;
-          sleep_minutes?: number;
+          sleep_state?: any;
           notes?: string;
           photos?: unknown[];
         }>> = {};
@@ -637,7 +636,7 @@ function calculateShiftScore(
   metrics: Array<{
     poop_count?: number;
     urination_count?: number;
-    sleep_minutes?: number;
+    sleep_state?: any;
     notes?: string;
     photos?: unknown[];
   }>
@@ -678,7 +677,7 @@ function calculateShiftScore(
 
   // 5. 🌙 Сон (теперь читаем sleep_minutes)
   const hasSleep = metrics.some(m =>
-    (m.sleep_minutes != null && m.sleep_minutes > 0)
+    (m.sleep_state != null && m.sleep_state > 0)
   );
   if (hasSleep) score++;
 

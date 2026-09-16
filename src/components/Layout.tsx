@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, LogOut, Home, Stethoscope, HeartPulse, Moon, Sun, Trophy,
-  CheckCircle2, BookOpen, History, ClipboardList, Users 
+  CheckCircle2, BookOpen, History, ClipboardList, Users, Activity 
 } from 'lucide-react';
 import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
@@ -18,6 +18,7 @@ interface LayoutProps {
 
 const NAV_ITEMS = [
   { id: 'daily_shift',   label: 'Слоновник',              icon: Home,          role: 'all' },
+  { id: 'monitoring',    label: 'Мониторинг физиологии',  icon: Activity,      role: 'all' },
   { id: 'vet_cabinet',   label: 'Веткабинет',             icon: Stethoscope,   role: 'all' },
   { id: 'journal',       label: 'Архив смен и хроника',   icon: History,       role: 'all' },
   { id: 'vet_dashboard', label: 'Назначения врача',       icon: ClipboardList, role: 'all' },

@@ -11,6 +11,7 @@ import { AssignmentsScreen } from './screens/AssignmentsScreen';
 import { StaffScreen } from './screens/StaffScreen';
 import { VetDashboard } from './screens/VetDashboard';
 import { VetCabinetDashboard } from './components/VetCabinetDashboard';
+import { MonitoringAnalyticsScreen } from './screens/MonitoringAnalyticsScreen';
 
 export default function App() {
   const { profile } = useStore();
@@ -35,11 +36,13 @@ export default function App() {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'settings':
-        return <DailyShiftPage />;
+        return <DailyShiftPage onNavigate={handleNavigate} />;
       case 'daily_shift':
-        return <DailyShiftPage />;
+        return <DailyShiftPage onNavigate={handleNavigate} />;
+      case 'monitoring':
+        return <MonitoringAnalyticsScreen onNavigate={handleNavigate} />;
       case 'vet_dashboard':
-        return <VetDashboard />;
+        return <VetDashboard onNavigate={handleNavigate} />;
       case 'vet_cabinet':
         return <VetCabinetDashboard onNavigate={handleNavigate} />;
       case 'today':
@@ -57,7 +60,7 @@ export default function App() {
       case 'staff':
         return <StaffScreen />;
       default:
-        return <DailyShiftPage />;
+        return <DailyShiftPage onNavigate={handleNavigate} />;
     }
   };
 

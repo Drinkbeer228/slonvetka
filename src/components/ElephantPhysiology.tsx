@@ -3,7 +3,7 @@ import { ElephantDailyMetrics } from '../types/shift';
 import { Elephant } from '../types';
 import { Check } from 'lucide-react';
 import { CounterButton } from './common/CounterButton';
-import { ELEPHANT_MOODS } from '../screens/DailyShiftPage';
+
 
 const FECES_OPTIONS = [
   'Сформирован (норма)',
@@ -123,7 +123,11 @@ export function ElephantPhysiology({
         <div>
           <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Эмоции и состояние</span>
           <div className="grid grid-cols-5 gap-2 w-full">
-            {ELEPHANT_MOODS.map(mood => {
+            {[{id: 'brisk', label: 'Бодрое', emoji: '💪', activeClass: 'bg-emerald-600 border-emerald-500 text-white shadow-md'},
+  {id: 'lethargic', label: 'Вялое', emoji: '🥱', activeClass: 'bg-rose-600 border-rose-500 text-white shadow-md'},
+  {id: 'aggressive', label: 'Агрессивное', emoji: '💢', activeClass: 'bg-amber-600 border-amber-500 text-white shadow-md'},
+  {id: 'calm', label: 'Спокойное', emoji: '😌', activeClass: 'bg-sky-600 border-sky-500 text-white shadow-md'},
+  {id: 'playful', label: 'Игривое', emoji: '🎈', activeClass: 'bg-indigo-600 border-indigo-500 text-white shadow-md'}].map(mood => {
               const isSelected = currentBehavior === mood.id;
               return (
                 <button

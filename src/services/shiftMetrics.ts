@@ -1,4 +1,4 @@
-import { ElephantDailyMetrics, clampCount, clampSleepMinutes, createDefaultElephantMetrics } from '../types/shift';
+import { ElephantDailyMetrics, clampCount, createDefaultElephantMetrics } from '../types/shift';
 import { FAVORED_GAIT_LABEL } from '../constants/elephantObservations';
 
 export function normalizeMetric(
@@ -19,7 +19,7 @@ export function normalizeMetric(
       ? rawMetric.urination_traits
       : baseMetric.urination_traits,
     behavior: rawMetric.behavior || baseMetric.behavior,
-    sleep_minutes: clampSleepMinutes(rawMetric.sleep_minutes ?? 0),
+    sleep_state: rawMetric.sleep_state || baseMetric.sleep_state,
     sleep_intervals: Array.isArray(rawMetric.sleep_intervals) ? rawMetric.sleep_intervals : [],
     notes: rawMetric.notes ?? '',
     photos: Array.isArray(rawMetric.photos) ? rawMetric.photos : [],

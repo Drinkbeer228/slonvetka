@@ -144,14 +144,6 @@ export function evaluateElephantHealth(
       reasons.push(`Выделения: ${metrics.nasal_discharge}`);
     }
 
-    if (
-      metrics.sleep_intervals &&
-      metrics.sleep_intervals.length === 0 &&
-      metrics.sleep_minutes !== undefined &&
-      metrics.sleep_minutes === 0
-    ) {
-      // 0 sleep recorded might be noted if needed, but not necessarily warning unless explicitly flagged
-    }
   }
 
   if (severity === 'alert') {

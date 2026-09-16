@@ -278,47 +278,6 @@ export function ExcretionControl({
     }
   };
 
-  const handleIncrementSleep = (elephantId: string, elephantName: string) => {
-    if (isLocked) return;
-    const cd = getCooldownHook(elephantId, 'sleep');
-    if (cd && cd.isBlocked) return;
-    
-    setActiveElephantId(elephantId);
-    handleHaptic(10);
-    const current = metrics?.[elephantId]?.sleep_minutes ?? 0;
-    const next = Math.min(720, current + 30);
-    onMetricChange?.(elephantId, 'sleep_minutes', next);
-    if (next > 0) {
-      const currentIntervals = metrics?.[elephantId]?.sleep_intervals ?? [];
-      if (currentIntervals.length === 0) {
-        onMetricChange?.(elephantId, 'sleep_intervals', [
-          { id: `sleep-${Date.now()}`, start: '01:00', end: '01:00' },
-        ]);
-      }
-    }
-
-    if (selectedSleepTrait !== 'Спокойно (норма)') {
-      let currentNotes = metrics?.[elephantId]?.notes || '';
-      const appended = `[${selectedSleepTrait}]`;
-      if (!currentNotes.includes(appended)) {
-        onMetricChange?.(elephantId, 'notes', (currentNotes.trim() + ' ' + appended).trim());
-      }
-      setSelectedSleepTrait('Спокойно (норма)');
-    }
-  };
-
-  const handleDecrementSleep = (elephantId: string) => {
-    if (isLocked) return;
-    setActiveElephantId(elephantId);
-    handleHaptic(10);
-    const current = metrics?.[elephantId]?.sleep_minutes ?? 0;
-    const next = Math.max(0, current - 30);
-    onMetricChange?.(elephantId, 'sleep_minutes', next);
-    if (next === 0) {
-      onMetricChange?.(elephantId, 'sleep_intervals', []);
-    }
-  };
-
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -360,7 +319,7 @@ export function ExcretionControl({
   const latestPhoto = allPhotos[allPhotos.length - 1];
 
   const totalCount = displayElephants.reduce((acc, e) => {
-    if (activeTab === 'sleep') return acc + (metrics?.[e.id]?.sleep_minutes ?? 0);
+    if (activeTab === 'sleep') return acc;
     const field = activeTab === 'stool' ? 'poop_count' : 'urination_count';
     return acc + ((metrics?.[e.id]?.[field] as number) ?? 0);
   }, 0);
@@ -412,7 +371,7 @@ export function ExcretionControl({
             <div
               className={`px-3 py-1.5 rounded-full bg-gradient-to-br ${currentTab.accentColor} text-white text-xs font-black shadow-md`}
             >
-              {activeTab === 'sleep' ? formatTotalSleepHours(totalCount) : totalCount}
+              {totalCount}
             </div>
             <PhotoActionThumbnail
               photoUrl={latestPhoto?.photo.dataUrl}
@@ -463,84 +422,7 @@ export function ExcretionControl({
           {displayElephants.map(elephant => {
             const isSelectedElephant = elephant.id === activeElephantId;
 
-            if (activeTab === 'sleep') {
-              const sleepMinutes = metrics?.[elephant.id]?.sleep_minutes ?? 0;
-              const hasSleep = sleepMinutes > 0;
-
-              return (
-                <div 
-                  key={elephant.id} 
-                  onClick={() => setActiveElephantId(elephant.id)}
-                  className={`flex flex-col gap-1.5 cursor-pointer transition-all ${
-                    isSelectedElephant ? 'scale-[1.01]' : 'opacity-90 hover:opacity-100'
-                  }`}
-                >
-                  <div className="text-xs sm:text-sm font-black text-slate-700 text-center flex items-center justify-center gap-1 select-none dark:text-slate-300">
-                    <span>{ELEPHANT_EMOJI[elephant.id] ?? '🐘'}</span>
-                    <span className={isSelectedElephant ? 'text-violet-700 font-black' : ''}>{elephant.name}</span>
-                  </div>
-
-                  {/* Карточка слона для сна */}
-                  <div
-                    className={`rounded-[22px] overflow-hidden transition-all duration-150 ${
-                      isSelectedElephant 
-                        ? 'ring-2 ring-violet-500/80 border-violet-400 shadow-md' 
-                        : hasSleep
-                        ? 'border-violet-300/60 shadow-xs'
-                        : 'border-slate-200/80 shadow-xs dark:border-slate-700'
-                    }`}
-                    style={{
-                      borderWidth: '1px',
-                      background: 'rgba(255,255,255,0.85)',
-                    }}
-                  >
-                    {/* Кнопка [+] */}
-                    <button
-                      type="button"
-                      disabled={isLocked || sleepMinutes >= 720}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleIncrementSleep(elephant.id, elephant.name);
-                      }}
-                      className="h-12 w-full flex items-center justify-center text-2xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none tap-target bg-white text-violet-600 dark:bg-slate-800 dark:text-violet-400"
-                      aria-label={`Добавить 30 мин сна для ${elephant.name}`}
-                    >
-                      +
-                    </button>
-
-                    {/* Центральное значение */}
-                    <div
-                      className={`py-2 text-center select-none flex flex-col items-center justify-center gap-0.5 min-h-[60px] ${
-                        hasSleep
-                          ? 'bg-violet-100/70 dark:bg-violet-950/40'
-                          : 'bg-slate-50/80 dark:bg-slate-900/60'
-                      }`}
-                    >
-                      
-                      <span className="text-3xl font-mono font-black text-slate-950 leading-none dark:text-slate-100">{formatTotalSleepHours(sleepMinutes)}</span>
-                    </div>
-
-                    {/* Кнопка [-] */}
-                    <button
-                      type="button"
-                      disabled={isLocked || sleepMinutes <= 0}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDecrementSleep(elephant.id);
-                      }}
-                      className="h-12 w-full flex items-center justify-center text-xl font-black transition-all active:scale-95 cursor-pointer disabled:opacity-30 disabled:pointer-events-none tap-target bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-slate-950 border-t border-slate-200/80 dark:bg-slate-800 dark:text-slate-200"
-                      aria-label={`Уменьшить 30 мин сна для ${elephant.name}`}
-                    >
-                      −
-                    </button>
-                  </div>
-
-                  
-                </div>
-              );
-            }
-
-            const field = activeTab === 'stool' ? 'poop_count' : 'urination_count';
+            if (activeTab === 'sleep') { return null; } const field = activeTab === 'stool' ? 'poop_count' : 'urination_count';
             const count = (metrics?.[elephant.id]?.[field] as number) ?? 0;
             const hasCount = count > 0;
             const cd = getCooldownHook(elephant.id, activeTab);
