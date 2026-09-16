@@ -45,11 +45,19 @@ input[type=number] {
 }
 
 /* --- Базовый фон страницы --- */
+html, body, #root {
+  background-color: #020617 !important; /* bg-slate-950 */
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #020617; /* Default to dark so rubber-banding is dark */
 }
 
 /* --- Утилиты Liquid Glass --- */

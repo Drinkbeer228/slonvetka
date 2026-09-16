@@ -207,7 +207,7 @@ export function DailyShiftPage({ onNavigate }: { onNavigate: (screen: string) =>
   };
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] w-full overflow-y-auto snap-y snap-mandatory scroll-smooth touch-pan-y overscroll-none select-none bg-slate-950 text-slate-100" ref={containerRef}>
+    <div className="w-screen min-w-full h-[100dvh] max-h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-slate-950 overflow-y-auto snap-y snap-mandatory scroll-smooth touch-pan-y overscroll-none select-none text-slate-100" ref={containerRef}>
       
       {/* SMART AUTO-HIDING HEADER */}
       <div className={`fixed top-0 left-0 right-0 z-40 px-4 h-[52px] flex items-center justify-between bg-slate-900/90 backdrop-blur-md border-b border-slate-800 transition-transform duration-300 ${scrollDir === 'down' ? '-translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100 pointer-events-auto'}`}>
