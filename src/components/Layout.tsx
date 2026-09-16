@@ -58,25 +58,28 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   };
 
   const isVetDashboard = currentScreen === 'vet_dashboard' || currentScreen === 'vet_cabinet';
-  const contentWidthClass = isVetDashboard 
-    ? 'max-w-7xl px-2 sm:px-6' 
-    : 'max-w-3xl lg:max-w-4xl px-3 sm:px-6';
+  const isDailyShift = currentScreen === 'daily_shift';
+  const contentWidthClass = isDailyShift 
+     ? 'w-full max-w-none px-0'
+     : isVetDashboard 
+       ? 'max-w-7xl px-2 sm:px-6' 
+       : 'max-w-3xl lg:max-w-4xl px-3 sm:px-6';
 
   return (
     <div
-      className="min-h-screen text-slate-800 flex flex-col font-sans antialiased"
+      className="min-h-[100dvh] text-slate-800 flex flex-col font-sans antialiased"
       data-theme={darkMode ? 'dark' : 'light'}
       style={{ background: darkMode ? '#121212' : 'linear-gradient(160deg, #f1f5f9 0%, #e9f0f8 60%, #eff6ff 100%)' }}
     >
       {/* STICKY HEADER */}
-      <Header 
+      {!isDailyShift && <Header  
         currentScreen={currentScreen} 
         onOpenMenu={() => setDrawerOpen(true)} 
         onNavigate={onNavigate}
-      />
+      />}
 
       {/* MAIN CONTENT */}
-      <main className={`flex-1 w-full mx-auto pt-14 transition-all ${contentWidthClass}`}>
+      <main className={`flex-1 w-full mx-auto transition-all ${isDailyShift ? 'pt-0' : 'pt-14'} ${contentWidthClass}`}>
         {children}
       </main>
 

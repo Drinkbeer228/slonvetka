@@ -1,26 +1,35 @@
 const fs = require('fs');
-let code = fs.readFileSync('src/screens/DailyShiftPage.tsx', 'utf8');
+const file = 'src/components/Layout.tsx';
 
+let code = fs.readFileSync(file, 'utf8');
+
+// 1. Identify isDailyShift
 code = code.replace(
-  /<div\s*className="space-y-6 mt-3 relative pb-52 sm:pb-56"\s*style={{ paddingBottom: 'calc\\(14rem \+ env\\(safe-area-inset-bottom, 0px\\)\\)' }}\s*onTouchStart={handleTouchStart}\s*onTouchMove={handleTouchMove}\s*onTouchEnd={handleTouchEnd}\s*>/m,
-  '<div className="h-[calc(100dvh-3.5rem)] w-full overflow-y-auto snap-y snap-mandatory scroll-smooth touch-pan-y relative" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>'
+  /const isVetDashboard = currentScreen === 'vet_dashboard' \|\| currentScreen === 'vet_cabinet';/,
+  `const isVetDashboard = currentScreen === 'vet_dashboard' || currentScreen === 'vet_cabinet';
+  const isDailyShift = currentScreen === 'daily_shift';`
 );
 
-const sectionClass = 'snap-start h-[calc(100dvh-3.5rem)] w-full flex flex-col p-4 box-border shrink-0 overflow-y-auto';
-
+// 2. Adjust contentWidthClass
 code = code.replace(
-  /<div className="space-y-6">/,
-  `<div className="${sectionClass} justify-start">`
+  /const contentWidthClass = isVetDashboard \n     \? 'max-w-7xl px-2 sm:px-6' \n     : 'max-w-3xl lg:max-w-4xl px-3 sm:px-6';/,
+  `const contentWidthClass = isDailyShift 
+     ? 'w-full max-w-none px-0'
+     : isVetDashboard 
+       ? 'max-w-7xl px-2 sm:px-6' 
+       : 'max-w-3xl lg:max-w-4xl px-3 sm:px-6';`
+);
+
+// 3. Remove pt-14 for daily_shift and hide global Header
+code = code.replace(
+  /\{\/\* STICKY HEADER \*\/\}\n      <Header([\s\S]*?)\/>/,
+  `{/* STICKY HEADER */}
+      {!isDailyShift && <Header $1/>}`
 );
 
 code = code.replace(
-  /<div className="space-y-3">/,
-  `<div className="${sectionClass} justify-start">`
+  /<main className=\{\`flex-1 w-full mx-auto pt-14 transition-all \$\{contentWidthClass\}\`\}>/,
+  `<main className={\`flex-1 w-full mx-auto transition-all \${isDailyShift ? 'pt-0' : 'pt-14'} \${contentWidthClass}\`}>`
 );
 
-code = code.replace(
-  /<div className="space-y-4">/g,
-  `<div className="${sectionClass} justify-start">`
-);
-
-fs.writeFileSync('src/screens/DailyShiftPage.tsx', code);
+fs.writeFileSync(file, code);
