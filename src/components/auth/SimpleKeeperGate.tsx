@@ -66,7 +66,7 @@ export function SimpleKeeperGate({ children }: SimpleKeeperGateProps) {
       };
       
       // We still attempt the user's requested query, catching the error quietly if the table doesn't exist.
-      const { data, error } = await supabase.from('keepers').insert([{ name: trimmedName }]).select().single();
+      const { data, error } = await supabase.from('keepers').insert([{ name: trimmedName }]).select().maybeSingle();
       
       const finalKeeper = data && !error ? data : newKeeper;
 

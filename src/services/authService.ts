@@ -33,7 +33,7 @@ export const authService = {
         .from('profiles')
         .select('current_session_id')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
         
       if (error) {
         console.error('Error verifying device session:', error);

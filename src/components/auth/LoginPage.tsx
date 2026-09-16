@@ -29,7 +29,7 @@ export function LoginPage({ children }: LoginPageProps) {
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
             
           if (profileData) {
             const localToken = localStorage.getItem('slonovet_session_token');
@@ -166,7 +166,7 @@ export function LoginPage({ children }: LoginPageProps) {
         .from('profiles')
         .select('*')
         .eq('id', data.user.id)
-        .single();
+        .maybeSingle();
 
       if (profileData) {
         setProfile(profileData);

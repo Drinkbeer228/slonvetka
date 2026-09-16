@@ -476,14 +476,46 @@ export function VetDashboard({ onNavigate }: VetDashboardProps) {
             </div>
 
             {/* Quick Upload from Vet */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => vetPhotoInputRef.current?.click()}
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-sky-300 border border-slate-700 flex items-center gap-1.5 active:scale-95 transition-all shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Загрузить фото осмотра</span>
-              </button>
+            <div className="flex flex-col gap-3 p-3 bg-slate-950/50 rounded-2xl border border-slate-800">
+              <div className="text-xs font-bold text-slate-400">Загрузить фото осмотра:</div>
+              <div className="flex gap-2">
+                <select
+                  value={uploadElephant}
+                  onChange={e => setUploadElephant(e.target.value as any)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg text-xs p-1.5 text-slate-200"
+                >
+                  <option value="margo">Марго</option>
+                  <option value="audrey">Одри</option>
+                  <option value="pretty">Прэтти</option>
+                </select>
+                <select
+                  value={uploadType}
+                  onChange={e => setUploadType(e.target.value as any)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg text-xs p-1.5 text-slate-200"
+                >
+                  <option value="foot">Стопа</option>
+                  <option value="silhouette">Силуэт</option>
+                </select>
+                {uploadType === 'foot' && (
+                  <select
+                    value={uploadFoot}
+                    onChange={e => setUploadFoot(e.target.value as any)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg text-xs p-1.5 text-slate-200"
+                  >
+                    <option value="ПП">ПП</option>
+                    <option value="ЛП">ЛП</option>
+                    <option value="ПЗ">ПЗ</option>
+                    <option value="ЛЗ">ЛЗ</option>
+                  </select>
+                )}
+                <button
+                  onClick={() => vetPhotoInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-bold text-white flex items-center gap-1.5 active:scale-95 transition-all shadow-sm ml-auto"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Снять / Загрузить</span>
+                </button>
+              </div>
               <input
                 ref={vetPhotoInputRef}
                 type="file"
