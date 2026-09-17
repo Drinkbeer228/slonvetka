@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useStore } from '../../store';
 import { authService } from '../../services/authService';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { SplashScreen } from '../common/SplashScreen';
 
 interface LoginPageProps {
   children: React.ReactNode;
@@ -17,6 +18,7 @@ export function LoginPage({ children }: LoginPageProps) {
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -184,6 +186,9 @@ export function LoginPage({ children }: LoginPageProps) {
   }
 
   if (profile) {
+    if (showSplash) {
+      return <SplashScreen onFinish={() => setShowSplash(false)} />;
+    }
     return <>{children}</>;
   }
 

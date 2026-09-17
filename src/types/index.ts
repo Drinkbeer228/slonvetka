@@ -65,3 +65,14 @@ export interface TreatmentRecordWithPhotos extends TreatmentRecord {
     name: string;
   } | null;
 }
+
+export interface FodderItem {
+  id: string;
+  parentId: 'bales' | 'rolls' | 'browse' | 'general' | 'juicy' | 'concentrate';
+  name: string;
+  scoreTag?: string;
+  category: 'rough' | 'concentrate' | 'juicy';
+  amount: number;
+  unit: string;
+  isDefault?: boolean;
+}
