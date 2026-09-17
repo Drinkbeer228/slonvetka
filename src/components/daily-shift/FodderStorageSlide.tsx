@@ -50,7 +50,7 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
     const isCollapsed = collapsedGroups[parentId];
 
     return (
-      <div key={parentId} className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm flex flex-col overflow-hidden mb-4">
+      <div key={parentId} className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm flex flex-col overflow-hidden mb-4 shrink-0 h-auto">
         <button 
           onClick={() => toggleGroup(parentId)}
           className="flex items-center justify-between p-4 bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
@@ -63,16 +63,16 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
               Всего: <span className="text-slate-200 font-bold">{totalAmount}</span> {defaultUnit}
             </p>
           </div>
-          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-400">
+          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 shrink-0">
             <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-180'}`} />
           </div>
         </button>
 
         <div className={`grid transition-all duration-300 overflow-hidden ${isCollapsed ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}>
-          <div className="min-h-0">
-            <div className="p-3 pt-1 space-y-2.5 bg-slate-950/30 border-t border-slate-800/50">
+          <div className="min-h-0 h-auto">
+            <div className="p-3 pt-1 space-y-2.5 bg-slate-950/30 border-t border-slate-800/50 h-auto w-full">
               {items.map(item => (
-                <div key={item.id} className="flex flex-col gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800/80 shadow-sm relative">
+                <div key={item.id} className="flex flex-col gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800/80 shadow-sm relative shrink-0 min-h-[90px]">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 pr-2">
                       <div className="flex items-center gap-1.5 mb-0.5">
@@ -116,7 +116,7 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
               
               <button 
                 onClick={() => setEditingItem({ parentId: parentId as any, name: '', scoreTag: '', category: defaultCategory as any, amount: 0, unit: defaultUnit })}
-                className="w-full h-10 bg-slate-900 text-emerald-500 border border-emerald-900/30 border-dashed rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:bg-slate-800 transition-colors mt-2"
+                className="w-full h-10 shrink-0 bg-slate-900 text-emerald-500 border border-emerald-900/30 border-dashed rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:bg-slate-800 transition-colors mt-2"
               >
                 <Plus className="w-4 h-4" />
                 Добавить позицию
@@ -130,7 +130,7 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
 
   return (
     <div className={slideWrapperClass}>
-      <h2 className="text-xl font-black text-slate-100 flex items-center gap-2 mb-4 mt-1">🌾 Фуражная</h2>
+      <h2 className="text-xl font-black text-slate-100 flex items-center gap-2 mb-4 mt-1 shrink-0">🌾 Фуражная</h2>
       
       {renderGroup('bales', 'Тюки сена', 'шт', 'rough')}
       {renderGroup('rolls', 'Рулоны сена', 'рул', 'rough')}

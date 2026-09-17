@@ -189,15 +189,72 @@ export function DailyShiftPage({ onNavigate }: { onNavigate: (screen: string) =>
   // ---------------------------------------------------------
   // REEL 3: RATION & WATER
   // ---------------------------------------------------------
-  const [mashBaseIngredients, setMashBaseIngredients] = useState<string[]>([]);
-  const [mashPhytoAdditives, setMashPhytoAdditives] = useState<string[]>([]);
-  const [feedStatus, setFeedStatus] = useState<Record<string, string>>({ m: 'clean', n: 'clean', e: 'clean' });
-  const [wateringSlots, setWateringSlots] = useState<Record<string, any>>({});
-
-  const toggleMash = (arr: string[], setArr: any, item: string) => {
-    if (arr.includes(item)) setArr(arr.filter((i: string) => i !== item));
-    else setArr([...arr, item]);
-    if (navigator.vibrate) navigator.vibrate(15);
+  const [dietProblems, setDietProblems] = useState<{slotId: string, elephant: string, reason: string}[]>([]);
+  const [openProblemSlot, setOpenProblemSlot] = useState<string | null>(null);
+  const [problemForm, setProblemForm] = useState({ elephant: 'margo', reason: '' });
+  
+  // RATION PRESETS
+  const [activeRecipes, setActiveRecipes] = useState<Record<string, string>>({
+    m: 'classic_m',
+    n: 'classic_n'
+  });
+  
+  const [activeSeasonals, setActiveSeasonals] = useState<string[]>([]);
+  const [dispensedSlots, setDispensedSlots] = useState<Record<string, boolean>>({});
+  
+  const handleDispense = (slotId: string, recipeKey: string, isEvening: boolean, seasonals: string[]) => {
+    if (dispensedSlots[slotId]) return;
+    
+    // Decrement from fodderInventory (updateFodderAmount takes id and delta)
+    let logMsg = '';
+    
+    if (slotId === 'm') {
+      if (recipeKey === 'classic_m') { updateFodderAmount('c1', -0.5); updateFodderAmount('c2', -0.3); logMsg = "списано: 0.5 меш овса, 0.3 меш отрубей"; }
+      if (recipeKey === 'diet_m') { updateFodderAmount('c4', -0.2); updateFodderAmount('c3', -0.3); logMsg = "списано: 0.2 меш льна, 0.3 меш ВТМ"; }
+      if (recipeKey === 'energy_m') { updateFodderAmount('c1', -0.5); updateFodderAmount('c5', -0.5); logMsg = "списано: 0.5 меш овса, 0.5 меш ячменя"; }
+    } else if (slotId === 'n') {
+      if (recipeKey === 'classic_n') { updateFodderAmount('c3', -0.2); updateFodderAmount('c4', -0.1); logMsg = "списано: 0.2 меш ВТМ, 0.1 меш льна"; }
+      if (recipeKey === 'diet_n') { updateFodderAmount('c4', -0.2); logMsg = "списано: 0.2 меш льна"; }
+    } else if (isEvening) {
+      updateFodderAmount('j1', -15);
+      updateFodderAmount('j2', -10);
+      updateFodderAmount('j3', -5);
+      logMsg = "списано: 15кг моркови, 10кг свёклы, 5кг яблок";
+      if (seasonals.includes('🎃 Тыква')) { updateFodderAmount('j4', -5); logMsg += ", 5кг тыквы"; }
+    }
+    
+    const slotMap: any = { m: 'Утренняя запарка', n: 'Обеденный мэш', e: 'Вечерний салат' };
+    const recipeNameMap: any = {
+      'classic_m': 'Стандарт', 'diet_m': 'Диета', 'energy_m': 'Зима/Энергия',
+      'classic_n': 'Мэш с ВТМ', 'diet_n': 'Легкий отвар'
+    };
+    
+    let eventTitle = slotMap[slotId] + ': выдан рацион';
+    if (!isEvening) {
+      eventTitle += " '" + (recipeNameMap[recipeKey] || 'Базовый') + "'";
+    }
+    if (logMsg) eventTitle += ", " + logMsg;
+    
+    addEvent(eventTitle);
+    setDispensedSlots(p => ({...p, [slotId]: true}));
+  };
+  
+  const submitDietProblem = () => {
+    if (!openProblemSlot || !problemForm.reason) return;
+    
+    setDietProblems(prev => [...prev, {
+      slotId: openProblemSlot,
+      elephant: problemForm.elephant,
+      reason: problemForm.reason
+    }]);
+    
+    const eleMap: any = { margo: 'Марго', audrey: 'Одри', pretty: 'Прэтти' };
+    const slotMap: any = { m: 'Утро', n: 'Обед', e: 'Вечер' };
+    
+    addEvent(slotMap[openProblemSlot] + ' • ' + eleMap[problemForm.elephant] + ' — ' + problemForm.reason);
+    
+    setOpenProblemSlot(null);
+    setProblemForm({ elephant: 'margo', reason: '' });
   };
 
   // ---------------------------------------------------------
@@ -522,79 +579,171 @@ export function DailyShiftPage({ onNavigate }: { onNavigate: (screen: string) =>
       {/* SCREEN 3: RATION & WATER */}
       <div className={slideWrapperClass}>
         <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2 mb-4 mt-1">🥣 Рацион и Водопой</h2>
-
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl mb-4">
-          <span className="text-xs font-black text-slate-200 block mb-2">Конструктор каши</span>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {['Овёс', 'Отруби', 'Ячмень', 'Wellhorse', 'ВТМ', 'Лён'].map(item => {
-              const isActive = mashBaseIngredients.includes(item) || mashPhytoAdditives.includes(item);
-              return (
-                <button
-                  key={item}
-                  onClick={() => {
-                    if (['Овёс', 'Отруби', 'Ячмень'].includes(item)) toggleMash(mashBaseIngredients, setMashBaseIngredients, item);
-                    else toggleMash(mashPhytoAdditives, setMashPhytoAdditives, item);
-                  }}
-                  className={`h-9 px-3 rounded-xl text-xs font-bold border transition-all ${isActive ? 'bg-amber-500/20 border-amber-400 text-amber-200' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
-                >
-                  {item}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3">
+        
+        <div className="flex flex-col gap-4">
           {[
-            { id: 'm', label: 'Утро', desc: 'Запарка' },
-            { id: 'n', label: 'Обед', desc: 'Мэш' },
-            { id: 'e', label: 'Вечер', desc: 'Салат' }
-          ].map(slot => (
-            <div key={slot.id} className="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex flex-col gap-2 shadow-sm">
-              <span className="text-sm font-black text-slate-200">{slot.label} <span className="text-slate-500 font-normal text-xs">({slot.desc})</span></span>
-              
-              {/* Food Status */}
-              <div className="grid grid-cols-3 gap-1.5">
-                {['clean', 'leftovers', 'refusal'].map(status => {
-                  const labels: any = { clean: 'Съедено ✓', leftovers: 'Остаток', refusal: 'Отказ ⚠️' };
-                  const isActive = feedStatus[slot.id] === status;
-                  const colors: any = { clean: 'emerald', leftovers: 'amber', refusal: 'rose' };
-                  const col = colors[status];
-                  return (
-                    <button 
-                      key={status}
-                      onClick={() => {
-                        setFeedStatus(p => ({...p, [slot.id]: status}));
-                        if (status === 'refusal') triggerCamera(`refusal_${slot.id}`);
-                      }}
-                      className={`h-10 text-[10px] font-bold rounded-xl border transition-all ${isActive ? `bg-${col}-600/30 border-${col}-500/50 text-${col}-400` : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+            { 
+              id: 'm', 
+              label: 'Утро', 
+              desc: 'Запарка', 
+              presets: {
+                'classic_m': { name: '🥣 Базовая запарка', chips: ['🌾 Овёс 5кг', '🌾 Отруби 2кг', '💊 Wellhorse', '💧 Вода 10л'] },
+                'diet_m': { name: '🌱 Диетический мэш', chips: ['🌾 Лён распаренный', '🌾 Отруби', '🌿 ВТМ'] },
+                'energy_m': { name: '⚡ Зимний / Энергия', chips: ['🌾 Овёс', '🌾 Ячмень плющеный', '🌻 Жмых', '🌿 ВТМ'] }
+              }
+            },
+            { 
+              id: 'n', 
+              label: 'Обед', 
+              desc: 'Мэш', 
+              presets: {
+                'classic_n': { name: '🍵 Тёплый льняной отвар / Мэш', chips: ['🌿 ВТМ', '🌾 Лён', '💧 Тёплый отвар'] },
+                'diet_n': { name: '🌱 Легкий мэш', chips: ['🌾 Лён', '💧 Больше воды'] }
+              }
+            },
+            { 
+              id: 'e', 
+              label: 'Вечер', 
+              desc: 'Сочный салат',
+              isEvening: true,
+              chips: ['🥕 Морковь', '🍎 Яблоки', '🟣 Свёкла']
+            }
+          ].map(slot => {
+            const slotProblems = dietProblems.filter(p => p.slotId === slot.id);
+            const eleMap: any = { margo: 'Марго', audrey: 'Одри', pretty: 'Прэтти' };
+            const activePreset = slot.presets ? slot.presets[activeRecipes[slot.id] || Object.keys(slot.presets)[0]] : null;
+            const chipsToRender = slot.isEvening ? slot.chips : activePreset?.chips;
+            
+            return (
+            <div key={slot.id} className="bg-slate-900 border border-slate-800 p-4 rounded-3xl flex flex-col gap-3 shadow-sm shrink-0">
+              <div className="flex flex-col gap-2">
+                <span className="text-base font-black text-slate-100">{slot.label} <span className="text-slate-500 font-bold text-sm">({slot.desc})</span></span>
+                
+                {slot.presets && (
+                  <div className="relative group">
+                    <select 
+                      className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-200 outline-none focus:border-emerald-500/50"
+                      value={activeRecipes[slot.id] || Object.keys(slot.presets)[0]}
+                      onChange={(e) => setActiveRecipes(p => ({...p, [slot.id]: e.target.value}))}
                     >
-                      {labels[status]}
-                    </button>
-                  )
-                })}
+                      {Object.entries(slot.presets).map(([k, v]) => (
+                        <option key={k} value={k}>{v.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-2.5 pointer-events-none" />
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex flex-wrap gap-1.5 mb-1">
+                {chipsToRender?.map((chip: string) => (
+                  <span key={chip} className="px-2 py-1 bg-slate-950 border border-slate-800 text-slate-300 text-[10px] font-bold rounded-lg">
+                    {chip}
+                  </span>
+                ))}
               </div>
 
-              {/* Water Status */}
-              <div className="grid grid-cols-3 gap-1.5">
-                {['normal', 'greedy', 'refusal'].map(status => {
-                  const labels: any = { normal: 'Норма 💧', greedy: 'Жадно', refusal: 'Отказ ⚠️' };
-                  const isActive = wateringSlots[slot.id]?.thirst === status;
-                  const colors: any = { normal: 'sky', greedy: 'indigo', refusal: 'rose' };
-                  const col = colors[status];
-                  return (
-                    <button 
-                      key={status}
-                      onClick={() => setWateringSlots(p => ({...p, [slot.id]: { thirst: status }}))}
-                      className={`h-10 text-[10px] font-bold rounded-xl border transition-all ${isActive ? `bg-${col}-600/30 border-${col}-500/50 text-${col}-400` : 'bg-slate-950 border-slate-800 text-slate-400'}`}
-                    >
-                      {labels[status]}
+              {slot.isEvening && (
+                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-800/50">
+                  {['🎃 Тыква', '🍉 Арбуз', '🥒 Кабачки', '🍌 Бананы'].map(s => {
+                    const isActive = activeSeasonals.includes(s);
+                    return (
+                      <button 
+                        key={s}
+                        onClick={() => setActiveSeasonals(p => isActive ? p.filter(i => i !== s) : [...p, s])}
+                        className={'px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ' + (isActive ? 'bg-emerald-900/40 border-emerald-500/50 text-emerald-400' : 'bg-slate-950 border-slate-800/50 text-slate-400')}
+                      >
+                        + {s}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              
+              <button
+                disabled={dispensedSlots[slot.id]}
+                onClick={() => handleDispense(slot.id, activeRecipes[slot.id] || (slot.presets ? Object.keys(slot.presets)[0] : ''), slot.isEvening || false, activeSeasonals)}
+                className={"w-full h-11 rounded-xl font-bold text-xs flex items-center justify-center transition-all " + (dispensedSlots[slot.id] ? 'bg-slate-950 text-emerald-500/50 border border-emerald-900/30' : 'bg-slate-800 text-slate-200 border border-slate-700 active:scale-95 hover:bg-slate-700')}
+              >
+                {dispensedSlots[slot.id] ? '✓ Выдано и списано' : '✓ Выдать и списать со склада'}
+              </button>
+              
+              {slotProblems.length > 0 && (
+                <div className="flex flex-col gap-2 mt-1 mb-2 border-t border-slate-800/50 pt-3">
+                  {slotProblems.map((prob, idx) => (
+                    <div key={idx} className="bg-amber-950/30 border border-amber-900/50 rounded-xl p-2.5 flex items-start gap-2">
+                      <span className="text-amber-500 mt-0.5">⚠️</span>
+                      <div>
+                        <span className="text-amber-400 font-bold text-xs block">{eleMap[prob.elephant]}</span>
+                        <span className="text-amber-200/70 font-semibold text-xs">{prob.reason}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {openProblemSlot === slot.id ? (
+                <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-3 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Кто?</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['margo', 'audrey', 'pretty'].map(el => (
+                        <button
+                          key={el}
+                          onClick={() => setProblemForm(p => ({...p, elephant: el}))}
+                          className={'h-10 rounded-xl text-xs font-bold border transition-all ' + (problemForm.elephant === el ? 'bg-amber-600/30 border-amber-500/50 text-amber-400' : 'bg-slate-900 border-slate-800 text-slate-400')}
+                        >
+                          {eleMap[el]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Что случилось?</span>
+                    <div className="flex flex-wrap gap-2">
+                      {['🥣 Съела половину', '❌ Полный отказ', '💢 Отогнали от таза', '💧 Не пьёт воду', '💊 Выплюнула добавку'].map(reason => (
+                        <button
+                          key={reason}
+                          onClick={() => setProblemForm(p => ({...p, reason}))}
+                          className={'px-3 py-2 rounded-xl text-[11px] font-bold border transition-all ' + (problemForm.reason === reason ? 'bg-rose-600/30 border-rose-500/50 text-rose-400' : 'bg-slate-900 border-slate-800 text-slate-400')}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 mt-1">
+                    <button onClick={() => setOpenProblemSlot(null)} className="flex-1 h-11 bg-slate-900 text-slate-400 border border-slate-800 rounded-xl font-bold text-xs">
+                      Отмена
                     </button>
-                  )
-                })}
-              </div>
+                    <button 
+                      onClick={submitDietProblem}
+                      disabled={!problemForm.reason}
+                      className="flex-[2] h-11 bg-rose-500 text-rose-950 rounded-xl font-black text-xs disabled:opacity-50 transition-all active:scale-95"
+                    >
+                      Зафиксировать в лог
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 border-t border-slate-800/50 pt-3 mt-1">
+                  <div className="flex-1 bg-emerald-950/20 border border-emerald-900/30 rounded-xl p-3 flex flex-col justify-center items-center">
+                    <span className="text-emerald-500 text-lg mb-1">🟢</span>
+                    <span className="text-emerald-400/80 font-bold text-[10px] text-center leading-tight">Все слонихи: аппетит и<br/>водопой в норме</span>
+                  </div>
+                  <button 
+                    onClick={() => { setOpenProblemSlot(slot.id); setProblemForm({ elephant: 'margo', reason: '' }); }}
+                    className="w-16 h-full min-h-[72px] shrink-0 bg-amber-950/20 hover:bg-amber-900/30 border border-amber-900/30 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
+                  >
+                    <span className="text-amber-500 text-lg">⚠️</span>
+                    <span className="text-amber-500/80 font-bold text-[9px] text-center leading-tight">Отклонение</span>
+                  </button>
+                </div>
+              )}
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
