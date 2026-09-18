@@ -20,15 +20,26 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const unit = formData.get('unit') as any;
+    const isBag = unit === 'меш' || formData.get('fullBagsCount') !== null;
+    
+    const fullBags = formData.get('fullBagsCount') !== null ? Number(formData.get('fullBagsCount')) : undefined;
+    const currentKg = formData.get('currentBagKg') !== null ? Number(formData.get('currentBagKg')) : undefined;
+    const capacityKg = formData.get('bagCapacityKg') !== null ? Number(formData.get('bagCapacityKg')) : (editingItem?.bagCapacityKg || 30);
+    const rawAmount = Number(formData.get('amount')) || 0;
+
     const itemData: FodderItem = {
       id: editingItem?.id || Date.now().toString(),
       parentId: (formData.get('parentId') as any) || 'bales',
       name: formData.get('name') as string,
       scoreTag: formData.get('scoreTag') as string,
       category: formData.get('category') as any,
-      amount: Number(formData.get('amount')) || 0,
-      unit: formData.get('unit') as any,
+      amount: fullBags !== undefined ? fullBags + ((currentKg && currentKg > 0) ? 1 : 0) : rawAmount,
+      unit: unit,
       isDefault: editingItem?.isDefault,
+      fullBagsCount: fullBags,
+      currentBagKg: currentKg,
+      bagCapacityKg: capacityKg,
     };
     
     if (editingItem?.id) {
@@ -46,7 +57,7 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
   const renderGroup = (parentId: string, title: string, defaultUnit: string, defaultCategory: string) => {
     const items = fodderInventory.filter(i => i.parentId === parentId);
     
-    const totalAmount = items.reduce((acc, item) => acc + item.amount, 0);
+    const totalAmount = Math.round(items.reduce((acc, item) => acc + (item.fullBagsCount !== undefined ? item.fullBagsCount : item.amount), 0) * 100) / 100;
     const isCollapsed = collapsedGroups[parentId];
 
     return (
@@ -77,15 +88,30 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
                     <div className="flex-1 pr-2">
                       <div className="flex items-center gap-1.5 mb-0.5">
                         {item.scoreTag && <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-bold">{item.scoreTag}</span>}
-                        {item.amount < 0 && <span className="text-[10px] bg-rose-950/40 text-rose-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-rose-900/50">В долг</span>}
+                        {((item.fullBagsCount !== undefined && item.fullBagsCount <= 0 && (!item.currentBagKg || item.currentBagKg <= 0)) || item.amount < 0) && (
+                          <span className="text-[10px] bg-rose-950/40 text-rose-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-rose-900/50">Закончилось</span>
+                        )}
                       </div>
                       <span className="text-sm font-bold text-slate-200">{item.name}</span>
                     </div>
                     
                     <div className="flex items-center gap-2">
                       <div className="text-right">
-                        <span className="text-xl font-black text-slate-200">{item.amount}</span>
-                        <span className="text-xs font-semibold text-slate-500 ml-1">{item.unit}</span>
+                        {item.fullBagsCount !== undefined && item.unit === 'меш' ? (
+                          <div className="flex flex-col items-end">
+                            <div className="text-base font-black text-slate-200">
+                              {item.fullBagsCount} <span className="text-xs font-semibold text-slate-500">меш</span>
+                            </div>
+                            <div className="text-[11px] font-medium text-slate-400">
+                              (вскрыт: <span className="text-emerald-400 font-bold">{item.currentBagKg ?? 0} кг</span>)
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-xl font-black text-slate-200">{Number(item.amount.toFixed(2))}</span>
+                            <span className="text-xs font-semibold text-slate-500 ml-1">{item.unit}</span>
+                          </div>
+                        )}
                       </div>
                       
                       <button 
@@ -172,10 +198,27 @@ export const FodderStorageSlide: React.FC<FodderStorageSlideProps> = ({ slideWra
                 </div>
               </div>
               
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Текущий остаток</label>
-                <input required type="number" name="amount" defaultValue={editingItem.amount || 0} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50 font-bold" />
-              </div>
+              {editingItem.parentId === 'concentrate' || editingItem.unit === 'меш' || editingItem.fullBagsCount !== undefined ? (
+                <div className="grid grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-2xl border border-slate-800/60">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Целых мешков</label>
+                    <input required type="number" step="1" name="fullBagsCount" defaultValue={editingItem.fullBagsCount ?? Math.floor(editingItem.amount || 0)} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white outline-none focus:border-emerald-500/50 font-bold" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Вскрытый (кг)</label>
+                    <input required type="number" step="0.1" name="currentBagKg" defaultValue={editingItem.currentBagKg ?? 0} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-emerald-400 outline-none focus:border-emerald-500/50 font-bold" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Вес мешка (кг)</label>
+                    <input type="number" step="1" name="bagCapacityKg" defaultValue={editingItem.bagCapacityKg ?? 30} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-300 outline-none focus:border-emerald-500/50 text-xs" />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Текущий остаток</label>
+                  <input required type="number" step="any" name="amount" defaultValue={editingItem.amount || 0} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50 font-bold" />
+                </div>
+              )}
               
               <button type="submit" className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 rounded-xl font-bold flex items-center justify-center gap-2 mt-2 transition-colors">
                 <Check className="w-5 h-5" />

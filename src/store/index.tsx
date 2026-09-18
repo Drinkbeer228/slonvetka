@@ -26,6 +26,7 @@ interface StoreContextType extends StoreState {
   setActiveElephantId: (id: string) => void;
   setGlobalSaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => void;
   updateFodderAmount: (id: string, delta: number) => void;
+  deductFodderKg: (id: string, kg: number) => void;
   addFodderItem: (item: FodderItem) => void;
   deleteFodderItem: (id: string) => void;
   editFodderItem: (id: string, updates: Partial<FodderItem>) => void;
@@ -62,16 +63,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     { id: 'b4', parentId: 'browse', name: 'Брёвна / Кряжи', scoreTag: '🪵 8/10', amount: 2, category: 'rough', unit: 'шт', isDefault: true },
     { id: 'b5', parentId: 'browse', name: 'Веники банные', scoreTag: '🍃 7/10', amount: 3, category: 'rough', unit: 'шт', isDefault: true },
 
-    { id: 'c1', parentId: 'concentrate', name: 'Овёс (мешки)', amount: 20, category: 'concentrate', unit: 'меш', isDefault: true },
-    { id: 'c2', parentId: 'concentrate', name: 'Отруби (мешки)', amount: 12, category: 'concentrate', unit: 'меш', isDefault: true },
-    { id: 'c3', parentId: 'concentrate', name: 'ВТМ (мешки)', amount: 10, category: 'concentrate', unit: 'меш', isDefault: true },
-    { id: 'c4', parentId: 'concentrate', name: 'Лён (мешки)', amount: 5, category: 'concentrate', unit: 'меш', isDefault: true },
-    { id: 'c5', parentId: 'concentrate', name: 'Ячмень (мешки)', amount: 8, category: 'concentrate', unit: 'меш', isDefault: true },
-    { id: 'c6', parentId: 'concentrate', name: 'Мэш готовый (мешки)', amount: 15, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c1', parentId: 'concentrate', name: 'Овёс (мешки)', amount: 20, fullBagsCount: 19, currentBagKg: 20, bagCapacityKg: 30, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c2', parentId: 'concentrate', name: 'Отруби пшеничные (мешки)', amount: 12, fullBagsCount: 11, currentBagKg: 15, bagCapacityKg: 25, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c3', parentId: 'concentrate', name: 'ВТМ гранулы (мешки)', amount: 10, fullBagsCount: 9, currentBagKg: 25, bagCapacityKg: 30, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c4', parentId: 'concentrate', name: 'Льняной жмых (мешки)', amount: 8, fullBagsCount: 7, currentBagKg: 18, bagCapacityKg: 25, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c5', parentId: 'concentrate', name: 'Ячмень плющеный (мешки)', amount: 8, fullBagsCount: 7, currentBagKg: 28, bagCapacityKg: 35, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c6', parentId: 'concentrate', name: 'Свекловичный жом (мешки)', amount: 6, fullBagsCount: 5, currentBagKg: 22, bagCapacityKg: 30, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c11', parentId: 'concentrate', name: 'Геркулес хлопья (мешки)', amount: 10, fullBagsCount: 9, currentBagKg: 22, bagCapacityKg: 25, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c12', parentId: 'concentrate', name: 'Гречка ядрица (мешки)', amount: 8, fullBagsCount: 7, currentBagKg: 20, bagCapacityKg: 25, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c7', parentId: 'concentrate', name: 'Псиллиум / Солевой премикс', amount: 10, category: 'concentrate', unit: 'уп', isDefault: true },
+    { id: 'c8', parentId: 'concentrate', name: 'Мэш готовый (мешки)', amount: 15, fullBagsCount: 14, currentBagKg: 20, bagCapacityKg: 25, category: 'concentrate', unit: 'меш', isDefault: true },
+    { id: 'c9', parentId: 'concentrate', name: 'Кальций / Связки и ногти', amount: 20, category: 'concentrate', unit: 'уп', isDefault: true },
+    { id: 'c10', parentId: 'concentrate', name: 'Витаминный премикс роста', amount: 15, category: 'concentrate', unit: 'уп', isDefault: true },
     { id: 'j1', parentId: 'juicy', name: 'Морковь', amount: 150, category: 'juicy', unit: 'кг', isDefault: true },
     { id: 'j2', parentId: 'juicy', name: 'Свёкла', amount: 30, category: 'juicy', unit: 'кг', isDefault: true },
     { id: 'j3', parentId: 'juicy', name: 'Яблоки', amount: 50, category: 'juicy', unit: 'кг', isDefault: true },
-    { id: 'j4', parentId: 'juicy', name: 'Тыква', amount: 20, category: 'juicy', unit: 'кг', isDefault: true }
+    { id: 'j4', parentId: 'juicy', name: 'Тыква', amount: 20, category: 'juicy', unit: 'кг', isDefault: true },
+    { id: 'j5', parentId: 'juicy', name: 'Кабачки', amount: 25, category: 'juicy', unit: 'кг', isDefault: true },
+    { id: 'j6', parentId: 'juicy', name: 'Арбуз сезонный', amount: 40, category: 'juicy', unit: 'кг', isDefault: true },
+    { id: 'j7', parentId: 'juicy', name: 'Бананы', amount: 15, category: 'juicy', unit: 'кг', isDefault: true }
   ]);
 
   useEffect(() => {
@@ -156,7 +166,58 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = canManageUsers(profile);
 
   const updateFodderAmount = (id: string, delta: number) => {
-    setFodderInventory(prev => prev.map(item => item.id === id ? { ...item, amount: item.amount + delta } : item));
+    setFodderInventory(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      if (item.fullBagsCount !== undefined) {
+        const newFull = Math.max(0, item.fullBagsCount + delta);
+        return {
+          ...item,
+          fullBagsCount: newFull,
+          amount: newFull + ((item.currentBagKg && item.currentBagKg > 0) ? 1 : 0)
+        };
+      }
+      return {
+        ...item,
+        amount: Math.max(0, Math.round((item.amount + delta) * 100) / 100)
+      };
+    }));
+  };
+
+  const deductFodderKg = (id: string, kg: number) => {
+    setFodderInventory(prev => prev.map(item => {
+      if (item.id !== id) return item;
+
+      // Concentrates with opened bag tracking
+      if (item.fullBagsCount !== undefined && item.currentBagKg !== undefined) {
+        const capacity = item.bagCapacityKg || 30;
+        let newCurrent = Math.round((item.currentBagKg - kg) * 100) / 100;
+        let newFullBags = item.fullBagsCount;
+
+        while (newCurrent <= 0 && newFullBags > 0) {
+          newFullBags -= 1;
+          newCurrent = Math.round((newCurrent + capacity) * 100) / 100;
+        }
+
+        if (newFullBags === 0 && newCurrent < 0) {
+          newCurrent = 0;
+        }
+
+        const newAmount = newFullBags + (newCurrent > 0 ? 1 : 0);
+
+        return {
+          ...item,
+          fullBagsCount: newFullBags,
+          currentBagKg: newCurrent,
+          amount: newAmount
+        };
+      }
+
+      // Default item (e.g. succulent kg)
+      return {
+        ...item,
+        amount: Math.max(0, Math.round((item.amount - kg) * 100) / 100)
+      };
+    }));
   };
   
   const addFodderItem = (item: FodderItem) => {
@@ -168,13 +229,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
   
   const editFodderItem = (id: string, updates: Partial<FodderItem>) => {
-    setFodderInventory(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    setFodderInventory(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const merged = { ...item, ...updates };
+      if (merged.fullBagsCount !== undefined && merged.currentBagKg !== undefined) {
+        merged.amount = merged.fullBagsCount + (merged.currentBagKg > 0 ? 1 : 0);
+      }
+      return merged;
+    }));
   };
 
   return (
     <StoreContext.Provider value={{
       profile, setProfile, isAdmin, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate, globalSaveStatus, setGlobalSaveStatus,
-      fodderInventory, updateFodderAmount, addFodderItem, deleteFodderItem, editFodderItem
+      fodderInventory, updateFodderAmount, deductFodderKg, addFodderItem, deleteFodderItem, editFodderItem
     }}>
       {children}
     </StoreContext.Provider>

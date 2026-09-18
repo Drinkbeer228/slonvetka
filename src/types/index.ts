@@ -75,4 +75,7 @@ export interface FodderItem {
   amount: number;
   unit: string;
   isDefault?: boolean;
+  fullBagsCount?: number;
+  currentBagKg?: number;
+  bagCapacityKg?: number;
 }
