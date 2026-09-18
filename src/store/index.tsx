@@ -193,9 +193,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         let newCurrent = Math.round((item.currentBagKg - kg) * 100) / 100;
         let newFullBags = item.fullBagsCount;
 
+        // Deduction: if opened bag emptied, take from full bags
         while (newCurrent <= 0 && newFullBags > 0) {
           newFullBags -= 1;
           newCurrent = Math.round((newCurrent + capacity) * 100) / 100;
+        }
+
+        // Reversion/Restoration: if returned kg overflows opened bag, pack into full bags
+        while (newCurrent >= capacity) {
+          newFullBags += 1;
+          newCurrent = Math.round((newCurrent - capacity) * 100) / 100;
         }
 
         if (newFullBags === 0 && newCurrent < 0) {

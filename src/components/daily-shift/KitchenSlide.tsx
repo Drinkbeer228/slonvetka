@@ -9,6 +9,12 @@ interface KitchenSlideProps {
   addEvent: (title: string) => void;
 }
 
+interface DispensedBatch {
+  time: string;
+  ingredients: Record<string, number>;
+  additives: string[];
+}
+
 // Biochemical Active Agents & Functional markers (Понятный язык киперов)
 const BIOCHEMICAL_MARKERS: Record<string, { label: string; style: string }> = {
   // Крупяные и структурные маркеры
@@ -227,24 +233,136 @@ export function KitchenSlide({
     }
   }, [activeMealTab]);
 
-  // Dispensed timestamps per meal and elephant
-  const [dispensedPortions, setDispensedPortions] = useState<Record<string, Record<string, string>>>(() => {
+  // Dispensed batches with recorded ingredients and additives for exact warehouse reversion
+  const [dispensedBatches, setDispensedBatches] = useState<Record<string, Record<string, DispensedBatch>>>(() => {
     try {
-      const s = localStorage.getItem('kitchen_dispensed_portions');
-      return s ? JSON.parse(s) : {};
+      const s = localStorage.getItem('kitchen_dispensed_batches');
+      if (s) return JSON.parse(s);
+      // Migrate from older kitchen_dispensed_portions if exists
+      const old = localStorage.getItem('kitchen_dispensed_portions');
+      if (old) {
+        const parsed = JSON.parse(old);
+        const migrated: Record<string, Record<string, DispensedBatch>> = {};
+        Object.entries(parsed).forEach(([meal, els]: [string, any]) => {
+          migrated[meal] = {};
+          Object.entries(els).forEach(([elId, time]: [string, any]) => {
+            migrated[meal][elId] = {
+              time: String(time),
+              ingredients: {},
+              additives: []
+            };
+          });
+        });
+        return migrated;
+      }
+      return {};
     } catch {
       return {};
     }
   });
 
+  // Track if ingredients/additives were modified after previously dispensing
+  const [modifiedBatches, setModifiedBatches] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     try {
-      localStorage.setItem('kitchen_dispensed_portions', JSON.stringify(dispensedPortions));
+      localStorage.setItem('kitchen_dispensed_batches', JSON.stringify(dispensedBatches));
+      // Keep legacy format updated for any other components reading it
+      const portions: Record<string, Record<string, string>> = {};
+      Object.entries(dispensedBatches).forEach(([m, els]) => {
+        portions[m] = {};
+        Object.entries(els).forEach(([elId, batch]) => {
+          if (batch?.time) portions[m][elId] = batch.time;
+        });
+      });
+      localStorage.setItem('kitchen_dispensed_portions', JSON.stringify(portions));
     } catch {}
-  }, [dispensedPortions]);
+  }, [dispensedBatches]);
+
+  // Derived quick lookup map: [meal][elId] => timestamp
+  const dispensedPortions = React.useMemo(() => {
+    const portions: Record<string, Record<string, string>> = {};
+    Object.entries(dispensedBatches).forEach(([m, els]) => {
+      portions[m] = {};
+      Object.entries(els).forEach(([elId, batch]) => {
+        if (batch?.time) portions[m][elId] = batch.time;
+      });
+    });
+    return portions;
+  }, [dispensedBatches]);
+
+  // Revert a dispensed meal: restore warehouse stock and reset draft state
+  const handleRevertDispense = (meal: 'm' | 'n' | 'e', elephantId: string, reason: 'cancel' | 'edit' = 'cancel') => {
+    const batch = dispensedBatches[meal]?.[elephantId];
+    if (!batch) return;
+
+    const elName = KITCHEN_ELEPHANTS.find(e => e.id === elephantId)?.name || elephantId;
+    const mealLabel = meal === 'm' ? 'Завтрак' : meal === 'n' ? 'Обед' : 'Ужин';
+    const returnedItems: string[] = [];
+
+    // 1. Revert base ingredients back to warehouse
+    Object.entries(batch.ingredients || {}).forEach(([id, val]) => {
+      if (val > 0) {
+        const item = fodderInventory.find(f => f.id === id);
+        const name = item ? item.name.split('(')[0].trim() : id;
+
+        if (deductFodderKg) {
+          // Negative kg returns the feed into currentBagKg (or amount)
+          deductFodderKg(id, -val);
+        } else if (meal === 'e') {
+          updateFodderAmount(id, val);
+        } else {
+          const deltaBags = Number((val / 25).toFixed(3));
+          updateFodderAmount(id, deltaBags);
+        }
+        returnedItems.push(`${name} ${val} кг`);
+      }
+    });
+
+    // 2. Revert additives back to warehouse (+1)
+    (batch.additives || []).forEach(addId => {
+      const addInfo = KITCHEN_ADDITIVES.find(a => a.id === addId);
+      if (addInfo) {
+        updateFodderAmount(addInfo.fodderId, 1);
+        returnedItems.push(`${addInfo.label}`);
+      }
+    });
+
+    // 3. Remove batch from dispensedBatches
+    setDispensedBatches(prev => {
+      const nextMeal = { ...(prev[meal] || {}) };
+      delete nextMeal[elephantId];
+      return { ...prev, [meal]: nextMeal };
+    });
+
+    if (reason === 'cancel') {
+      // Clear modified flag
+      setModifiedBatches(prev => {
+        const next = { ...prev };
+        delete next[`${meal}-${elephantId}`];
+        return next;
+      });
+
+      if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
+      addEvent(`↺ Отменён замес для ${elName} (${mealLabel}). Списания аннулированы, корма возвращены на склад.`);
+    } else {
+      // Mark as modified so button prompts to recalculate and fix
+      setModifiedBatches(prev => ({
+        ...prev,
+        [`${meal}-${elephantId}`]: true
+      }));
+
+      addEvent(`✏️ Рецепт для ${elName} (${mealLabel}) изменён: предыдущий замес сброшен, корма возвращены на склад.`);
+    }
+  };
 
   // Fast 1-tap reset to clinical baseline
   const applyElephantPreset = (meal: 'm' | 'n' | 'e', elephantId: 'margo' | 'audrey' | 'pretty') => {
+    // If was previously dispensed, automatically revert previous batch first so bowl is unlocked
+    if (dispensedBatches[meal]?.[elephantId]) {
+      handleRevertDispense(meal, elephantId, 'edit');
+    }
+
     const preset = ELEPHANT_PRESETS[meal]?.[elephantId];
     if (!preset) return;
 
@@ -287,6 +405,11 @@ export function KitchenSlide({
       return;
     }
 
+    // Free editing: if batch was already dispensed, auto-revert previous deduction and reset dispensed state
+    if (dispensedBatches[meal]?.[elephantId]) {
+      handleRevertDispense(meal, elephantId, 'edit');
+    }
+
     setKitchenIngredients(prev => {
       const mealMap = { ...(prev[meal] || {}) };
       const elMap = { ...(mealMap[elephantId] || {}) };
@@ -307,6 +430,11 @@ export function KitchenSlide({
       if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
       addEvent(`⚠️ Ошибка: Дьявольский коготь запрещён натощак! Применяется только в обед со слизистым мэшем (льняной жмых).`);
       return;
+    }
+
+    // Free editing: if batch was already dispensed, auto-revert previous deduction and reset dispensed state
+    if (dispensedBatches[meal]?.[elephantId]) {
+      handleRevertDispense(meal, elephantId, 'edit');
     }
 
     setKitchenAdditives(prev => {
@@ -427,14 +555,26 @@ export function KitchenSlide({
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    setDispensedPortions(prev => {
-      return {
-        ...prev,
-        [meal]: {
-          ...(prev[meal] || {}),
-          [elephantId]: timeStr
+    const isPreviouslyModified = Boolean(modifiedBatches[`${meal}-${elephantId}`]);
+
+    // Save batch record with exact ingredients and additives for possible rollback
+    setDispensedBatches(prev => ({
+      ...prev,
+      [meal]: {
+        ...(prev[meal] || {}),
+        [elephantId]: {
+          time: timeStr,
+          ingredients: { ...ings },
+          additives: [...adds]
         }
-      };
+      }
+    }));
+
+    // Clear modified flag
+    setModifiedBatches(prev => {
+      const next = { ...prev };
+      delete next[`${meal}-${elephantId}`];
+      return next;
     });
 
     if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
@@ -444,6 +584,8 @@ export function KitchenSlide({
 
     if (hasShortage) {
       addEvent(`⚠️ Списание при нулевом остатке! Замешано для ${elName} (${mealLabel}, ${totalWeight.toFixed(1)} кг): ${logItems.join(', ')}.`);
+    } else if (isPreviouslyModified) {
+      addEvent(`✓ Замес для ${elName} пересчитан и зафиксирован (${mealLabel}, ${totalWeight.toFixed(1)} кг): ${logItems.join(', ')}. Списано со склада.`);
     } else {
       addEvent(`✓ Замешано для ${elName} (${mealLabel}, ${totalWeight.toFixed(1)} кг): ${logItems.join(', ')}. Списано со склада.`);
     }
@@ -849,30 +991,56 @@ export function KitchenSlide({
           );
         })()}
 
-        {/* 6. ACTION BUTTON */}
+        {/* 6. ACTION BUTTON (ДВУСТОРОННИЙ СТЕЙТ С ВОЗМОЖНОСТЬЮ ОТМЕНЫ И РЕДАКТИРОВАНИЯ) */}
         {(() => {
           const isDispensed = Boolean(dispensedPortions[activeMealTab]?.[selectedKitchenElephant]);
-          const timeStr = dispensedPortions[activeMealTab]?.[selectedKitchenElephant];
+          const timeStr = dispensedPortions[activeMealTab]?.[selectedKitchenElephant] || '';
           const elName = KITCHEN_ELEPHANTS.find(e => e.id === selectedKitchenElephant)?.name || selectedKitchenElephant;
+          const isModified = Boolean(modifiedBatches[`${activeMealTab}-${selectedKitchenElephant}`]);
+
+          if (isDispensed) {
+            return (
+              <div className="flex items-center gap-1.5 w-full h-10">
+                {/* Left plate: статус фиксации с временной отметкой */}
+                <div className="flex-1 h-full rounded-xl bg-emerald-950/80 border border-emerald-500/60 px-3 flex items-center justify-between text-xs font-bold text-emerald-300 shadow-sm min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-emerald-400 font-black text-sm shrink-0">✓</span>
+                    <span className="truncate">Замешано для {elName}</span>
+                  </div>
+                  <span className="font-mono text-[11px] text-emerald-300 font-black shrink-0 bg-emerald-900/80 border border-emerald-500/50 px-2 py-0.5 rounded-lg ml-1">
+                    {timeStr}
+                  </span>
+                </div>
+
+                {/* Right button: ↺ Отменить / Вернуть на склад */}
+                <button
+                  type="button"
+                  onClick={() => handleRevertDispense(activeMealTab, selectedKitchenElephant, 'cancel')}
+                  className="h-full px-3.5 rounded-xl bg-slate-900 hover:bg-rose-950/60 active:scale-95 border border-slate-700 hover:border-rose-500/60 text-slate-300 hover:text-rose-200 font-bold text-xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-sm group"
+                  title="Отменить фиксацию замеса и вернуть списанные корма на склад"
+                >
+                  <span className="text-sm text-rose-400 group-hover:rotate-[-45deg] transition-transform">↺</span>
+                  <span>Отменить</span>
+                </button>
+              </div>
+            );
+          }
 
           return (
             <button
               type="button"
               onClick={() => handleKitchenDispense(activeMealTab, selectedKitchenElephant)}
-              className={`w-full h-10 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-98 cursor-pointer ${
-                isDispensed
-                  ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 shadow-slate-950/50'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/40'
-              }`}
+              className="w-full h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-950/40 active:scale-98 cursor-pointer"
             >
-              {isDispensed ? (
+              {isModified ? (
                 <>
-                  <span>✓ Замешано для {elName} в {timeStr}</span>
-                  <span className="opacity-70 text-[10px] font-bold">• Повторить</span>
+                  <span>✓</span>
+                  <span>Пересчитать и зафиксировать замес</span>
                 </>
               ) : (
                 <>
-                  <span>✓ Замесить и списать со склада</span>
+                  <span>✓</span>
+                  <span>Замесить и списать со склада</span>
                 </>
               )}
             </button>

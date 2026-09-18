@@ -8,6 +8,7 @@ import { bodyMonitoringService, VetRecommendation } from '../services/bodyMonito
 import { Menu, ClipboardList, ChevronDown, Plus, Minus, Check, X, ChevronRight } from 'lucide-react';
 import { FodderStorageSlide } from '../components/daily-shift/FodderStorageSlide';
 import { KitchenSlide } from '../components/daily-shift/KitchenSlide';
+import { HouseholdSlide } from '../components/daily-shift/HouseholdSlide';
 import { ShiftCalendarSlide } from '../components/daily-shift/ShiftCalendarSlide';
 import { MenuServiceSlide } from '../components/daily-shift/MenuServiceSlide';
 
@@ -186,25 +187,6 @@ export function DailyShiftPage({ onNavigate }: { onNavigate: (screen: string) =>
     }
 
     if (navigator.vibrate) navigator.vibrate(15);
-  };
-
-  // ---------------------------------------------------------
-  // REEL 4: HANDOVER, CHORES & INCIDENTS
-  // ---------------------------------------------------------
-  const [washedElephants, setWashedElephants] = useState<string[]>([]);
-  const [dungWheelbarrows, setDungWheelbarrows] = useState(0);
-  const [brokenTools, setBrokenTools] = useState<string[]>([]);
-  const [handoverStep, setHandoverStep] = useState<'outgoing' | 'incoming' | 'completed'>('outgoing');
-  const [outgoingChecklist, setOutgoingChecklist] = useState<string[]>(['Поилки вычищены', 'Ночная пайка сена', 'Задвижки заперты', 'Ковры помыты']);
-  const [outgoingSlider, setOutgoingSlider] = useState(0);
-  const [handoverTime, setHandoverTime] = useState('');
-
-  const toggleBrokenTool = (tool: string) => {
-    setBrokenTools(p => {
-      if (p.includes(tool)) return p.filter(t => t !== tool);
-      addEvent(`Поломка: ${tool}`);
-      return [...p, tool];
-    });
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -527,110 +509,11 @@ export function DailyShiftPage({ onNavigate }: { onNavigate: (screen: string) =>
       {/* SCREEN 4: FODDER */}
       <FodderStorageSlide slideWrapperClass={slideWrapperClass} />
 
-      {/* SCREEN 5: HANDOVER, CHORES & INCIDENTS */}
-      <div className={slideWrapperClass}>
-        <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2 mb-4 mt-1">📋 Хозработы и Сдача</h2>
-
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl mb-4">
-          <span className="text-xs font-black text-slate-200 block mb-2">🚿 Помывка слонов</span>
-          <div className="grid grid-cols-3 gap-2">
-            {['margo', 'audrey', 'pretty'].map(el => {
-              const labels: any = { margo: 'Марго', audrey: 'Одри', pretty: 'Прэтти' };
-              const isActive = washedElephants.includes(el);
-              return (
-                <button
-                  key={el}
-                  onClick={() => setWashedElephants(p => isActive ? p.filter(i => i !== el) : [...p, el])}
-                  className={`h-11 rounded-xl text-xs font-bold border transition-all ${isActive ? 'bg-sky-600/30 border-sky-500/50 text-sky-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
-                >
-                  🐘 {labels[el]} {isActive && '✓'}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex flex-col items-center">
-            <span className="text-[11px] font-bold text-slate-400 mb-2">Навоз (тачек)</span>
-            <div className="flex flex-col w-full rounded-xl overflow-hidden border border-slate-800">
-              <button onClick={() => setDungWheelbarrows(p => p + 1)} className="flex items-center justify-center py-2.5 w-full bg-emerald-900/40 text-emerald-500 active:brightness-125 transition-all">
-                <Plus className="w-5 h-5" />
-              </button>
-              <div className="bg-slate-900/80 py-2 flex items-center justify-center text-2xl font-bold text-white">
-                {dungWheelbarrows}
-              </div>
-              <button onClick={() => setDungWheelbarrows(p => Math.max(0, p - 1))} className="flex items-center justify-center py-2 w-full bg-rose-950/20 text-rose-500 active:bg-rose-900/40 transition-all">
-                <Minus className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex flex-col">
-            <span className="text-[11px] font-bold text-slate-400 mb-2 text-center">Поломки (1 тап)</span>
-            <div className="grid grid-cols-2 gap-1.5 flex-1">
-              {['Метла', 'Ведро', 'Шланг', 'Засов'].map(tool => {
-                const isActive = brokenTools.includes(tool);
-                return (
-                  <button
-                    key={tool}
-                    onClick={() => toggleBrokenTool(tool)}
-                    className={`rounded-xl text-[10px] font-bold border transition-all flex items-center justify-center ${isActive ? 'bg-rose-600/30 border-rose-500/50 text-rose-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
-                  >
-                    {tool}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex flex-col gap-3">
-          <span className="text-xs font-black text-slate-200 block">Чек-лист передачи смены</span>
-          {['Поилки вычищены', 'Ночная пайка сена', 'Задвижки заперты', 'Ковры помыты'].map(item => {
-            const done = outgoingChecklist.includes(item);
-            return (
-              <button 
-                key={item} 
-                onClick={() => setOutgoingChecklist(p => done ? p.filter(i => i !== item) : [...p, item])}
-                className="flex items-center gap-3 text-left"
-              >
-                <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${done ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-800 border-slate-700'}`}>
-                  {done && <Check className="w-3.5 h-3.5 text-slate-950 stroke-[3]" />}
-                </div>
-                <span className={`text-sm ${done ? 'text-slate-300' : 'text-slate-500'}`}>{item}</span>
-              </button>
-            )
-          })}
-
-          <div className="relative h-12 bg-slate-950 rounded-xl overflow-hidden mt-2 border border-slate-800 flex items-center justify-center">
-            <span className="text-slate-500 text-xs font-bold pointer-events-none z-0 select-none">Потяните вправо для сдачи</span>
-            <div 
-              className="absolute top-0 left-0 bottom-0 bg-emerald-500/20 border-r border-emerald-500/50 z-10 transition-all duration-75"
-              style={{ width: `${outgoingSlider}%` }}
-            />
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={outgoingSlider}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                setOutgoingSlider(val);
-                if (val > 95) {
-                  setOutgoingSlider(100);
-                  setHandoverStep('incoming');
-                  const now = new Date();
-                  setHandoverTime(now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-                  addEvent('Смена сдана (ожидание приемки)');
-                  if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-                }
-              }}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-20"
-            />
-          </div>
-        </div>
-      </div>
+      {/* SCREEN 5: HOUSEHOLD & ELEPHANT HOUSE SAFETY */}
+      <HouseholdSlide
+        slideWrapperClass={slideWrapperClass}
+        addEvent={addEvent}
+      />
 
       {/* SCREEN 6: SHIFT CALENDAR */}
       <ShiftCalendarSlide
