@@ -12,18 +12,18 @@ export const authService = {
       
       // Если RPC не существует (схема еще не обновлена в Supabase), используем прямой update (разрешено через RLS)
       if (rpcError) {
-        console.warn('RPC register_device_session error, falling back to direct update:', rpcError);
+        console.warn('RPC register_device_session notice, falling back to direct update:', rpcError.message || rpcError);
         const { error: updateError } = await supabase
           .from('profiles')
           .update({ current_session_id: sessionToken })
           .eq('id', userId);
           
         if (updateError) {
-          console.error('Failed to update session token:', updateError);
+          console.warn('Notice updating session token:', updateError.message || updateError);
         }
       }
     } catch (err) {
-      console.error('Error registering device session:', err);
+      console.warn('Network notice registering device session:', err);
     }
   },
 
@@ -36,7 +36,7 @@ export const authService = {
         .maybeSingle();
         
       if (error) {
-        console.error('Error verifying device session:', error);
+        console.warn('Notice verifying device session (offline/unreachable):', error.message || error);
         return true; // В случае ошибки сети не выбрасываем пользователя
       }
       
@@ -50,7 +50,7 @@ export const authService = {
       
       return true;
     } catch (err) {
-      console.error('Error in verifyDeviceSession:', err);
+      console.warn('Notice in verifyDeviceSession (offline/unreachable):', err);
       return true;
     }
   }

@@ -68,7 +68,7 @@ export interface TreatmentRecordWithPhotos extends TreatmentRecord {
 
 export interface FodderItem {
   id: string;
-  parentId: 'bales' | 'rolls' | 'browse' | 'general' | 'juicy' | 'concentrate';
+  parentId: 'hay' | 'bales' | 'rolls' | 'browse' | 'general' | 'juicy' | 'concentrate';
   name: string;
   scoreTag?: string;
   category: 'rough' | 'concentrate' | 'juicy';

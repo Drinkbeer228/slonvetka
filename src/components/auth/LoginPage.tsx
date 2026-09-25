@@ -55,7 +55,7 @@ export function LoginPage({ children }: LoginPageProps) {
           }
         }
       } catch (err) {
-        console.error('Auth init error:', err);
+        console.warn('Auth init notice (running offline):', err);
       } finally {
         setLoading(false);
       }
@@ -102,11 +102,13 @@ export function LoginPage({ children }: LoginPageProps) {
 
   const handleSignOut = async (msg?: string) => {
     localStorage.removeItem('slonovet_session_token');
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setProfile(null);
     setLoading(false);
     if (msg) {
-      alert(msg); // Простой alert (в идеале toast)
+      setError(msg);
     }
   };
 

@@ -12,6 +12,7 @@ import { StaffScreen } from './screens/StaffScreen';
 import { VetDashboard } from './screens/VetDashboard';
 import { VetCabinetDashboard } from './components/VetCabinetDashboard';
 import { MonitoringAnalyticsScreen } from './screens/MonitoringAnalyticsScreen';
+import { RoleProvider } from './context/RoleContext';
 
 export default function App() {
   const { profile } = useStore();
@@ -65,11 +66,13 @@ export default function App() {
   };
 
   return (
-    <LoginPage>
-      <Layout currentScreen={currentScreen} onNavigate={handleNavigate}>
-        {renderScreen()}
-      </Layout>
-    </LoginPage>
+    <RoleProvider>
+      <LoginPage>
+        <Layout currentScreen={currentScreen} onNavigate={handleNavigate}>
+          {renderScreen()}
+        </Layout>
+      </LoginPage>
+    </RoleProvider>
   );
 }
 

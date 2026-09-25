@@ -8,122 +8,191 @@ const urlCache = new Map<string, { url: string, expiresAt: number }>();
 
 export const supabaseService = {
   async getProfile(userId: string): Promise<Profile | null> {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    if (error) {
-      console.error('Failed to get profile:', error);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) {
+        console.warn('Supabase getProfile notice:', error.message || error);
+        return null;
+      }
+      return data as Profile | null;
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getProfile):', err);
       return null;
     }
-    return data as Profile | null;
   },
 
   async getElephants(): Promise<Elephant[]> {
-    const { data, error } = await supabase
-      .from('elephants')
-      .select('*')
-      .order('name');
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('elephants')
+        .select('*')
+        .order('name');
+      if (error) {
+        console.warn('Supabase getElephants notice:', error.message || error);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getElephants):', err);
+      return [];
+    }
   },
 
   async getActiveAssignments(): Promise<Assignment[]> {
-    const { data, error } = await supabase
-      .from('assignments')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Supabase getActiveAssignments notice:', error.message || error);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getActiveAssignments):', err);
+      return [];
+    }
   },
 
   async getAllAssignments(): Promise<Assignment[]> {
-    const { data, error } = await supabase
-      .from('assignments')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Supabase getAllAssignments notice:', error.message || error);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getAllAssignments):', err);
+      return [];
+    }
   },
 
   async getAssignmentsByElephant(elephantId: string): Promise<Assignment[]> {
-    const { data, error } = await supabase
-      .from('assignments')
-      .select('*')
-      .eq('elephant_id', elephantId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('elephant_id', elephantId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Supabase getAssignmentsByElephant notice:', error.message || error);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getAssignmentsByElephant):', err);
+      return [];
+    }
   },
 
   async getTodayRecords(): Promise<TreatmentRecordWithPhotos[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isoString = today.toISOString();
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isoString = today.toISOString();
 
-    const { data, error } = await supabase
-      .from('treatment_records')
-      .select(`
-        *,
-        photos:treatment_photos(*),
-        keeper:profiles(id, name)
-      `)
-      .gte('performed_at', isoString);
+      const { data, error } = await supabase
+        .from('treatment_records')
+        .select(`
+          *,
+          photos:treatment_photos(*),
+          keeper:profiles(id, name)
+        `)
+        .gte('performed_at', isoString);
 
-    if (error) throw error;
-    return data as any;
+      if (error) {
+        console.warn('Supabase getTodayRecords notice:', error.message || error);
+        return [];
+      }
+      return (data as any) || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getTodayRecords):', err);
+      return [];
+    }
   },
 
   async getRecordsByDate(dateStr: string): Promise<TreatmentRecordWithPhotos[]> {
-    const startOfDay = `${dateStr}T00:00:00.000Z`;
-    const endOfDay = `${dateStr}T23:59:59.999Z`;
+    try {
+      const startOfDay = `${dateStr}T00:00:00.000Z`;
+      const endOfDay = `${dateStr}T23:59:59.999Z`;
 
-    const { data, error } = await supabase
-      .from('treatment_records')
-      .select(`
-        *,
-        photos:treatment_photos(*),
-        keeper:profiles(id, name)
-      `)
-      .gte('performed_at', startOfDay)
-      .lte('performed_at', endOfDay);
+      const { data, error } = await supabase
+        .from('treatment_records')
+        .select(`
+          *,
+          photos:treatment_photos(*),
+          keeper:profiles(id, name)
+        `)
+        .gte('performed_at', startOfDay)
+        .lte('performed_at', endOfDay);
 
-    if (error) throw error;
-    return data as any;
+      if (error) {
+        console.warn('Supabase getRecordsByDate notice:', error.message || error);
+        return [];
+      }
+      return (data as any) || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getRecordsByDate):', err);
+      return [];
+    }
   },
 
   async getTreatmentHistory(limit = 100): Promise<TreatmentRecordWithPhotos[]> {
-    const { data, error } = await supabase
-      .from('treatment_records')
-      .select(`
-        *,
-        photos:treatment_photos(*),
-        keeper:profiles(id, name)
-      `)
-      .order('performed_at', { ascending: false })
-      .limit(limit);
+    try {
+      const { data, error } = await supabase
+        .from('treatment_records')
+        .select(`
+          *,
+          photos:treatment_photos(*),
+          keeper:profiles(id, name)
+        `)
+        .order('performed_at', { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
-    return data as any;
+      if (error) {
+        console.warn('Supabase getTreatmentHistory notice:', error.message || error);
+        return [];
+      }
+      return (data as any) || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getTreatmentHistory):', err);
+      return [];
+    }
   },
 
   async getElephantHistory(elephantId: string, limit = 100): Promise<TreatmentRecordWithPhotos[]> {
-    const { data, error } = await supabase
-      .from('treatment_records')
-      .select(`
-        *,
-        photos:treatment_photos(*),
-        keeper:profiles(id, name)
-      `)
-      .eq('elephant_id', elephantId)
-      .order('performed_at', { ascending: false })
-      .limit(limit);
+    try {
+      const { data, error } = await supabase
+        .from('treatment_records')
+        .select(`
+          *,
+          photos:treatment_photos(*),
+          keeper:profiles(id, name)
+        `)
+        .eq('elephant_id', elephantId)
+        .order('performed_at', { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
-    return data as any;
+      if (error) {
+        console.warn('Supabase getElephantHistory notice:', error.message || error);
+        return [];
+      }
+      return (data as any) || [];
+    } catch (err) {
+      console.warn('Network offline or Supabase unreachable (getElephantHistory):', err);
+      return [];
+    }
   },
 
   async createAssignment(assignment: Omit<Assignment, 'id' | 'created_at' | 'updated_at'>): Promise<Assignment> {
@@ -260,20 +329,25 @@ export const supabaseService = {
       return cached.url;
     }
 
-    const { data, error } = await supabase.storage
-      .from('elephant-treatments')
-      .createSignedUrl(storagePath, 3600); // 1 hour
+    try {
+      const { data, error } = await supabase.storage
+        .from('elephant-treatments')
+        .createSignedUrl(storagePath, 3600); // 1 hour
 
-    if (error) {
-      console.error('Failed to create signed URL', error);
-      return ''; // Fallback
+      if (error) {
+        console.warn('Notice creating signed URL:', error.message || error);
+        return ''; // Fallback
+      }
+
+      urlCache.set(storagePath, {
+        url: data.signedUrl,
+        expiresAt: now + 3600 * 1000
+      });
+
+      return data.signedUrl;
+    } catch (err) {
+      console.warn('Notice creating signed URL (offline):', err);
+      return '';
     }
-
-    urlCache.set(storagePath, {
-      url: data.signedUrl,
-      expiresAt: now + 3600 * 1000
-    });
-
-    return data.signedUrl;
   }
 };

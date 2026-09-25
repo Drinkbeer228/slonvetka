@@ -225,10 +225,10 @@ export const shiftService = {
         .from('feed_inventory')
         .upsert(dbPayload, { onConflict: 'item_type' });
       if (error) {
-        console.error('Ошибка списания со склада:', error);
+        console.warn('Notice syncing feed inventory with server (offline mode):', error.message || error);
       }
     } catch (err) {
-      console.error('Ошибка списания со склада (сеть):', err);
+      console.warn('Notice syncing feed inventory with server (offline/network):', err);
     }
   },
 
@@ -269,7 +269,7 @@ export const shiftService = {
       if (error) throw error;
       return data as DailyShift | null;
     } catch (err) {
-      console.error('Error checking pending handover:', err);
+      console.warn('Notice checking pending handover (network offline):', err);
       return null;
     }
   },

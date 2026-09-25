@@ -8,6 +8,10 @@ import {
   RotateCcw,
   Sparkles
 } from 'lucide-react';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useStore } from '../../store';
+import { normalizeElephantSlug, getElephantName } from '../../utils/elephantUtils';
+import { useRole } from '../../context/RoleContext';
 
 interface HouseholdSlideProps {
   slideWrapperClass: string;
@@ -17,7 +21,7 @@ interface HouseholdSlideProps {
 type ElephantId = 'margo' | 'audrey' | 'pretty';
 type SkinCareId = 'shower' | 'scrub' | 'mud' | 'pool';
 type TechNodeId = 'hydro_gates' | 'drinkers_pressure' | 'barriers_perimeter' | 'heavy_tools';
-type HandoverTaskId = 'gates_locks' | 'night_forage' | 'clean_drinkers' | 'corral_gates';
+type HandoverTaskId = 'gates_locks' | 'night_forage' | 'enrichment' | 'clean_drinkers' | 'corral_gates';
 type TaskStatus = 'done' | 'colleague';
 
 const ELEPHANTS: { id: ElephantId; name: string }[] = [
@@ -43,41 +47,52 @@ const TECH_NODES: { id: TechNodeId; label: string; icon: string }[] = [
 const HANDOVER_TASKS: { id: HandoverTaskId; title: string }[] = [
   { id: 'gates_locks', title: 'Шиберы и вольеры на замках (ТБ)' },
   { id: 'night_forage', title: 'Ночной фураж и ветки развешаны на высоте' },
+  { id: 'enrichment', title: '🌳 Обогащение среды (игрушки, подвесы)' },
   { id: 'clean_drinkers', title: 'Автопоилки промыты и наполнены' },
   { id: 'corral_gates', title: 'Выгул: ворота заперты, периметр чист' }
 ];
 
 export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlideProps) {
-  // 1. SKIN CARE & HYDROTHERAPY
-  const [selectedElephant, setSelectedElephant] = useState<ElephantId>('margo');
-  const [skinCareState, setSkinCareState] = useState<Record<ElephantId, SkinCareId[]>>(() => {
-    try {
-      const saved = localStorage.getItem('household_skin_care');
-      return saved ? JSON.parse(saved) : { margo: [], audrey: [], pretty: [] };
-    } catch {
-      return { margo: [], audrey: [], pretty: [] };
-    }
-  });
+  const { elephants: storeElephants } = useStore();
+  const { isChief, isKeeper, roleConfig } = useRole();
+  const canInteract = isKeeper;
 
-  useEffect(() => {
+  // Helper for resilient vibration
+  const triggerHaptic = (pattern: number | number[]) => {
     try {
-      localStorage.setItem('household_skin_care', JSON.stringify(skinCareState));
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator && navigator.vibrate) {
+        navigator.vibrate(pattern);
+      }
     } catch {}
-  }, [skinCareState]);
+  };
+
+  // 1. SKIN CARE & HYDROTHERAPY
+  const [selectedElephant, setSelectedElephant] = useLocalStorage<string>(
+    'slonovet_active_elephant',
+    'margo'
+  );
+
+  const normSelectedElephant = normalizeElephantSlug(selectedElephant, storeElephants);
+
+  const [skinCareState, setSkinCareState] = useLocalStorage<Record<ElephantId, SkinCareId[]>>(
+    'slonovet_household_skin_care',
+    { margo: [], audrey: [], pretty: [] },
+    ['household_skin_care']
+  );
 
   const toggleSkinCare = (procedureId: SkinCareId) => {
-    const elName = ELEPHANTS.find(e => e.id === selectedElephant)?.name || selectedElephant;
+    const elName = getElephantName(normSelectedElephant, storeElephants);
     const proc = SKIN_CARE_PROCEDURES.find(p => p.id === procedureId);
-    const currentList = skinCareState[selectedElephant] || [];
+    const currentList = skinCareState[normSelectedElephant] || [];
     const isAlreadyActive = currentList.includes(procedureId);
 
     const updated = isAlreadyActive
       ? currentList.filter(id => id !== procedureId)
       : [...currentList, procedureId];
 
-    setSkinCareState(prev => ({ ...prev, [selectedElephant]: updated }));
+    setSkinCareState(prev => ({ ...prev, [normSelectedElephant]: updated }));
 
-    if (navigator.vibrate) navigator.vibrate(12);
+    triggerHaptic(12);
 
     if (!isAlreadyActive) {
       addEvent(`🚿 ${proc?.title || procedureId} выполнено для ${elName}`);
@@ -86,78 +101,39 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
     }
   };
 
-  // 2. DUNG & BEDDING WHEELBARROWS COUNTERS
-  const [dungCount, setDungCount] = useState<number>(() => {
-    try {
-      const s = localStorage.getItem('household_dung_count');
-      return s ? parseInt(s, 10) || 0 : 0;
-    } catch {
-      return 0;
-    }
-  });
-
-  const [beddingCount, setBeddingCount] = useState<number>(() => {
-    try {
-      const s = localStorage.getItem('household_bedding_count');
-      return s ? parseInt(s, 10) || 0 : 0;
-    } catch {
-      return 0;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('household_dung_count', dungCount.toString());
-    } catch {}
-  }, [dungCount]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('household_bedding_count', beddingCount.toString());
-    } catch {}
-  }, [beddingCount]);
-
-  const updateDung = (delta: number) => {
-    const nextVal = Math.max(0, dungCount + delta);
-    if (nextVal === dungCount) return;
-    setDungCount(nextVal);
-    if (navigator.vibrate) navigator.vibrate(15);
-    addEvent(`💩 Навоз вывезен: ${nextVal} тачек (${delta > 0 ? '+1' : '-1'})`);
-  };
+  // 2. BEDDING / SAND WHEELBARROWS COUNTER (ПОДСТИЛКА В ВОЛЬЕРАХ)
+  const [beddingCount, setBeddingCount] = useLocalStorage<number>(
+    'slonovet_household_bedding_count',
+    0,
+    ['household_bedding_count']
+  );
 
   const updateBedding = (delta: number) => {
     const nextVal = Math.max(0, beddingCount + delta);
     if (nextVal === beddingCount) return;
     setBeddingCount(nextVal);
-    if (navigator.vibrate) navigator.vibrate(15);
+    triggerHaptic(15);
     addEvent(`🚜 Свежая подстилка: ${nextVal} тачек (${delta > 0 ? '+1' : '-1'})`);
   };
 
-  // 3. INFRASTRUCTURE & CLASS "A" SAFETY STATUS
-  const [techStatuses, setTechStatuses] = useState<Record<TechNodeId, 'normal' | 'attention'>>(() => {
-    try {
-      const saved = localStorage.getItem('household_tech_statuses');
-      return saved ? JSON.parse(saved) : {
-        hydro_gates: 'normal',
-        drinkers_pressure: 'normal',
-        barriers_perimeter: 'normal',
-        heavy_tools: 'normal'
-      };
-    } catch {
-      return {
-        hydro_gates: 'normal',
-        drinkers_pressure: 'normal',
-        barriers_perimeter: 'normal',
-        heavy_tools: 'normal'
-      };
-    }
-  });
+  const setBeddingDirect = (val: number) => {
+    const nextVal = Math.max(0, Math.min(20, val));
+    setBeddingCount(nextVal);
+    triggerHaptic(12);
+    addEvent(`🚜 Подстилка/песок за смену: ${nextVal} тачек`);
+  };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('household_tech_statuses', JSON.stringify(techStatuses));
-    } catch {}
-  }, [techStatuses]);
+  // 3. INFRASTRUCTURE & CLASS "A" SAFETY STATUS
+  const [techStatuses, setTechStatuses] = useLocalStorage<Record<TechNodeId, 'normal' | 'attention'>>(
+    'slonovet_household_tech_statuses',
+    {
+      hydro_gates: 'normal',
+      drinkers_pressure: 'normal',
+      barriers_perimeter: 'normal',
+      heavy_tools: 'normal'
+    },
+    ['household_tech_statuses']
+  );
 
   const toggleTechNode = (nodeId: TechNodeId) => {
     const current = techStatuses[nodeId] || 'normal';
@@ -166,7 +142,7 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
 
     setTechStatuses(prev => ({ ...prev, [nodeId]: nextStatus }));
 
-    if (navigator.vibrate) navigator.vibrate(nextStatus === 'attention' ? [25, 40, 25] : 15);
+    triggerHaptic(nextStatus === 'attention' ? [25, 40, 25] : 15);
 
     if (nextStatus === 'attention') {
       addEvent(`⚠️ Заявка технику: ${node?.label || nodeId} (требует осмотра/внимания)`);
@@ -176,30 +152,17 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
   };
 
   // 4. HANDOVER CHECKLIST (RESPECTFUL NON-TOXIC)
-  const [checklist, setChecklist] = useState<Record<HandoverTaskId, TaskStatus | null>>(() => {
-    try {
-      const saved = localStorage.getItem('household_handover_checklist');
-      return saved ? JSON.parse(saved) : {
-        gates_locks: 'done',
-        night_forage: 'done',
-        clean_drinkers: 'done',
-        corral_gates: 'done'
-      };
-    } catch {
-      return {
-        gates_locks: 'done',
-        night_forage: 'done',
-        clean_drinkers: 'done',
-        corral_gates: 'done'
-      };
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('household_handover_checklist', JSON.stringify(checklist));
-    } catch {}
-  }, [checklist]);
+  const [checklist, setChecklist] = useLocalStorage<Record<HandoverTaskId, TaskStatus | null>>(
+    'slonovet_household_handover_checklist',
+    {
+      gates_locks: 'done',
+      night_forage: 'done',
+      enrichment: 'done',
+      clean_drinkers: 'done',
+      corral_gates: 'done'
+    },
+    ['household_handover_checklist']
+  );
 
   const setTaskStatus = (taskId: HandoverTaskId, status: TaskStatus) => {
     const current = checklist[taskId];
@@ -207,7 +170,7 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
     const task = HANDOVER_TASKS.find(t => t.id === taskId);
 
     setChecklist(prev => ({ ...prev, [taskId]: newStatus }));
-    if (navigator.vibrate) navigator.vibrate(12);
+    triggerHaptic(12);
 
     if (newStatus === 'done') {
       addEvent(`✓ Задача закрыта: «${task?.title || taskId}»`);
@@ -219,25 +182,23 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
   };
 
   // 5. PROTECTED SWIPE TO FINISH SHIFT
-  const [handoverComplete, setHandoverComplete] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('household_shift_completed') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [handoverComplete, setHandoverComplete] = useLocalStorage<boolean>(
+    'slonovet_household_shift_completed',
+    false,
+    ['household_shift_completed']
+  );
 
-  const [handoverTime, setHandoverTime] = useState<string>(() => {
-    try {
-      return localStorage.getItem('household_shift_completed_time') || '';
-    } catch {
-      return '';
-    }
-  });
+  const [handoverTime, setHandoverTime] = useLocalStorage<string>(
+    'slonovet_household_shift_completed_time',
+    '',
+    ['household_shift_completed_time']
+  );
 
   const [sliderValue, setSliderValue] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const sliderTrackRef = useRef<HTMLDivElement>(null);
+  const lastVibratedStepRef = useRef<number>(0);
+  const hasTriggeredCompleteRef = useRef<boolean>(false);
 
   const handleSliderDrag = (clientX: number) => {
     if (!sliderTrackRef.current || handoverComplete) return;
@@ -246,7 +207,15 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
     const percentage = Math.min(100, Math.max(0, (offsetX / rect.width) * 100));
     setSliderValue(percentage);
 
-    if (percentage >= 92) {
+    // Haptic notch feedback at 25%, 50%, 75% milestones
+    const step = Math.floor(percentage / 25);
+    if (step > lastVibratedStepRef.current && percentage < 92) {
+      lastVibratedStepRef.current = step;
+      triggerHaptic(12); // subtle tactile tick on each threshold
+    }
+
+    if (percentage >= 92 && !hasTriggeredCompleteRef.current) {
+      hasTriggeredCompleteRef.current = true;
       completeHandover();
     }
   };
@@ -258,12 +227,8 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     setHandoverTime(timeStr);
 
-    try {
-      localStorage.setItem('household_shift_completed', 'true');
-      localStorage.setItem('household_shift_completed_time', timeStr);
-    } catch {}
-
-    if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+    // Rich tactile multi-pulse haptic feedback confirming shift completion
+    triggerHaptic([35, 50, 60]);
     addEvent(`🏁 Смена успешно передана в ${timeStr}! Отчёт дежурства зафиксирован.`);
   };
 
@@ -271,13 +236,10 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
     setHandoverComplete(false);
     setSliderValue(0);
     setHandoverTime('');
+    hasTriggeredCompleteRef.current = false;
+    lastVibratedStepRef.current = 0;
 
-    try {
-      localStorage.removeItem('household_shift_completed');
-      localStorage.removeItem('household_shift_completed_time');
-    } catch {}
-
-    if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+    triggerHaptic([20, 30, 20]);
     addEvent(`↺ Отменена передача смены. Режим дежурства снова активен.`);
   };
 
@@ -288,13 +250,15 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
         {/* HEADER */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-black tracking-tight text-slate-100 flex items-center gap-1.5">
+            <h1 className="text-base font-black tracking-tight text-slate-100 flex items-center gap-1.5 leading-none">
               <span>🧹</span>
-              <span>Хозяйство</span>
+              <span>Хозяйство и ТБ</span>
             </h1>
-            <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
-              ТБ Класса «А»
-            </span>
+            {!isKeeper ? (
+              <span className="text-[9px] font-bold text-amber-300 bg-amber-950/80 border border-amber-800 px-1.5 py-0.5 rounded-full">
+                🔒 Режим просмотра ({roleConfig.shortLabel})
+              </span>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400">
@@ -306,6 +270,14 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
             )}
           </div>
         </div>
+
+        {/* NON-KEEPER NOTICE */}
+        {!canInteract && (
+          <div className="px-2.5 py-1.5 rounded-xl bg-amber-950/50 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center justify-between">
+            <span>🔒 Режим просмотра: отмечать хозяйство и ТБ могут только киперы</span>
+            <span className="text-[10px] text-amber-400 font-mono font-bold">{roleConfig.shortLabel}</span>
+          </div>
+        )}
 
         {/* 1. БЛОК 1: ГИГИЕНА КОЖИ И ВОДНЫЕ ПРОЦЕДУРЫ */}
         <div className="bg-slate-900/90 border border-slate-800/90 rounded-xl p-2 flex flex-col gap-1.5 shadow-sm">
@@ -320,7 +292,7 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
           {/* Elephant Selector */}
           <div className="grid grid-cols-3 gap-1">
             {ELEPHANTS.map(el => {
-              const isSelected = selectedElephant === el.id;
+              const isSelected = normSelectedElephant === el.id;
               const count = (skinCareState[el.id] || []).length;
               return (
                 <button
@@ -351,15 +323,18 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
           {/* 4 Multi-select Procedure Chips for Active Elephant */}
           <div className="grid grid-cols-2 gap-1">
             {SKIN_CARE_PROCEDURES.map(proc => {
-              const activeList = skinCareState[selectedElephant] || [];
+              const activeList = skinCareState[normSelectedElephant] || [];
               const isActive = activeList.includes(proc.id);
 
               return (
                 <button
                   key={proc.id}
                   type="button"
-                  onClick={() => toggleSkinCare(proc.id)}
-                  className={`h-8 px-2 rounded-lg text-left transition-all flex items-center justify-between border cursor-pointer ${
+                  onClick={!canInteract ? undefined : () => toggleSkinCare(proc.id)}
+                  disabled={!canInteract}
+                  className={`h-8 px-2 rounded-lg text-left transition-all flex items-center justify-between border ${
+                    !canInteract ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'
+                  } ${
                     isActive
                       ? 'bg-teal-950/70 border-teal-500/60 text-teal-200 shadow-sm'
                       : 'bg-slate-950/50 border-slate-800/80 text-slate-400 hover:bg-slate-800/50 hover:text-slate-300'
@@ -382,78 +357,80 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
           </div>
         </div>
 
-        {/* 2. БЛОК 2: БАЛАНС ГРУНТА И ПАССАЖА ЖКТ (СИММЕТРИЧНЫЕ СЧЕТЧИКИ) */}
-        <div className="grid grid-cols-2 gap-1.5">
-          {/* Dung Wheelbarrows */}
-          <div className="bg-slate-900/90 border border-slate-800/90 rounded-xl p-2 flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1 truncate">
-                <span>💩</span>
-                <span className="truncate">Навоз (тачек)</span>
-              </span>
-              <span className="text-[9px] text-emerald-400/80 font-mono uppercase">ЖКТ</span>
+        {/* 2. БЛОК 2: ОБНОВЛЕНИЕ ПОДСТИЛКИ (ГРУНТ / ПЕСОК) */}
+        <div className="w-full bg-slate-900/90 border border-slate-800/90 rounded-xl p-2.5 flex flex-col justify-between shadow-sm gap-1.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">🚜</span>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-slate-200 leading-tight">
+                  Грунт / Песок
+                </span>
+                <span className="text-[9px] text-slate-400 leading-none">
+                  Обновление подстилки в вольерах за смену
+                </span>
+              </div>
             </div>
-
-            <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-lg h-9 px-1">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => updateDung(-1)}
-                disabled={dungCount <= 0}
-                className="w-7 h-7 rounded-md bg-slate-900 hover:bg-rose-950/60 active:scale-95 disabled:opacity-30 disabled:hover:bg-slate-900 text-rose-400 flex items-center justify-center transition-all cursor-pointer"
-                title="Уменьшить"
+                onClick={!canInteract ? undefined : () => updateBedding(-1)}
+                disabled={!canInteract}
+                className={`w-6 h-6 rounded-lg text-slate-300 font-black text-xs flex items-center justify-center transition-all border border-slate-700 ${
+                  !canInteract ? 'bg-slate-950 cursor-not-allowed opacity-50' : 'bg-slate-800 hover:bg-slate-700 active:scale-95 cursor-pointer'
+                }`}
+                title="Уменьшить на 1 тачку"
               >
-                <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+                -
               </button>
-
-              <span className="font-mono text-base font-black text-white px-2">
-                {dungCount}
+              <span className="font-mono text-sm font-black text-amber-400 min-w-[50px] text-center">
+                {beddingCount} <span className="text-[10px] font-normal text-slate-400">тачек</span>
               </span>
-
               <button
                 type="button"
-                onClick={() => updateDung(1)}
-                className="w-7 h-7 rounded-md bg-slate-900 hover:bg-emerald-950/60 active:scale-95 text-emerald-400 flex items-center justify-center transition-all cursor-pointer"
-                title="Добавить тачку"
+                onClick={!canInteract ? undefined : () => updateBedding(1)}
+                disabled={!canInteract}
+                className={`w-6 h-6 rounded-lg text-slate-300 font-black text-xs flex items-center justify-center transition-all border border-slate-700 ${
+                  !canInteract ? 'bg-slate-950 cursor-not-allowed opacity-50' : 'bg-slate-800 hover:bg-slate-700 active:scale-95 cursor-pointer'
+                }`}
+                title="Добавить 1 тачку"
               >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                +
               </button>
             </div>
           </div>
 
-          {/* Bedding / Sand Wheelbarrows */}
-          <div className="bg-slate-900/90 border border-slate-800/90 rounded-xl p-2 flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1 truncate">
-                <span>🚜</span>
-                <span className="truncate">Грунт / Песок</span>
-              </span>
-              <span className="text-[9px] text-amber-400/80 font-mono uppercase">Слой</span>
-            </div>
+          <input 
+            type="range"
+            min="0"
+            max="15"
+            step="1"
+            value={beddingCount}
+            disabled={!canInteract}
+            onChange={(e) => setBeddingDirect(parseInt(e.target.value, 10))}
+            className={`w-full accent-amber-500 h-1.5 bg-slate-950 rounded-lg my-1 ${
+              !canInteract ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+            }`}
+          />
 
-            <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-lg h-9 px-1">
+          <div className="grid grid-cols-6 gap-1">
+            {[0, 1, 2, 4, 6, 8].map(val => (
               <button
+                key={val}
                 type="button"
-                onClick={() => updateBedding(-1)}
-                disabled={beddingCount <= 0}
-                className="w-7 h-7 rounded-md bg-slate-900 hover:bg-rose-950/60 active:scale-95 disabled:opacity-30 disabled:hover:bg-slate-900 text-rose-400 flex items-center justify-center transition-all cursor-pointer"
-                title="Уменьшить"
+                onClick={!canInteract ? undefined : () => setBeddingDirect(val)}
+                disabled={!canInteract}
+                className={`h-6.5 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center ${
+                  !canInteract ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                } ${
+                  beddingCount === val
+                    ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
+                    : 'bg-slate-950/80 text-slate-400 border border-slate-800 hover:text-slate-200 hover:border-slate-700'
+                }`}
               >
-                <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+                {val} тач
               </button>
-
-              <span className="font-mono text-base font-black text-white px-2">
-                {beddingCount}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => updateBedding(1)}
-                className="w-7 h-7 rounded-md bg-slate-900 hover:bg-amber-950/60 active:scale-95 text-amber-400 flex items-center justify-center transition-all cursor-pointer"
-                title="Добавить тачку"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              </button>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -476,20 +453,23 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
                 <button
                   key={node.id}
                   type="button"
-                  onClick={() => toggleTechNode(node.id)}
-                  className={`h-8 px-2 rounded-lg text-left flex items-center justify-between border transition-all cursor-pointer ${
+                  onClick={!canInteract ? undefined : () => toggleTechNode(node.id)}
+                  disabled={!canInteract}
+                  className={`min-h-[38px] py-1 px-1.5 rounded-lg flex items-center justify-between border transition-all ${
+                    !canInteract ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'
+                  } ${
                     isAttention
                       ? 'bg-amber-950/80 border-amber-500/70 text-amber-200 shadow-sm shadow-amber-950/40'
                       : 'bg-slate-950/60 border-slate-800/80 text-slate-300 hover:bg-slate-800/40'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                  <div className="flex items-center gap-1 min-w-0 pr-1 flex-1">
                     <span className="text-xs shrink-0">{node.icon}</span>
-                    <span className="text-[10px] font-bold truncate leading-tight">
+                    <span className="whitespace-normal text-center leading-tight text-[11px] font-bold flex-1">
                       {node.label}
                     </span>
                   </div>
-                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 border ${
+                  <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded-full shrink-0 border ${
                     isAttention
                       ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
                       : 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40'
@@ -531,8 +511,11 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
                   <div className="flex items-center gap-0.5 shrink-0 bg-slate-900 p-0.5 rounded-md border border-slate-800">
                     <button
                       type="button"
-                      onClick={() => setTaskStatus(task.id, 'done')}
-                      className={`h-5 px-1.5 rounded text-[9px] font-black flex items-center gap-0.5 transition-all cursor-pointer ${
+                      onClick={!canInteract ? undefined : () => setTaskStatus(task.id, 'done')}
+                      disabled={!canInteract}
+                      className={`h-5 px-1.5 rounded text-[9px] font-black flex items-center gap-0.5 transition-all ${
+                        !canInteract ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                      } ${
                         isDone
                           ? 'bg-emerald-500 text-slate-950 shadow-sm'
                           : 'text-slate-400 hover:text-slate-200'
@@ -544,8 +527,11 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
 
                     <button
                       type="button"
-                      onClick={() => setTaskStatus(task.id, 'colleague')}
-                      className={`h-5 px-1.5 rounded text-[9px] font-black flex items-center gap-0.5 transition-all cursor-pointer ${
+                      onClick={!canInteract ? undefined : () => setTaskStatus(task.id, 'colleague')}
+                      disabled={!canInteract}
+                      className={`h-5 px-1.5 rounded text-[9px] font-black flex items-center gap-0.5 transition-all ${
+                        !canInteract ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+                      } ${
                         isColleague
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-400 hover:text-slate-200'
@@ -563,7 +549,11 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
         </div>
 
         {/* 5. ЗАЩИЩЕННЫЙ СВАЙПЕР ЗАКРЫТИЯ СМЕНЫ (SWIPE TO FINISH) */}
-        {handoverComplete ? (
+        {!canInteract ? (
+          <div className="h-10 px-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 text-xs font-bold shadow-sm">
+            <span>🔒 Режим просмотра: передача смены доступна только киперам</span>
+          </div>
+        ) : handoverComplete ? (
           <div className="h-10 px-3 rounded-xl bg-emerald-950/80 border border-emerald-500/60 flex items-center justify-between shadow-sm animate-in fade-in duration-200">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-6 h-6 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-xs shrink-0">
@@ -595,6 +585,9 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
             className="relative h-10 bg-slate-900 border border-slate-700 rounded-xl overflow-hidden flex items-center justify-center select-none shadow-md touch-none"
             onPointerDown={(e) => {
               setIsDragging(true);
+              hasTriggeredCompleteRef.current = false;
+              lastVibratedStepRef.current = 0;
+              triggerHaptic(10); // initial touch feedback
               handleSliderDrag(e.clientX);
             }}
             onPointerMove={(e) => {
@@ -602,11 +595,23 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
             }}
             onPointerUp={() => {
               setIsDragging(false);
-              if (sliderValue < 92) setSliderValue(0);
+              if (sliderValue < 92) {
+                if (sliderValue >= 20) {
+                  triggerHaptic(15); // snap back rejection haptic
+                }
+                setSliderValue(0);
+              }
+              lastVibratedStepRef.current = 0;
             }}
             onPointerCancel={() => {
               setIsDragging(false);
-              if (sliderValue < 92) setSliderValue(0);
+              if (sliderValue < 92) {
+                if (sliderValue >= 20) {
+                  triggerHaptic(15);
+                }
+                setSliderValue(0);
+              }
+              lastVibratedStepRef.current = 0;
             }}
           >
             {/* Filled highlight track */}
@@ -636,18 +641,37 @@ export function HouseholdSlide({ slideWrapperClass, addEvent }: HouseholdSlidePr
               min="0"
               max="100"
               value={sliderValue}
+              onPointerDown={() => {
+                hasTriggeredCompleteRef.current = false;
+                lastVibratedStepRef.current = 0;
+                triggerHaptic(10);
+              }}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
                 setSliderValue(val);
-                if (val >= 92) {
+                const step = Math.floor(val / 25);
+                if (step > lastVibratedStepRef.current && val < 92) {
+                  lastVibratedStepRef.current = step;
+                  triggerHaptic(12);
+                }
+                if (val >= 92 && !hasTriggeredCompleteRef.current) {
+                  hasTriggeredCompleteRef.current = true;
                   completeHandover();
                 }
               }}
               onMouseUp={() => {
-                if (sliderValue < 92) setSliderValue(0);
+                if (sliderValue < 92) {
+                  if (sliderValue >= 20) triggerHaptic(15);
+                  setSliderValue(0);
+                }
+                lastVibratedStepRef.current = 0;
               }}
               onTouchEnd={() => {
-                if (sliderValue < 92) setSliderValue(0);
+                if (sliderValue < 92) {
+                  if (sliderValue >= 20) triggerHaptic(15);
+                  setSliderValue(0);
+                }
+                lastVibratedStepRef.current = 0;
               }}
               className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30"
               aria-label="Провести для передачи смены"

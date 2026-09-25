@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Users, Calendar as CalendarIcon, Clock, CheckCircle2, ArrowRightLeft, X, Check } from 'lucide-react';
+import { useRole } from '../../context/RoleContext';
 
 interface ShiftCalendarSlideProps {
   slideWrapperClass: string;
@@ -16,6 +17,7 @@ interface DayShiftInfo {
 }
 
 export const ShiftCalendarSlide: React.FC<ShiftCalendarSlideProps> = ({ slideWrapperClass, addEvent }) => {
+  const { isChief } = useRole();
   // Current month: September 2026 (0-indexed month: 8)
   const [currentYear, setCurrentYear] = useState(2026);
   const [currentMonth, setCurrentMonth] = useState(8); // 8 = September
@@ -111,10 +113,17 @@ export const ShiftCalendarSlide: React.FC<ShiftCalendarSlideProps> = ({ slideWra
         
         {/* Header Slide */}
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
-            <CalendarIcon className="w-4 h-4 text-emerald-400" />
-            <span>Календарь смен</span>
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+              <CalendarIcon className="w-4 h-4 text-emerald-400" />
+              <span>Календарь смен</span>
+            </h2>
+            {isChief && (
+              <span className="text-[9px] font-bold text-purple-300 bg-purple-950/80 border border-purple-800 px-1.5 py-0.5 rounded-full">
+                👁️ Только чтение
+              </span>
+            )}
+          </div>
           <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             График 2/2
@@ -321,11 +330,17 @@ export const ShiftCalendarSlide: React.FC<ShiftCalendarSlideProps> = ({ slideWra
           {/* Swap shift request button */}
           <button
             type="button"
-            onClick={() => setSwapModalOpen(true)}
-            className="w-full h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-98 text-emerald-400 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+            onClick={isChief ? undefined : () => setSwapModalOpen(true)}
+            disabled={isChief}
+            className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
+              isChief
+                ? 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                : 'bg-slate-800 hover:bg-slate-700 active:scale-98 text-emerald-400 border border-emerald-500/40 cursor-pointer'
+            }`}
+            title={isChief ? 'Режим наблюдателя: запрос подмены заблокирован' : 'Запросить подмену'}
           >
             <ArrowRightLeft className="w-4 h-4" />
-            <span>Запросить подмену / Обмен сменами</span>
+            <span>{isChief ? 'Запрос подмены (только чтение)' : 'Запросить подмену / Обмен сменами'}</span>
           </button>
         </div>
 
