@@ -380,7 +380,7 @@ export function FeedingSection({
                 <X size={16} />
               </button>
             </div>
-            <FodderStorageSlide />
+            <FodderStorageSlide slideWrapperClass="w-full" />
           </div>
         </div>
       )}

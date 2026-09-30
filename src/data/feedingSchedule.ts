@@ -43,6 +43,7 @@ export const FEEDING_SCHEDULE: FeedingScheduleSlot[] = [
 export interface RecipeIngredient {
   name: string;
   amount: string;
+  note?: string;
 }
 
 export interface FeedingRecipe {
