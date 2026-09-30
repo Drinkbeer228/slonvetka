@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#020617" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>СлоноВет</title>
+    <meta name="description" content="Полевой журнал и система мониторинга состояния слонов" />
+    <meta property="og:title" content="СлоноВет" />
+    <meta property="og:description" content="Полевой журнал и система мониторинга состояния слонов" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif;">' + 
+          '<h3>Runtime Error</h3>' + 
+          '<p>' + message + '</p>' + 
+          '<pre>' + (error && error.stack ? error.stack : '') + '</pre>' + 
+          '</div>';
+      };
+      window.addEventListener('unhandledrejection', function(event) {
+        document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif;">' + 
+          '<h3>Unhandled Promise Rejection</h3>' + 
+          '<p>' + event.reason + '</p>' + 
+          '<pre>' + (event.reason && event.reason.stack ? event.reason.stack : '') + '</pre>' + 
+          '</div>';
+      });
+    </script>  <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #020617; /* Very dark slate */
+      }
+      #root {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

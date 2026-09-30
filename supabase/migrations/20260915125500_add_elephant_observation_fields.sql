@@ -1,0 +1,17 @@
+alter table public.elephant_daily_metrics
+  add column if not exists trunk_tone text,
+  add column if not exists breathing_observation text,
+  add column if not exists trunk_tip_condition text,
+  add column if not exists nasal_discharge text,
+  add column if not exists dust_bathing boolean not null default false,
+  add column if not exists ear_flapping text,
+  add column if not exists temporal_glands text,
+  add column if not exists eye_observations jsonb not null default '[]'::jsonb,
+  add column if not exists feed_consumption text,
+  add column if not exists selective_eating text not null default '',
+  add column if not exists foreign_object_suspected boolean not null default false,
+  add column if not exists foreign_object_note text not null default '',
+  add column if not exists gait_assessment text,
+  add column if not exists favored_leg text,
+  add column if not exists hoof_warmth text,
+  add column if not exists arena_reaction text;

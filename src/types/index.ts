@@ -1,0 +1,81 @@
+import { UserRole } from './roles';
+
+export interface Profile {
+  id: string;
+  name: string;
+  role: UserRole;
+  active: boolean;
+  created_at: string;
+  invite_code?: string;
+  birth_date?: string;
+  avatar_url?: string;
+  current_session_id?: string;
+}
+
+export interface Elephant {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export type ScheduleType = 'daily' | 'weekly' | 'as_needed';
+export type AssessmentType = 'none' | 'normal_or_issue' | 'needs_cleaning' | 'result' | 'foot_status';
+
+export interface Assignment {
+  id: string;
+  elephant_id: string;
+  title: string;
+  description: string | null;
+  schedule_type: ScheduleType;
+  requires_photo: boolean;
+  requires_before_after: boolean;
+  assessment_type: AssessmentType | null;
+  medicine: string | null;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TreatmentRecord {
+  id: string;
+  assignment_id: string | null;
+  elephant_id: string;
+  keeper_id: string;
+  performed_at: string;
+  assessment: string | null;
+  medicine_used: string | null;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface TreatmentPhoto {
+  id: string;
+  treatment_record_id: string;
+  storage_path: string;
+  photo_type: 'single' | 'before' | 'after';
+  created_at: string;
+}
+
+// Extends for UI convenience
+export interface TreatmentRecordWithPhotos extends TreatmentRecord {
+  photos: TreatmentPhoto[];
+  keeper?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface FodderItem {
+  id: string;
+  parentId: 'hay' | 'bales' | 'rolls' | 'browse' | 'general' | 'juicy' | 'concentrate';
+  name: string;
+  scoreTag?: string;
+  category: 'rough' | 'concentrate' | 'juicy';
+  amount: number;
+  unit: string;
+  isDefault?: boolean;
+  fullBagsCount?: number;
+  currentBagKg?: number;
+  bagCapacityKg?: number;
+}
