@@ -34,7 +34,14 @@ export function useShiftEvents(shiftId: string | null) {
       try {
         const saved = localStorage.getItem(`shift_events_${shiftId}`);
         if (saved) {
-          setEvents(JSON.parse(saved));
+          const parsed: ShiftEvent[] = JSON.parse(saved);
+          const seen = new Set<string>();
+          const uniqueEvents = parsed.filter(ev => {
+            if (!ev || !ev.id || seen.has(ev.id)) return false;
+            seen.add(ev.id);
+            return true;
+          });
+          setEvents(uniqueEvents);
         } else {
           setEvents([]);
         }
@@ -67,13 +74,16 @@ export function useShiftEvents(shiftId: string | null) {
     
     const newEvent: ShiftEvent = {
       ...event,
-      id: Math.random().toString(36).substring(2, 9),
+      id: typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `ev_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       shift_id: shiftId,
       timestamp: Date.now(),
     };
     
     setEvents(prev => {
-      const updated = [newEvent, ...prev].slice(0, 100); // Keep last 100 events
+      const filteredPrev = prev.filter(e => e.id !== newEvent.id);
+      const updated = [newEvent, ...filteredPrev].slice(0, 100); // Keep last 100 events
       try {
         localStorage.setItem(`shift_events_${shiftId}`, JSON.stringify(updated));
         window.dispatchEvent(new CustomEvent(`shift_events_updated_${shiftId}`));

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Image as ImageIcon, X, Check, Loader2, RotateCcw, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Camera, X, Check, Loader2, RotateCcw, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Assignment, Elephant } from '../../types';
 import { compressImage } from '../../utils/imageCompressor';
 
@@ -159,7 +159,7 @@ export function ExecutionBottomSheet({
                 🐘 {elephant.name}
               </span>
             </div>
-            <p className="text-xs font-bold text-slate-700 mt-1 break-words">
+            <p className="text-xs font-bold text-slate-700 mt-1 line-clamp-1">
               {assignment.title}
             </p>
           </div>
@@ -193,10 +193,10 @@ export function ExecutionBottomSheet({
                 <Check size={14} strokeWidth={3} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-black text-emerald-900 break-words">
+                <div className="text-xs font-black text-emerald-900 truncate">
                   {assignment.medicine ? assignment.medicine : 'Штатная обработка (без спецпрепарата)'}
                 </div>
-                <div className="text-[10px] text-emerald-700 font-semibold break-words">
+                <div className="text-[10px] text-emerald-700 font-semibold truncate">
                   Применено согласно ветеринарному протоколу
                 </div>
               </div>

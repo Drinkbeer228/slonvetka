@@ -3,15 +3,12 @@ import {
   CheckCircle2,
   AlertTriangle,
   Camera,
-  Calendar,
   Plus,
   Trash2,
   Check,
   ChevronLeft,
   X,
   Stethoscope,
-  Filter,
-  Eye,
   Footprints,
   Scale
 } from 'lucide-react';

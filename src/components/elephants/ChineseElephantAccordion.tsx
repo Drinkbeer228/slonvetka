@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   ChevronDown, ChevronUp, Camera, Plus, Minus, CheckCircle2,
-  AlertTriangle, ShieldAlert, Sparkles, X, Eye, Video, HeartPulse
+  AlertTriangle, ShieldAlert, Sparkles, X, Eye, Video, HeartPulse, Clock, Trash2
 } from 'lucide-react';
 import {
   ElephantShiftChecklist,
@@ -19,13 +19,15 @@ import {
   UrineFrequency,
   FeedingSlotTime,
   AppetiteIssue,
-  SleepDuration,
-  SleepPosture,
+  SleepIntervalItem,
+  WaterIntakeStatus,
+  WaterBowlStatus,
   BehaviorState,
   WashingType,
   SkinCondition,
   EyeObservation,
   TrunkTone,
+  normalizeChecklist,
 } from '../../types/conservation';
 import { ChecklistEvaluationResult } from '../../utils/conservationStandard';
 import { compressImage } from '../../utils/imageCompressor';
@@ -45,19 +47,25 @@ interface ChineseElephantAccordionProps {
 export function ChineseElephantAccordion({
   elephantId,
   elephantName,
-  checklist,
+  checklist: incomingChecklist,
   evaluation,
   onChange,
   onLogShiftEvent,
   onRequestChiefApproval,
   triggerHaptic,
 }: ChineseElephantAccordionProps) {
-  // Currently expanded block (1 to 9, null means all collapsed)
+  const checklist = normalizeChecklist(incomingChecklist, elephantId, incomingChecklist?.shift_date || '');
   const [expandedBlock, setExpandedBlock] = useState<number | null>(null);
   const [zoomPhotoUrl, setZoomPhotoUrl] = useState<string | null>(null);
 
+  // New sleep interval inputs
+  const [showAddInterval, setShowAddInterval] = useState(false);
+  const [intervalStart, setIntervalStart] = useState('01:30');
+  const [intervalEnd, setIntervalEnd] = useState('02:45');
+  const [intervalPosture, setIntervalPosture] = useState<'side' | 'standing'>('side');
+
   // File input refs
-  const eehvPhotoRef = useRef<HTMLInputElement>(null);
+  const urgentPhotoRef = useRef<HTMLInputElement>(null);
   const feetTopPhotoRef = useRef<HTMLInputElement>(null);
   const feetSolePhotoRef = useRef<HTMLInputElement>(null);
   const overallPhotoRef = useRef<HTMLInputElement>(null);
@@ -101,12 +109,46 @@ export function ChineseElephantAccordion({
     }
   };
 
+  const handleAddSleepInterval = () => {
+    if (!intervalStart || !intervalEnd) return;
+    triggerHaptic?.(12);
+    const newInterval: SleepIntervalItem = {
+      id: `int-${Date.now()}`,
+      start: intervalStart,
+      end: intervalEnd,
+      posture: intervalPosture,
+    };
+    const nextList = [...checklist.sleep_behavior.intervals, newInterval];
+    onChange({
+      ...checklist,
+      sleep_behavior: {
+        ...checklist.sleep_behavior,
+        intervals: nextList,
+      },
+    });
+    setShowAddInterval(false);
+  };
+
+  const handleRemoveSleepInterval = (id: string) => {
+    triggerHaptic?.(10);
+    const nextList = checklist.sleep_behavior.intervals.filter((i) => i.id !== id);
+    onChange({
+      ...checklist,
+      sleep_behavior: {
+        ...checklist.sleep_behavior,
+        intervals: nextList,
+      },
+    });
+  };
+
   return (
     <div className="space-y-2.5">
-      {/* ═══ 1. 🚨 КРАСНЫЕ ФЛАГИ (EEHV-ПРОТОКОЛ) ═══ */}
+      {/* ═══ 1. 🚨 СРОЧНЫЕ ПРИЗНАКИ ВЕТВРАЧУ (КРИТИЧЕСКИЙ БЛОК) ═══ */}
       <div className={`rounded-2xl border transition-all ${
         evaluation.blockSummaries[1]?.dot === 'red'
-          ? 'bg-rose-950/30 border-rose-500 shadow-md shadow-rose-950/30'
+          ? 'bg-rose-950/40 border-rose-500 shadow-md shadow-rose-950/30'
+          : evaluation.blockSummaries[1]?.dot === 'yellow'
+          ? 'bg-amber-950/30 border-amber-500/60'
           : 'bg-zinc-900 border-zinc-800'
       }`}>
         <button
@@ -118,7 +160,7 @@ export function ChineseElephantAccordion({
             <span className="text-base shrink-0">🚨</span>
             <div className="min-w-0">
               <span className="text-xs font-bold text-white block leading-tight">
-                1. Красные флаги (EEHV-протокол)
+                1. Срочные признаки ветврачу
               </span>
               <span className="text-[11px] text-zinc-400 block mt-0.5 break-words">
                 {evaluation.blockSummaries[1]?.summary}
@@ -127,7 +169,11 @@ export function ChineseElephantAccordion({
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className={`h-2.5 w-2.5 rounded-full ${
-              evaluation.blockSummaries[1]?.dot === 'red' ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400'
+              evaluation.blockSummaries[1]?.dot === 'red'
+                ? 'bg-rose-500 animate-pulse'
+                : evaluation.blockSummaries[1]?.dot === 'yellow'
+                ? 'bg-amber-400'
+                : 'bg-emerald-400'
             }`} />
             {expandedBlock === 1 ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </div>
@@ -135,100 +181,104 @@ export function ChineseElephantAccordion({
 
         {expandedBlock === 1 && (
           <div className="p-3 pt-0 border-t border-zinc-800/80 space-y-3 mt-1">
-            <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-[11px] text-zinc-400">
-              Китайский стандарт: EEHV (вирус герпеса) — смертельный риск для молодых слонов. Проверка слизистой и отёков каждое утро.
+            <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-[11px] text-zinc-400 space-y-1">
+              <p className="font-bold text-zinc-300">Признаки, требующие немедленного сообщения ветврачу</p>
+              <p className="text-[10px] text-zinc-500">
+                ⚠️ Возможный клинический риск. Не является диагнозом. Отметьте все замеченные отклонения от нормы.
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic?.(10);
-                  onChange({
-                    ...checklist,
-                    eehv: { ...checklist.eehv, mucosa_pink: !checklist.eehv.mucosa_pink }
-                  });
-                }}
-                className={`min-h-[44px] rounded-xl border text-xs font-bold p-2 transition ${
-                  checklist.eehv.mucosa_pink
-                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                }`}
-              >
-                <span>Слизистая розовая {checklist.eehv.mucosa_pink ? '✓' : ''}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const nextVal = !checklist.eehv.cyanosis;
-                  if (nextVal) {
-                    triggerHaptic?.(35);
-                    onLogShiftEvent?.(`🚨 СИНЮШНОСТЬ СЛИЗИСТОЙ (${elephantName})`, '🚨');
-                  }
-                  onChange({
-                    ...checklist,
-                    eehv: { ...checklist.eehv, cyanosis: nextVal }
-                  });
-                }}
-                className={`min-h-[44px] rounded-xl border text-xs font-bold p-2 transition ${
-                  checklist.eehv.cyanosis
-                    ? 'bg-rose-500 text-white font-black animate-pulse'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                }`}
-              >
-                <span>Синюшность (Цианоз) 🔴</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const nextVal = !checklist.eehv.facial_edema;
-                  if (nextVal) {
-                    triggerHaptic?.(35);
-                    onLogShiftEvent?.(`🚨 ОТЁК МОРДЫ/ХОБОТА (${elephantName})`, '🚨');
-                  }
-                  onChange({
-                    ...checklist,
-                    eehv: { ...checklist.eehv, facial_edema: nextVal }
-                  });
-                }}
-                className={`min-h-[44px] rounded-xl border text-xs font-bold p-2 transition ${
-                  checklist.eehv.facial_edema
-                    ? 'bg-rose-500 text-white font-black animate-pulse'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                }`}
-              >
-                <span>Отёк морды/хобота 🔴</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const nextVal = !checklist.eehv.trunk_lethargy;
-                  if (nextVal) {
-                    triggerHaptic?.(30);
-                    onLogShiftEvent?.(`🚨 ВЯЛОСТЬ ХОБОТА/ПЕТЛЯ (${elephantName})`, '🚨');
-                  }
-                  onChange({
-                    ...checklist,
-                    eehv: { ...checklist.eehv, trunk_lethargy: nextVal }
-                  });
-                }}
-                className={`min-h-[44px] rounded-xl border text-xs font-bold p-2 transition ${
-                  checklist.eehv.trunk_lethargy
-                    ? 'bg-rose-500 text-white font-black animate-pulse'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                }`}
-              >
-                <span>Вялость / петля 🔴</span>
-              </button>
+            {/* Ранние признаки (требует внимания) */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">
+                ⚠️ Требует внимания (ранние наблюдения):
+              </span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  { key: 'appetite_drop' as const, label: 'Снижение аппетита' },
+                  { key: 'drinking_drop' as const, label: 'Снижение питья' },
+                  { key: 'behavior_change' as const, label: 'Изменение поведения' },
+                  { key: 'fecal_change' as const, label: 'Изменение стула' },
+                  { key: 'lameness_pain' as const, label: 'Хромота / боль' },
+                  { key: 'sleep_change' as const, label: 'Изменение сна' },
+                ]).map((item) => {
+                  const isChecked = checklist.urgent_signs[item.key];
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic?.(10);
+                        onChange({
+                          ...checklist,
+                          urgent_signs: {
+                            ...checklist.urgent_signs,
+                            [item.key]: !isChecked,
+                          },
+                        });
+                      }}
+                      className={`min-h-[40px] px-2 py-1 rounded-xl border text-xs font-bold transition text-left flex items-center justify-between ${
+                        isChecked
+                          ? 'bg-amber-500/25 border-amber-500 text-amber-200'
+                          : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                      }`}
+                    >
+                      <span className="break-words">{item.label}</span>
+                      <span>{isChecked ? '⚠️' : ''}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Photo capture for EEHV */}
+            {/* Критические признаки */}
+            <div className="space-y-1.5 pt-1 border-t border-zinc-800">
+              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider block">
+                🔴 Критично (немедленный вызов):
+              </span>
+              <div className="space-y-1.5">
+                {([
+                  { key: 'cyanosis' as const, label: 'Цианоз слизистой / языка (синюшность)' },
+                  { key: 'facial_edema' as const, label: 'Отёк головы / морды / хобота' },
+                  { key: 'severe_lethargy' as const, label: 'Выраженная вялость / пассивность' },
+                ]).map((item) => {
+                  const isChecked = checklist.urgent_signs[item.key];
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        const nextVal = !isChecked;
+                        if (nextVal) {
+                          triggerHaptic?.(35);
+                          onLogShiftEvent?.(`🚨 КРИТИЧЕСКИЙ ПРИЗНАК: ${item.label} (${elephantName})`, '🚨');
+                        }
+                        onChange({
+                          ...checklist,
+                          urgent_signs: {
+                            ...checklist.urgent_signs,
+                            [item.key]: nextVal,
+                          },
+                        });
+                      }}
+                      className={`w-full min-h-[44px] px-3 py-2 rounded-xl border text-xs font-black transition flex items-center justify-between text-left ${
+                        isChecked
+                          ? 'bg-rose-600 border-rose-500 text-white animate-pulse'
+                          : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                      }`}
+                    >
+                      <span className="break-words">{item.label}</span>
+                      <span>{isChecked ? '🔴' : ''}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Photo capture for urgent signs */}
             <div className="pt-1">
               <input
-                ref={eehvPhotoRef}
+                ref={urgentPhotoRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
@@ -236,24 +286,27 @@ export function ChineseElephantAccordion({
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    uploadAndSetPhoto(file, 'eehv_photo', (url) => {
-                      onChange({ ...checklist, eehv: { ...checklist.eehv, photo_url: url } });
+                    uploadAndSetPhoto(file, 'urgent_photo', (url) => {
+                      onChange({
+                        ...checklist,
+                        urgent_signs: { ...checklist.urgent_signs, photo_url: url },
+                      });
                     });
                   }
                 }}
               />
-              {checklist.eehv.photo_url ? (
+              {checklist.urgent_signs.photo_url ? (
                 <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-950 border border-zinc-800">
                   <div
-                    onClick={() => setZoomPhotoUrl(checklist.eehv.photo_url || null)}
+                    onClick={() => setZoomPhotoUrl(checklist.urgent_signs.photo_url || null)}
                     className="h-10 w-10 rounded-lg overflow-hidden border border-zinc-700 bg-black cursor-pointer shrink-0"
                   >
-                    <img src={checklist.eehv.photo_url} alt="EEHV" className="h-full w-full object-cover" />
+                    <img src={checklist.urgent_signs.photo_url} alt="Признак" className="h-full w-full object-cover" />
                   </div>
-                  <span className="text-xs text-emerald-400 font-bold">Фото слизистой сохранено ✓</span>
+                  <span className="text-xs text-emerald-400 font-bold">Фото симптома сохранено ✓</span>
                   <button
                     type="button"
-                    onClick={() => eehvPhotoRef.current?.click()}
+                    onClick={() => urgentPhotoRef.current?.click()}
                     className="text-xs text-zinc-400 underline cursor-pointer"
                   >
                     Переснять
@@ -262,17 +315,17 @@ export function ChineseElephantAccordion({
               ) : (
                 <button
                   type="button"
-                  onClick={() => eehvPhotoRef.current?.click()}
+                  onClick={() => urgentPhotoRef.current?.click()}
                   className="w-full min-h-[44px] rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer touch-manipulation"
                 >
                   <Camera size={14} />
-                  <span>Фото слизистой и морды</span>
+                  <span>Фото симптома (слизистая, отёк)</span>
                 </button>
               )}
             </div>
 
-            {/* Critical alert banner */}
-            {(checklist.eehv.cyanosis || checklist.eehv.facial_edema || checklist.eehv.trunk_lethargy) && onRequestChiefApproval && (
+            {/* Emergency Chief/Vet alert push */}
+            {(checklist.urgent_signs.cyanosis || checklist.urgent_signs.facial_edema || checklist.urgent_signs.severe_lethargy) && onRequestChiefApproval && (
               <button
                 type="button"
                 onClick={() => {
@@ -289,7 +342,7 @@ export function ChineseElephantAccordion({
         )}
       </div>
 
-      {/* ═══ 2. 💩 ДЕФЕКАЦИЯ ═══ */}
+      {/* ═══ 2. 💩 ДЕФЕКАЦИЯ (КРИТИЧЕСКИЙ БЛОК) ═══ */}
       <div className={`rounded-2xl border transition-all ${
         evaluation.blockSummaries[2]?.dot === 'red'
           ? 'bg-rose-950/20 border-rose-500'
@@ -340,7 +393,7 @@ export function ChineseElephantAccordion({
                       defecation: {
                         ...checklist.defecation,
                         poop_count: Math.max(0, checklist.defecation.poop_count - 1),
-                      }
+                      },
                     });
                   }}
                   className="h-10 w-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white active:scale-90 cursor-pointer"
@@ -362,7 +415,7 @@ export function ChineseElephantAccordion({
                         ...checklist.defecation,
                         poop_count: checklist.defecation.poop_count + 1,
                         last_poop_time: timeStr,
-                      }
+                      },
                     });
                   }}
                   className="h-10 w-10 rounded-xl bg-white text-zinc-950 font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-md"
@@ -372,6 +425,17 @@ export function ChineseElephantAccordion({
               </div>
             </div>
 
+            {/* Time Notice (Contextual, non-punitive) */}
+            {evaluation.poopTimeNotice && (
+              <div className={`p-2.5 rounded-xl border text-xs ${
+                evaluation.poopTimeNotice.includes('⚠️')
+                  ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
+                  : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+              }`}>
+                {evaluation.poopTimeNotice}
+              </div>
+            )}
+
             {/* Consistency chips */}
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
@@ -379,11 +443,11 @@ export function ChineseElephantAccordion({
               </span>
               <div className="flex flex-wrap gap-1">
                 {([
-                  { val: 'formed' as const, label: 'Сформированный', alert: false },
-                  { val: 'porridge' as const, label: 'Кашицеобразный', alert: false },
-                  { val: 'liquid' as const, label: 'Жидкий 🟡', alert: true },
-                  { val: 'mucus' as const, label: 'Слизь 🟡', alert: true },
-                  { val: 'blood' as const, label: 'Кровь 🔴', alert: true },
+                  { val: 'formed' as const, label: 'Сформированный' },
+                  { val: 'porridge' as const, label: 'Кашицеобразный' },
+                  { val: 'liquid' as const, label: 'Жидкий 🟡' },
+                  { val: 'mucus' as const, label: 'Слизь 🟡' },
+                  { val: 'blood' as const, label: 'Кровь 🔴' },
                 ]).map((item) => (
                   <button
                     key={item.val}
@@ -392,14 +456,14 @@ export function ChineseElephantAccordion({
                       triggerHaptic?.(10);
                       onChange({
                         ...checklist,
-                        defecation: { ...checklist.defecation, consistency: item.val }
+                        defecation: { ...checklist.defecation, consistency: item.val },
                       });
                     }}
                     className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition active:scale-95 cursor-pointer ${
                       checklist.defecation.consistency === item.val
                         ? item.val === 'blood'
                           ? 'bg-rose-500 border-rose-400 text-white font-black'
-                          : item.alert
+                          : item.val === 'liquid' || item.val === 'mucus'
                           ? 'bg-amber-500 border-amber-400 text-zinc-950 font-black'
                           : 'bg-emerald-500 border-emerald-400 text-zinc-950 font-black'
                         : 'bg-zinc-950 border-zinc-800 text-zinc-400'
@@ -430,11 +494,11 @@ export function ChineseElephantAccordion({
                       onClick={() => {
                         triggerHaptic?.(10);
                         const next = isChecked
-                          ? checklist.defecation.contents.filter(c => c !== item.val)
+                          ? checklist.defecation.contents.filter((c) => c !== item.val)
                           : [...checklist.defecation.contents, item.val];
                         onChange({
                           ...checklist,
-                          defecation: { ...checklist.defecation, contents: next }
+                          defecation: { ...checklist.defecation, contents: next },
                         });
                       }}
                       className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition active:scale-95 cursor-pointer ${
@@ -449,12 +513,6 @@ export function ChineseElephantAccordion({
                 })}
               </div>
             </div>
-
-            {checklist.defecation.last_poop_time && (
-              <p className="text-[11px] font-mono text-zinc-500">
-                Время последнего акта: {checklist.defecation.last_poop_time}
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -491,10 +549,6 @@ export function ChineseElephantAccordion({
 
         {expandedBlock === 3 && (
           <div className="p-3 pt-0 border-t border-zinc-800/80 space-y-3 mt-1">
-            <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-[11px] text-zinc-400">
-              Китайский стандарт: постоянный мониторинг тонуса мочевого пузыря для предупреждения цистита.
-            </div>
-
             {/* Counter */}
             <div className="flex items-center justify-between gap-3 bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
               <span className="text-xs font-bold text-zinc-300">Счётчик мочеиспусканий:</span>
@@ -508,7 +562,7 @@ export function ChineseElephantAccordion({
                       urination: {
                         ...checklist.urination,
                         urination_count: Math.max(0, checklist.urination.urination_count - 1),
-                      }
+                      },
                     });
                   }}
                   className="h-10 w-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white active:scale-90 cursor-pointer"
@@ -527,7 +581,7 @@ export function ChineseElephantAccordion({
                       urination: {
                         ...checklist.urination,
                         urination_count: checklist.urination.urination_count + 1,
-                      }
+                      },
                     });
                   }}
                   className="h-10 w-10 rounded-xl bg-white text-zinc-950 font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-md"
@@ -544,10 +598,10 @@ export function ChineseElephantAccordion({
               </span>
               <div className="grid grid-cols-2 gap-1.5">
                 {([
-                  { val: 'clear' as const, label: 'Прозрачная', alert: false },
-                  { val: 'light_yellow' as const, label: 'Светло-жёлтая', alert: false },
-                  { val: 'dark' as const, label: 'Тёмная 🟡', alert: true },
-                  { val: 'cloudy' as const, label: 'Мутная 🟡', alert: true },
+                  { val: 'clear' as const, label: 'Прозрачная' },
+                  { val: 'light_yellow' as const, label: 'Светло-жёлтая' },
+                  { val: 'dark' as const, label: 'Тёмная 🟡' },
+                  { val: 'cloudy' as const, label: 'Мутная 🟡' },
                 ]).map((item) => (
                   <button
                     key={item.val}
@@ -556,12 +610,12 @@ export function ChineseElephantAccordion({
                       triggerHaptic?.(10);
                       onChange({
                         ...checklist,
-                        urination: { ...checklist.urination, color: item.val }
+                        urination: { ...checklist.urination, color: item.val },
                       });
                     }}
                     className={`min-h-[40px] px-2 rounded-xl text-xs font-bold border transition active:scale-95 cursor-pointer ${
                       checklist.urination.color === item.val
-                        ? item.alert
+                        ? item.val === 'dark' || item.val === 'cloudy'
                           ? 'bg-amber-500 border-amber-400 text-zinc-950 font-black'
                           : 'bg-emerald-500 border-emerald-400 text-zinc-950 font-black'
                         : 'bg-zinc-950 border-zinc-800 text-zinc-400'
@@ -591,7 +645,7 @@ export function ChineseElephantAccordion({
                       triggerHaptic?.(10);
                       onChange({
                         ...checklist,
-                        urination: { ...checklist.urination, frequency: item.val }
+                        urination: { ...checklist.urination, frequency: item.val },
                       });
                     }}
                     className={`min-h-[40px] px-1 rounded-xl text-[11px] font-bold border transition active:scale-95 cursor-pointer text-center ${
@@ -609,7 +663,7 @@ export function ChineseElephantAccordion({
         )}
       </div>
 
-      {/* ═══ 4. 🦶 КОПЫТА И ПОХОДКА (ОБЯЗАТЕЛЬНО ФОТО) ═══ */}
+      {/* ═══ 4. 🦶 КОПЫТА И ПОХОДКА (КРИТИЧЕСКИЙ БЛОК) ═══ */}
       <div className={`rounded-2xl border transition-all ${
         evaluation.blockSummaries[4]?.dot === 'red'
           ? 'bg-rose-950/20 border-rose-500'
@@ -626,7 +680,7 @@ export function ChineseElephantAccordion({
             <span className="text-base shrink-0">🦶</span>
             <div className="min-w-0">
               <span className="text-xs font-bold text-white block leading-tight">
-                4. Копыта и походка (фото)
+                4. Копыта и походка
               </span>
               <span className="text-[11px] text-zinc-400 block mt-0.5 break-words">
                 {evaluation.blockSummaries[4]?.summary}
@@ -647,10 +701,6 @@ export function ChineseElephantAccordion({
 
         {expandedBlock === 4 && (
           <div className="p-3 pt-0 border-t border-zinc-800/80 space-y-3 mt-1">
-            <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-[11px] text-zinc-400">
-              Китайский стандарт: пододерматит — главная причина хромоты. Копыта осматриваются и фиксируются ежедневно.
-            </div>
-
             {/* 4 Limbs Grid */}
             <div className="grid grid-cols-2 gap-2">
               {([
@@ -691,7 +741,7 @@ export function ChineseElephantAccordion({
                               feet_gait: {
                                 ...checklist.feet_gait,
                                 [limb.key]: st.val,
-                              }
+                              },
                             });
                           }}
                           className={`min-h-[32px] px-1 rounded-lg text-[10px] font-bold border transition ${
@@ -727,7 +777,7 @@ export function ChineseElephantAccordion({
                       triggerHaptic?.(12);
                       onChange({
                         ...checklist,
-                        feet_gait: { ...checklist.feet_gait, gait: gait.val }
+                        feet_gait: { ...checklist.feet_gait, gait: gait.val },
                       });
                     }}
                     className={`min-h-[40px] px-1 rounded-xl text-xs font-bold border transition text-center ${
@@ -748,7 +798,6 @@ export function ChineseElephantAccordion({
 
             {/* 2 Photos: Top & Sole */}
             <div className="grid grid-cols-2 gap-2 pt-1">
-              {/* Photo Top */}
               <div>
                 <input
                   ref={feetTopPhotoRef}
@@ -779,7 +828,6 @@ export function ChineseElephantAccordion({
                 </button>
               </div>
 
-              {/* Photo Sole */}
               <div>
                 <input
                   ref={feetSolePhotoRef}
@@ -814,7 +862,7 @@ export function ChineseElephantAccordion({
         )}
       </div>
 
-      {/* ═══ 5. 🍽 КОРМЛЕНИЕ И ВОДА ═══ */}
+      {/* ═══ 5. 🍽 КОРМЛЕНИЕ И ВОДА (КРИТИЧЕСКИЙ БЛОК) ═══ */}
       <div className={`rounded-2xl border transition-all ${
         evaluation.blockSummaries[5]?.dot === 'red'
           ? 'bg-rose-950/20 border-rose-500'
@@ -852,36 +900,82 @@ export function ChineseElephantAccordion({
 
         {expandedBlock === 5 && (
           <div className="p-3 pt-0 border-t border-zinc-800/80 space-y-3 mt-1">
-            {/* Water row */}
-            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-2">
-              <div>
-                <span className="text-xs font-bold text-white block">💧 Поилка (100–200 л в сутки)</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">Чистая вода 24/7 по китайскому стандарту</span>
+            {/* Water Observation (Contextual and specific) */}
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-white block">💧 Состояние поилки</span>
+                  <span className="text-[10px] text-zinc-400">Чистота и свежесть воды</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic?.(12);
+                    const nextBowl = checklist.feeding_water.water_bowl === 'clean' ? 'needs_cleaning' : 'clean';
+                    onChange({
+                      ...checklist,
+                      feeding_water: {
+                        ...checklist.feeding_water,
+                        water_bowl: nextBowl,
+                      },
+                    });
+                  }}
+                  className={`min-h-[36px] px-3 rounded-lg text-xs font-black transition ${
+                    checklist.feeding_water.water_bowl === 'clean'
+                      ? 'bg-sky-500 text-zinc-950'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                  }`}
+                >
+                  {checklist.feeding_water.water_bowl === 'clean' ? 'Чистая ✓' : 'Требует мытья'}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic?.(12);
-                  onChange({
-                    ...checklist,
-                    feeding_water: {
-                      ...checklist.feeding_water,
-                      water_clean_fresh: !checklist.feeding_water.water_clean_fresh,
-                    }
-                  });
-                }}
-                className={`min-h-[38px] px-3 rounded-lg text-xs font-black transition ${
-                  checklist.feeding_water.water_clean_fresh
-                    ? 'bg-sky-500 text-zinc-950'
-                    : 'bg-zinc-900 border border-zinc-800 text-zinc-500'
-                }`}
-              >
-                {checklist.feeding_water.water_clean_fresh ? 'Свежая ✓' : 'Грязная'}
-              </button>
+
+              {/* Water Intake Observation */}
+              <div className="space-y-1 pt-1 border-t border-zinc-900">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  Наблюдение за питьём:
+                </span>
+                <div className="grid grid-cols-3 gap-1">
+                  {([
+                    { val: 'normal' as const, label: 'Нормальное питьё' },
+                    { val: 'reduced' as const, label: 'Пьёт меньше ⚠️' },
+                    { val: 'refused' as const, label: 'Отказ от воды 🔴' },
+                  ]).map((item) => (
+                    <button
+                      key={item.val}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic?.(10);
+                        onChange({
+                          ...checklist,
+                          feeding_water: {
+                            ...checklist.feeding_water,
+                            water_intake: item.val,
+                          },
+                        });
+                      }}
+                      className={`min-h-[38px] px-1 rounded-xl text-[11px] font-bold border transition text-center ${
+                        checklist.feeding_water.water_intake === item.val
+                          ? item.val === 'refused'
+                            ? 'bg-rose-500 text-white font-black'
+                            : item.val === 'reduced'
+                            ? 'bg-amber-500 text-zinc-950 font-black'
+                            : 'bg-emerald-500 text-zinc-950 font-black'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                      }`}
+                    >
+                      <span className="break-words">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* 4 slots */}
             <div className="space-y-2">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+                Слоты кормления:
+              </span>
               {(['07:00', '13:00', '17:00', '19:00'] as FeedingSlotTime[]).map((timeSlot) => {
                 const currentSlot = checklist.feeding_water.slots[timeSlot];
                 return (
@@ -901,9 +995,9 @@ export function ChineseElephantAccordion({
                                 [timeSlot]: {
                                   ...currentSlot,
                                   served: !currentSlot.served,
-                                }
-                              }
-                            }
+                                },
+                              },
+                            },
                           });
                         }}
                         className={`min-h-[34px] px-2.5 rounded-lg text-[11px] font-bold border transition ${
@@ -928,9 +1022,9 @@ export function ChineseElephantAccordion({
                                 [timeSlot]: {
                                   ...currentSlot,
                                   finished: !currentSlot.finished,
-                                }
-                              }
-                            }
+                                },
+                              },
+                            },
                           });
                         }}
                         className={`min-h-[34px] px-2.5 rounded-lg text-[11px] font-bold border transition ${
@@ -950,7 +1044,7 @@ export function ChineseElephantAccordion({
         )}
       </div>
 
-      {/* ═══ 6. 😴 СОН И ПОВЕДЕНИЕ ═══ */}
+      {/* ═══ 6. 😴 СОН И ПОВЕДЕНИЕ (С ПОДДЕРЖКОЙ ИНТЕРВАЛОВ И БУТОВ) ═══ */}
       <div className={`rounded-2xl border transition-all ${
         evaluation.blockSummaries[6]?.dot === 'red'
           ? 'bg-rose-950/20 border-rose-500'
@@ -988,81 +1082,122 @@ export function ChineseElephantAccordion({
 
         {expandedBlock === 6 && (
           <div className="p-3 pt-0 border-t border-zinc-800/80 space-y-3 mt-1">
-            {/* Sleep duration */}
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                Длительность сна:
-              </span>
-              <div className="grid grid-cols-4 gap-1">
-                {([
-                  { val: 'did_not_sleep' as const, label: 'Не спала 🔴' },
-                  { val: '1-2h' as const, label: '1–2ч 🟡' },
-                  { val: '3-5h' as const, label: '3–5ч (норма)' },
-                  { val: '>6h' as const, label: '>6ч 🟡' },
-                ]).map((dur) => (
-                  <button
-                    key={dur.val}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic?.(10);
-                      onChange({
-                        ...checklist,
-                        sleep_behavior: { ...checklist.sleep_behavior, duration: dur.val }
-                      });
-                    }}
-                    className={`min-h-[40px] px-1 rounded-xl text-[11px] font-bold border transition text-center ${
-                      checklist.sleep_behavior.duration === dur.val
-                        ? dur.val === 'did_not_sleep'
-                          ? 'bg-rose-500 text-white font-black'
-                          : dur.val === '3-5h'
-                          ? 'bg-emerald-500 text-zinc-950 font-black'
-                          : 'bg-amber-500 text-zinc-950 font-black'
-                        : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    <span className="break-words">{dur.label}</span>
-                  </button>
-                ))}
+            {/* Total Sleep & Intervals List */}
+            <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-white block">Суммарный сон за смену:</span>
+                  <span className="text-sm font-mono font-black text-emerald-400">
+                    {evaluation.totalSleepFormatted}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddInterval(!showAddInterval)}
+                  className="min-h-[34px] px-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1 hover:text-white"
+                >
+                  <Plus size={14} />
+                  <span>Интервал укладки</span>
+                </button>
               </div>
-            </div>
 
-            {/* Posture */}
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                Поза сна:
-              </span>
-              <div className="grid grid-cols-3 gap-1">
-                {([
-                  { val: 'side' as const, label: 'На боку' },
-                  { val: 'standing' as const, label: 'Стоя' },
-                  ...(isAudrey ? [{ val: 'calf_on_mother' as const, label: 'У матери' }] : []),
-                ]).map((pos) => (
-                  <button
-                    key={pos.val}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic?.(10);
-                      onChange({
-                        ...checklist,
-                        sleep_behavior: { ...checklist.sleep_behavior, posture: pos.val }
-                      });
-                    }}
-                    className={`min-h-[38px] px-1 rounded-xl text-xs font-bold border transition ${
-                      checklist.sleep_behavior.posture === pos.val
-                        ? 'bg-white text-zinc-950 font-black'
-                        : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    {pos.label}
-                  </button>
-                ))}
-              </div>
+              {/* Add Interval Form */}
+              {showAddInterval && (
+                <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-2 animate-fade-in">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+                    Добавить интервал сна:
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-zinc-500 block mb-0.5">Начало</span>
+                      <input
+                        type="time"
+                        value={intervalStart}
+                        onChange={(e) => setIntervalStart(e.target.value)}
+                        className="w-full h-9 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white px-2"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-zinc-500 block mb-0.5">Конец</span>
+                      <input
+                        type="time"
+                        value={intervalEnd}
+                        onChange={(e) => setIntervalEnd(e.target.value)}
+                        className="w-full h-9 rounded-lg bg-zinc-950 border border-zinc-700 text-xs text-white px-2"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIntervalPosture('side')}
+                      className={`flex-1 h-8 rounded-lg text-xs font-bold border ${
+                        intervalPosture === 'side' ? 'bg-white text-zinc-950' : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                      }`}
+                    >
+                      Лёжа на боку
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIntervalPosture('standing')}
+                      className={`flex-1 h-8 rounded-lg text-xs font-bold border ${
+                        intervalPosture === 'standing' ? 'bg-white text-zinc-950' : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                      }`}
+                    >
+                      Стоя
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddInterval(false)}
+                      className="px-3 h-8 text-xs text-zinc-400"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddSleepInterval}
+                      className="px-4 h-8 rounded-lg bg-emerald-500 text-zinc-950 font-bold text-xs"
+                    >
+                      Сохранить
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Intervals tags */}
+              {checklist.sleep_behavior.intervals && checklist.sleep_behavior.intervals.length > 0 ? (
+                <div className="space-y-1 pt-1">
+                  {checklist.sleep_behavior.intervals.map((it) => (
+                    <div
+                      key={it.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-zinc-900 border border-zinc-850 text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock size={12} className="text-zinc-400" />
+                        <span className="font-mono text-white font-bold">{it.start} – {it.end}</span>
+                        <span className="text-[11px] text-zinc-400">({it.posture === 'side' ? 'лёжа' : 'стоя'})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSleepInterval(it.id)}
+                        className="text-zinc-500 hover:text-rose-400 p-1"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-zinc-500">Интервалы укладок не добавлены (установлен базовый учёт).</p>
+              )}
             </div>
 
             {/* Behavior */}
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                Поведение:
+                Поведение слонихи:
               </span>
               <div className="flex flex-wrap gap-1">
                 {([
@@ -1079,7 +1214,7 @@ export function ChineseElephantAccordion({
                       triggerHaptic?.(10);
                       onChange({
                         ...checklist,
-                        sleep_behavior: { ...checklist.sleep_behavior, behavior: beh.val }
+                        sleep_behavior: { ...checklist.sleep_behavior, behavior: beh.val },
                       });
                     }}
                     className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition ${
@@ -1157,7 +1292,7 @@ export function ChineseElephantAccordion({
                       triggerHaptic?.(10);
                       onChange({
                         ...checklist,
-                        body_care: { ...checklist.body_care, washing: w.val }
+                        body_care: { ...checklist.body_care, washing: w.val },
                       });
                     }}
                     className={`min-h-[38px] px-1 rounded-xl text-xs font-bold border transition ${
@@ -1180,7 +1315,7 @@ export function ChineseElephantAccordion({
                   triggerHaptic?.(10);
                   onChange({
                     ...checklist,
-                    body_care: { ...checklist.body_care, dust_bath: !checklist.body_care.dust_bath }
+                    body_care: { ...checklist.body_care, dust_bath: !checklist.body_care.dust_bath },
                   });
                 }}
                 className={`min-h-[42px] rounded-xl border text-xs font-bold p-2 transition ${
@@ -1199,7 +1334,7 @@ export function ChineseElephantAccordion({
                   const nextTrunk = checklist.body_care.trunk === 'normal_tone' ? 'passive' : 'normal_tone';
                   onChange({
                     ...checklist,
-                    body_care: { ...checklist.body_care, trunk: nextTrunk }
+                    body_care: { ...checklist.body_care, trunk: nextTrunk },
                   });
                 }}
                 className={`min-h-[42px] rounded-xl border text-xs font-bold p-2 transition ${
@@ -1225,7 +1360,7 @@ export function ChineseElephantAccordion({
                         triggerHaptic?.(12);
                         onChange({
                           ...checklist,
-                          body_care: { ...checklist.body_care, temporal_gland_score: score }
+                          body_care: { ...checklist.body_care, temporal_gland_score: score },
                         });
                       }}
                       className={`min-h-[38px] rounded-lg border text-xs font-bold ${
@@ -1274,10 +1409,9 @@ export function ChineseElephantAccordion({
 
         {expandedBlock === 8 && (
           <div className="p-3 pt-0 border-t border-zinc-800/80 space-y-3 mt-1">
-            {/* Overall silhouette photo */}
             <div>
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
-                Обязательное фото общего вида (силуэт для кондиции):
+                Фото общего вида (силуэт для кондиции):
               </span>
               <input
                 ref={overallPhotoRef}
@@ -1302,7 +1436,7 @@ export function ChineseElephantAccordion({
                   >
                     <img src={checklist.photo_notes.overall_photo_url} alt="Силуэт" className="h-full w-full object-cover" />
                   </div>
-                  <span className="text-xs text-emerald-400 font-bold">Силуэт слонихи загружен ✓</span>
+                  <span className="text-xs text-emerald-400 font-bold">Силуэт загружен ✓</span>
                   <button
                     type="button"
                     onClick={() => overallPhotoRef.current?.click()}
@@ -1323,7 +1457,6 @@ export function ChineseElephantAccordion({
               )}
             </div>
 
-            {/* Notes textarea */}
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                 Заметки для ветеринара:
@@ -1333,7 +1466,7 @@ export function ChineseElephantAccordion({
                 onChange={(e) => {
                   onChange({
                     ...checklist,
-                    photo_notes: { ...checklist.photo_notes, vet_notes: e.target.value }
+                    photo_notes: { ...checklist.photo_notes, vet_notes: e.target.value },
                   });
                 }}
                 rows={2}
@@ -1383,10 +1516,6 @@ export function ChineseElephantAccordion({
 
         {expandedBlock === 9 && (
           <div className="p-3 pt-0 border-t border-zinc-800/80 space-y-3 mt-1">
-            <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 text-[11px] text-zinc-400">
-              Китайский стандарт: мониторинг иерархии, отталкиваний от поилки и стереотипии для раннего купирования хронического стресса.
-            </div>
-
             {/* Contacts between pairs */}
             <div className="space-y-1.5">
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
@@ -1412,9 +1541,9 @@ export function ChineseElephantAccordion({
                               ...checklist.social_dynamics,
                               contacts: {
                                 ...checklist.social_dynamics.contacts,
-                                [pair.key]: { ...current, active: !current.active }
-                              }
-                            }
+                                [pair.key]: { ...current, active: !current.active },
+                              },
+                            },
                           });
                         }}
                         className={`min-h-[32px] px-2 rounded-lg text-[10px] font-bold border transition ${
@@ -1434,9 +1563,9 @@ export function ChineseElephantAccordion({
                                 ...checklist.social_dynamics,
                                 contacts: {
                                   ...checklist.social_dynamics.contacts,
-                                  [pair.key]: { ...current, type: e.target.value as SocialContactType }
-                                }
-                              }
+                                  [pair.key]: { ...current, type: e.target.value as SocialContactType },
+                                },
+                              },
                             });
                           }}
                           className="min-h-[32px] rounded-lg bg-zinc-900 border border-zinc-800 text-[10px] text-white px-2 focus:outline-none"
@@ -1473,11 +1602,11 @@ export function ChineseElephantAccordion({
                       onClick={() => {
                         triggerHaptic?.(10);
                         const next = isChecked
-                          ? checklist.social_dynamics.conflicts.filter(c => c !== conf.val)
+                          ? checklist.social_dynamics.conflicts.filter((c) => c !== conf.val)
                           : [...checklist.social_dynamics.conflicts, conf.val];
                         onChange({
                           ...checklist,
-                          social_dynamics: { ...checklist.social_dynamics, conflicts: next }
+                          social_dynamics: { ...checklist.social_dynamics, conflicts: next },
                         });
                       }}
                       className={`px-2 py-1 rounded-xl text-[11px] font-bold border transition ${
@@ -1505,8 +1634,8 @@ export function ChineseElephantAccordion({
                       ...checklist,
                       social_dynamics: {
                         ...checklist.social_dynamics,
-                        stereotypy_observed: !checklist.social_dynamics.stereotypy_observed
-                      }
+                        stereotypy_observed: !checklist.social_dynamics.stereotypy_observed,
+                      },
                     });
                   }}
                   className={`min-h-[32px] px-2.5 rounded-lg text-xs font-bold transition ${
@@ -1531,7 +1660,7 @@ export function ChineseElephantAccordion({
                           onClick={() => {
                             onChange({
                               ...checklist,
-                              social_dynamics: { ...checklist.social_dynamics, stereotypy_duration: dur }
+                              social_dynamics: { ...checklist.social_dynamics, stereotypy_duration: dur },
                             });
                           }}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
@@ -1571,11 +1700,11 @@ export function ChineseElephantAccordion({
                       onClick={() => {
                         triggerHaptic?.(10);
                         const next = isChecked
-                          ? checklist.social_dynamics.vocalizations.filter(v => v !== voc.val)
+                          ? checklist.social_dynamics.vocalizations.filter((v) => v !== voc.val)
                           : [...checklist.social_dynamics.vocalizations, voc.val];
                         onChange({
                           ...checklist,
-                          social_dynamics: { ...checklist.social_dynamics, vocalizations: next }
+                          social_dynamics: { ...checklist.social_dynamics, vocalizations: next },
                         });
                       }}
                       className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition ${
@@ -1593,7 +1722,7 @@ export function ChineseElephantAccordion({
               </div>
             </div>
 
-            {/* Video/Photo behaviour capture */}
+            {/* Video/Photo behavior capture */}
             <div>
               <input
                 ref={behaviorMediaRef}

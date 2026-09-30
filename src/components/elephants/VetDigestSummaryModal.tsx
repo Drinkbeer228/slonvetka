@@ -12,13 +12,13 @@ interface VetDigestSummaryModalProps {
 }
 
 const ICONS_MAP: Record<number, { icon: string; name: string }> = {
-  1: { icon: '🚨', name: 'EEHV' },
+  1: { icon: '🚨', name: 'Признаки' },
   2: { icon: '💩', name: 'Кал' },
   3: { icon: '💧', name: 'Моча' },
   4: { icon: '🦶', name: 'Копыта' },
-  5: { icon: '🍽', name: 'Еда' },
+  5: { icon: '🍽', name: 'Корм' },
   6: { icon: '😴', name: 'Сон' },
-  7: { icon: '🧴', name: 'Тело' },
+  7: { icon: '🧴', name: 'Уход' },
   8: { icon: '📷', name: 'Фото' },
   9: { icon: '🐘', name: 'Социум' },
 };
@@ -45,7 +45,7 @@ export function VetDigestSummaryModal({
             <HeartPulse size={20} className="text-emerald-400" />
             <div>
               <h2 className="text-base font-black text-white">Вет-сводка и Контроль Шефа</h2>
-              <p className="text-[11px] text-zinc-400">9 ключевых маркеров поголовья по стандарту Xishuangbanna</p>
+              <p className="text-[11px] text-zinc-400">9 ключевых разделов сменного наблюдения слоновника</p>
             </div>
           </div>
           <button
@@ -57,15 +57,22 @@ export function VetDigestSummaryModal({
           </button>
         </div>
 
+        {/* Disclaimer Notice */}
+        <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-400 flex items-center gap-2">
+          <span className="text-sm">ℹ️</span>
+          <span>
+            Данные формируются на основе наблюдений дежурного кипера. Отклонения указывают на <strong>возможный клинический риск</strong> и не являются диагнозом.
+          </span>
+        </div>
+
         {/* 3 Elephants x 9 Icons Matrix */}
         <div className="space-y-3">
           {elephantMetas.map((meta) => {
             const ev = evaluations[meta.id];
-            const checklist = checklists[meta.id];
 
             return (
               <div key={meta.id} className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2.5">
-                {/* Header row with yesterday trend comparison */}
+                {/* Header row with status & trend */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">{meta.avatarEmoji}</span>
@@ -75,13 +82,12 @@ export function VetDigestSummaryModal({
                     </div>
                   </div>
 
-                  {/* Trends comparing to yesterday */}
                   <div className="flex items-center gap-2 text-[10px] font-mono">
                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-0.5">
-                      <TrendingUp size={10} /> стул ↑
+                      <TrendingUp size={10} /> стул в норме
                     </span>
                     <span className="px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center gap-0.5">
-                      аппетит 100%
+                      сон: {ev?.totalSleepFormatted || '4ч'}
                     </span>
                   </div>
                 </div>
@@ -151,7 +157,7 @@ export function VetDigestSummaryModal({
           </div>
         )}
 
-        {/* 7-Day Trend Mini-Chart (Placeholder for Longitudinal Data) */}
+        {/* 7-Day Trend Mini-Chart */}
         <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-zinc-200">📊 7-дневный тренд дефекации и аппетита</span>
@@ -174,7 +180,7 @@ export function VetDigestSummaryModal({
         <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2">
           <div className="flex items-center gap-1.5">
             <Users size={16} className="text-purple-400" />
-            <h3 className="text-xs font-bold text-white">Социальная динамика за неделю</h3>
+            <h3 className="text-xs font-bold text-white">Социальная динамика группы</h3>
           </div>
           <div className="space-y-1.5 text-xs text-zinc-300">
             <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900 border border-zinc-800">

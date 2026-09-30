@@ -10,7 +10,6 @@ interface StoreState {
   isAdmin: boolean;
   elephants: Elephant[];
   assignments: Assignment[];
-  profiles: Profile[];
   loading: boolean;
   selectedDate: string;
   activeElephantId: string;
@@ -23,15 +22,6 @@ interface StoreContextType extends StoreState {
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAssignments: () => Promise<void>;
-  claimAssignment: (id: string, keeperId: string) => Promise<void>;
-  unclaimAssignment: (id: string) => Promise<void>;
-  createBrigadeAssignment: (data: {
-    title: string;
-    description?: string;
-    elephant_id: string;
-    priority?: 'urgent' | 'normal';
-    requires_photo?: boolean;
-  }) => Promise<Assignment>;
   setSelectedDate: (date: string) => void;
   setActiveElephantId: (id: string) => void;
   setGlobalSaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => void;
@@ -99,18 +89,17 @@ const StoreContext = createContext<StoreContextType | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [elephants, setElephants] = useState<Elephant[]>(DEFAULT_ELEPHANTS);
+  const [elephants, setElephants] = useState<Elephant[]>([]);
   const [activeElephantId, setActiveElephantId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('slonovet_active_elephant');
-      return saved !== null ? JSON.parse(saved) : 'margo';
+      return saved !== null ? JSON.parse(saved) : '';
     } catch {
-      return 'margo';
+      return '';
     }
   });
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(false); // Init to false, SafeGate handles its own loading
+  const [loading] = useState(false); // Init to false, SafeGate handles its own loading
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [globalSaveStatus, setGlobalSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [fodderInventory, setFodderInventory] = useState<FodderItem[]>(() => {
@@ -174,10 +163,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         
         // Then attempt to fetch latest from server in background if available
         try {
-          const [els, asgs, profs] = await Promise.all([
+          const [els, asgs] = await Promise.all([
             supabaseService.getElephants(),
-            supabaseService.getActiveAssignments(),
-            supabaseService.getProfiles()
+            supabaseService.getActiveAssignments()
           ]);
           
           if (els && els.length > 0) {
@@ -187,9 +175,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           if (asgs && asgs.length > 0) {
             setAssignments(asgs);
             await cacheAssignments(asgs).catch(() => {});
-          }
-          if (profs && profs.length > 0) {
-            setProfiles(profs);
           }
         } catch (fetchErr) {
           console.warn('Backend unavailable, running in offline mode:', fetchErr);
@@ -262,194 +247,92 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const claimAssignment = async (id: string, keeperId: string) => {
-    const now = new Date().toISOString();
-    // Optimistic local state update
-    setAssignments(prev => {
-      const updated = prev.map(a => a.id === id ? { ...a, claimed_by: keeperId, claimed_at: now } : a);
-      cacheAssignments(updated).catch(() => {});
-      return updated;
-    });
-
-    try {
-      await supabaseService.claimAssignment(id, keeperId);
-    } catch (e) {
-      console.warn('Network offline, assignment claimed locally:', e);
-    }
-  };
-
-  const unclaimAssignment = async (id: string) => {
-    // Optimistic local state update
-    setAssignments(prev => {
-      const updated = prev.map(a => a.id === id ? { ...a, claimed_by: null, claimed_at: null } : a);
-      cacheAssignments(updated).catch(() => {});
-      return updated;
-    });
-
-    try {
-      await supabaseService.unclaimAssignment(id);
-    } catch (e) {
-      console.warn('Network offline, assignment unclaimed locally:', e);
-    }
-  };
-
-  const createBrigadeAssignment = async (data: {
-    title: string;
-    description?: string;
-    elephant_id: string;
-    priority?: 'urgent' | 'normal';
-    requires_photo?: boolean;
-  }): Promise<Assignment> => {
-    const newAsg: Omit<Assignment, 'id' | 'created_at' | 'updated_at'> = {
-      elephant_id: data.elephant_id || 'margo',
-      title: data.title,
-      description: data.description || null,
-      schedule_type: 'as_needed',
-      requires_photo: data.requires_photo ?? false,
-      requires_before_after: false,
-      assessment_type: null,
-      medicine: null,
-      is_active: true,
-      created_by: profile?.id || 'anon',
-      priority: data.priority || 'normal',
-      claimed_by: null,
-      claimed_at: null,
-    };
-
-    let created: Assignment;
-    try {
-      created = await supabaseService.createAssignment(newAsg);
-    } catch (e) {
-      console.warn('Offline fallback for assignment creation:', e);
-      created = {
-        ...newAsg,
-        id: `asg-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
-
-    setAssignments(prev => {
-      const next = [created, ...prev];
-      cacheAssignments(next).catch(() => {});
-      return next;
-    });
-
-    return created;
-  };
-
   const isAdmin = canManageUsers(profile);
 
-  const safeSetProfile = React.useCallback((p: Profile | null) => {
-    Promise.resolve().then(() => setProfile(p));
-  }, []);
-
-  const safeSetActiveElephantId = React.useCallback((id: string) => {
-    Promise.resolve().then(() => setActiveElephantId(id));
-  }, []);
-
-  const safeSetSelectedDate = React.useCallback((date: string) => {
-    Promise.resolve().then(() => setSelectedDate(date));
-  }, []);
-
-  const safeSetGlobalSaveStatus = React.useCallback((status: 'idle' | 'saving' | 'saved' | 'error') => {
-    Promise.resolve().then(() => setGlobalSaveStatus(status));
-  }, []);
-
-  const updateFodderAmount = React.useCallback((id: string, delta: number) => {
-    Promise.resolve().then(() => {
-      setFodderInventory(prev => prev.map(item => {
-        if (item.id !== id) return item;
-        if (item.fullBagsCount !== undefined) {
-          const newFull = Math.max(0, item.fullBagsCount + delta);
-          return {
-            ...item,
-            fullBagsCount: newFull,
-            amount: newFull + ((item.currentBagKg && item.currentBagKg > 0) ? 1 : 0)
-          };
-        }
+  const updateFodderAmount = (id: string, delta: number) => {
+    setFodderInventory(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      if (item.fullBagsCount !== undefined) {
+        const newFull = Math.max(0, item.fullBagsCount + delta);
         return {
           ...item,
-          amount: Math.max(0, Math.round((item.amount + delta) * 100) / 100)
+          fullBagsCount: newFull,
+          amount: newFull + ((item.currentBagKg && item.currentBagKg > 0) ? 1 : 0)
         };
-      }));
-    });
-  }, []);
+      }
+      return {
+        ...item,
+        amount: Math.max(0, Math.round((item.amount + delta) * 100) / 100)
+      };
+    }));
+  };
 
-  const deductFodderKg = React.useCallback((id: string, kg: number) => {
-    Promise.resolve().then(() => {
-      setFodderInventory(prev => prev.map(item => {
-        if (item.id !== id) return item;
+  const deductFodderKg = (id: string, kg: number) => {
+    setFodderInventory(prev => prev.map(item => {
+      if (item.id !== id) return item;
 
-        // Concentrates with opened bag tracking
-        if (item.fullBagsCount !== undefined && item.currentBagKg !== undefined) {
-          const capacity = item.bagCapacityKg || 30;
-          let newCurrent = Math.round((item.currentBagKg - kg) * 100) / 100;
-          let newFullBags = item.fullBagsCount;
+      // Concentrates with opened bag tracking
+      if (item.fullBagsCount !== undefined && item.currentBagKg !== undefined) {
+        const capacity = item.bagCapacityKg || 30;
+        let newCurrent = Math.round((item.currentBagKg - kg) * 100) / 100;
+        let newFullBags = item.fullBagsCount;
 
-          // Deduction: if opened bag emptied, take from full bags
-          while (newCurrent <= 0 && newFullBags > 0) {
-            newFullBags -= 1;
-            newCurrent = Math.round((newCurrent + capacity) * 100) / 100;
-          }
-
-          // Reversion/Restoration: if returned kg overflows opened bag, pack into full bags
-          while (newCurrent >= capacity) {
-            newFullBags += 1;
-            newCurrent = Math.round((newCurrent - capacity) * 100) / 100;
-          }
-
-          if (newFullBags === 0 && newCurrent < 0) {
-            newCurrent = 0;
-          }
-
-          const newAmount = newFullBags + (newCurrent > 0 ? 1 : 0);
-
-          return {
-            ...item,
-            fullBagsCount: newFullBags,
-            currentBagKg: newCurrent,
-            amount: newAmount
-          };
+        // Deduction: if opened bag emptied, take from full bags
+        while (newCurrent <= 0 && newFullBags > 0) {
+          newFullBags -= 1;
+          newCurrent = Math.round((newCurrent + capacity) * 100) / 100;
         }
 
-        // Default item (e.g. succulent kg)
+        // Reversion/Restoration: if returned kg overflows opened bag, pack into full bags
+        while (newCurrent >= capacity) {
+          newFullBags += 1;
+          newCurrent = Math.round((newCurrent - capacity) * 100) / 100;
+        }
+
+        if (newFullBags === 0 && newCurrent < 0) {
+          newCurrent = 0;
+        }
+
+        const newAmount = newFullBags + (newCurrent > 0 ? 1 : 0);
+
         return {
           ...item,
-          amount: Math.max(0, Math.round((item.amount - kg) * 100) / 100)
+          fullBagsCount: newFullBags,
+          currentBagKg: newCurrent,
+          amount: newAmount
         };
-      }));
-    });
-  }, []);
+      }
+
+      // Default item (e.g. succulent kg)
+      return {
+        ...item,
+        amount: Math.max(0, Math.round((item.amount - kg) * 100) / 100)
+      };
+    }));
+  };
   
-  const addFodderItem = React.useCallback((item: FodderItem) => {
-    Promise.resolve().then(() => {
-      setFodderInventory(prev => [...prev, item]);
-    });
-  }, []);
+  const addFodderItem = (item: FodderItem) => {
+    setFodderInventory(prev => [...prev, item]);
+  };
   
-  const deleteFodderItem = React.useCallback((id: string) => {
-    Promise.resolve().then(() => {
-      setFodderInventory(prev => prev.filter(item => item.id !== id));
-    });
-  }, []);
+  const deleteFodderItem = (id: string) => {
+    setFodderInventory(prev => prev.filter(item => item.id !== id));
+  };
   
-  const editFodderItem = React.useCallback((id: string, updates: Partial<FodderItem>) => {
-    Promise.resolve().then(() => {
-      setFodderInventory(prev => prev.map(item => {
-        if (item.id !== id) return item;
-        const merged = { ...item, ...updates };
-        if (merged.fullBagsCount !== undefined && merged.currentBagKg !== undefined) {
-          merged.amount = merged.fullBagsCount + (merged.currentBagKg > 0 ? 1 : 0);
-        }
-        return merged;
-      }));
-    });
-  }, []);
+  const editFodderItem = (id: string, updates: Partial<FodderItem>) => {
+    setFodderInventory(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const merged = { ...item, ...updates };
+      if (merged.fullBagsCount !== undefined && merged.currentBagKg !== undefined) {
+        merged.amount = merged.fullBagsCount + (merged.currentBagKg > 0 ? 1 : 0);
+      }
+      return merged;
+    }));
+  };
 
   return (
     <StoreContext.Provider value={{
-      profile, setProfile: safeSetProfile, isAdmin, elephants, activeElephantId, setActiveElephantId: safeSetActiveElephantId, assignments, profiles, loading, selectedDate, login, logout, refreshAssignments, claimAssignment, unclaimAssignment, createBrigadeAssignment, setSelectedDate: safeSetSelectedDate, globalSaveStatus, setGlobalSaveStatus: safeSetGlobalSaveStatus,
+      profile, setProfile, isAdmin, elephants, activeElephantId, setActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate, globalSaveStatus, setGlobalSaveStatus,
       fodderInventory, updateFodderAmount, deductFodderKg, addFodderItem, deleteFodderItem, editFodderItem
     }}>
       {children}

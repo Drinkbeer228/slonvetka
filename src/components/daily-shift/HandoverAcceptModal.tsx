@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
-  X, Check, AlertCircle, AlertTriangle, Sparkles, Loader2, 
-  ShieldCheck, HelpCircle, CheckSquare, Square
+  X, Check, AlertCircle, Loader2, 
+  ShieldCheck
 } from 'lucide-react';
 import { DailyShift } from '../../types/shift';
 import { shiftService } from '../../services/shiftService';

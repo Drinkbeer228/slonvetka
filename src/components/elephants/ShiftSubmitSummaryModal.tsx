@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, AlertTriangle, AlertCircle, Clock, Send, ShieldCheck } from 'lucide-react';
+import { X, CheckCircle2, AlertTriangle, AlertCircle, Clock, Send, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { ElephantShiftChecklist, ELEPHANTS_CHECKLIST_CONFIG } from '../../types/conservation';
 import { ChecklistEvaluationResult } from '../../utils/conservationStandard';
 
@@ -26,9 +26,11 @@ export function ShiftSubmitSummaryModal({
   if (!isOpen) return null;
 
   const elephantMetas = Object.values(ELEPHANTS_CHECKLIST_CONFIG);
+
+  // Safety rule: completed >= 7 AND all 4 critical blocks filled
   const canSubmitAll = elephantMetas.every((meta) => {
     const ev = evaluations[meta.id];
-    return (ev?.completedBlocksCount ?? 0) >= 7;
+    return ev?.isReadyToSubmit;
   });
 
   const handleConfirm = async () => {
@@ -56,7 +58,7 @@ export function ShiftSubmitSummaryModal({
             <ShieldCheck size={20} className="text-emerald-400" />
             <div>
               <h2 className="text-base font-black text-white">Сдача смены (12 часов)</h2>
-              <p className="text-[11px] text-zinc-400">Проверка готовности чек-листов всех слоних</p>
+              <p className="text-[11px] text-zinc-400">Проверка критических блоков и готовности чек-листов</p>
             </div>
           </div>
           <button
@@ -76,7 +78,9 @@ export function ShiftSubmitSummaryModal({
             </div>
             <h3 className="text-lg font-black text-white">Смена успешно сдана!</h3>
             <p className="text-sm font-mono text-emerald-400">Время фиксации: {submittedTime}</p>
-            <p className="text-xs text-zinc-400">Все 9 блоков занесены в базу данных Supabase и отправлены ветврачу.</p>
+            <p className="text-xs text-zinc-400">
+              Данные смены и чек-листы зафиксированы в базе данных Supabase и переданы ветврачу.
+            </p>
             <button
               type="button"
               onClick={onClose}
@@ -92,7 +96,8 @@ export function ShiftSubmitSummaryModal({
               {elephantMetas.map((meta) => {
                 const ev = evaluations[meta.id];
                 const count = ev?.completedBlocksCount ?? 0;
-                const isReady = count >= 7;
+                const isReady = ev?.isReadyToSubmit;
+                const missingCritical = ev?.missingCriticalBlocks || [];
 
                 return (
                   <div key={meta.id} className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2">
@@ -119,12 +124,25 @@ export function ShiftSubmitSummaryModal({
                       </div>
                     </div>
 
+                    {/* Missing critical blocks warning */}
+                    {missingCritical.length > 0 && (
+                      <div className="p-2 rounded-xl bg-rose-950/30 border border-rose-500/50 text-[11px] text-rose-300 flex items-start gap-1.5">
+                        <ShieldAlert size={14} className="shrink-0 text-rose-400 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Пропущены критические блоки:</span>
+                          <span className="block text-rose-200 mt-0.5">{missingCritical.join(', ')}</span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Blocks mini-breakdown */}
                     <div className="grid grid-cols-3 gap-1 pt-1 border-t border-zinc-900 text-[10px]">
                       {Object.entries(ev?.blockSummaries || {}).map(([num, b]) => (
                         <div key={num} className="flex items-center gap-1 text-zinc-400">
-                          <span>{b.isFilled ? '✓' : '⚠️'}</span>
-                          <span className="break-words">{b.title.split(' ')[1]}</span>
+                          <span>{b.isFilled ? '✓' : b.isCritical ? '🔴' : '⚠️'}</span>
+                          <span className={b.isCritical ? 'font-bold text-zinc-300 break-words' : 'break-words'}>
+                            {b.title.split(' ')[1]}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -133,15 +151,13 @@ export function ShiftSubmitSummaryModal({
               })}
             </div>
 
-            {/* Warning if blocked */}
-            {!canSubmitAll && (
-              <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-2">
-                <AlertCircle size={16} className="shrink-0 text-amber-400" />
-                <span>
-                  Для сдачи смены требуется заполнить минимум <strong>7 из 9 блоков</strong> по каждой слонихе.
-                </span>
-              </div>
-            )}
+            {/* Safety policy banner */}
+            <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs space-y-1">
+              <span className="font-bold text-white block">Правило безопасности смены:</span>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Минимум <strong>7 из 9 блоков</strong>. 4 критических блока (Срочные признаки, Дефекация, Копыта/походка, Кормление/вода) <strong>обязательны для каждой слонихи</strong>.
+              </p>
+            </div>
 
             {/* Submit button */}
             <button
@@ -155,7 +171,7 @@ export function ShiftSubmitSummaryModal({
               }`}
             >
               <Send size={16} />
-              <span>{submitting ? 'Отправка в Supabase...' : 'Подтвердить и отправить смену'}</span>
+              <span>{submitting ? 'Отправка в базу данных...' : 'Подтвердить и сдать смену'}</span>
             </button>
           </>
         )}

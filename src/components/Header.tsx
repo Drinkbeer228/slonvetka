@@ -4,7 +4,6 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useStore } from '../store';
-import { ROLE_SHORT_LABELS } from '../types/rbac';
 import { shiftService } from '../services/shiftService';
 import { getTodayStr } from '../utils/dates';
 
@@ -13,8 +12,6 @@ interface HeaderProps {
   onOpenMenu: () => void;
   onNavigate?: (screen: string) => void;
 }
-
-const JOURNAL_NAV = { id: 'journal', label: 'Журнал', icon: BookOpen };
 
 const getDaysInMonth = (year: number, month: number) => {
   return new Date(year, month, 0).getDate();
@@ -25,23 +22,9 @@ const getFirstDayOfWeek = (year: number, month: number) => {
 };
 
 export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
-  const { selectedDate, setSelectedDate, profile } = useStore();
+  const { selectedDate, setSelectedDate } = useStore();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
-  const roleBadgeClass = profile?.role === 'admin'
-    ? 'bg-rose-50 text-rose-800'
-    : profile?.role === 'chief'
-      ? 'bg-amber-50 text-amber-800'
-      : profile?.role === 'vet'
-        ? 'bg-sky-50 text-sky-800'
-        : 'bg-emerald-50 text-emerald-800';
-  const roleDotClass = profile?.role === 'admin'
-    ? 'bg-rose-500'
-    : profile?.role === 'chief'
-      ? 'bg-amber-500'
-      : profile?.role === 'vet'
-        ? 'bg-sky-500'
-        : 'bg-emerald-500';
 
   useEffect(() => {
     const updateNetwork = () => setIsOnline(navigator.onLine);
@@ -157,8 +140,6 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
-
-  const showViewToggle = currentScreen === 'daily_shift' || currentScreen === 'vet_cabinet';
 
   return (
     <>

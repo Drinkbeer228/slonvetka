@@ -66,7 +66,7 @@ let dbPromise: Promise<IDBPDatabase<SlonovetDB>> | null = null;
 export function getOfflineDb() {
   if (!dbPromise) {
     dbPromise = openDB<SlonovetDB>('slonvet_db', 3, {
-      upgrade(db, oldVersion) {
+      upgrade(db) {
         if (!db.objectStoreNames.contains('records_queue')) {
           db.createObjectStore('records_queue', { keyPath: 'temp_id' });
         }

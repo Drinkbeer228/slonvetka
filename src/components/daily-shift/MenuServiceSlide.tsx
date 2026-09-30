@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store';
 import { 
-  BookOpen, Package, BarChart3, Bell, Settings, 
-  User, CheckCircle2, ShieldCheck, ChevronRight, X, 
-  Volume2, Smartphone, Moon, Sun, Download, FileText,
-  AlertTriangle, HeartPulse, Sparkles, ExternalLink, Shield
+  Settings, ShieldCheck, ChevronRight, X, 
+  Moon, Sun, Download, AlertTriangle, HeartPulse, ExternalLink
 } from 'lucide-react';
-// Removed RecipeBottomSheet import
-import { useRole } from '../../context/RoleContext';
-import { APP_USER_ROLES, APP_ROLE_CONFIGS, AppUserRole } from '../../types/rbac';
+import { RecipeBottomSheet } from './RecipeBottomSheet';
 
 interface MenuServiceSlideProps {
   slideWrapperClass: string;
@@ -24,7 +20,6 @@ export const MenuServiceSlide: React.FC<MenuServiceSlideProps> = ({
   scrollToSlide
 }) => {
   const { profile } = useStore();
-  const { userRole, setUserRole, roleConfig } = useRole();
 
   // Modals for each menu tile
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -106,65 +101,9 @@ export const MenuServiceSlide: React.FC<MenuServiceSlideProps> = ({
                   <ShieldCheck className="w-3 h-3" /> EAZA Level 3
                 </span>
                 <span>•</span>
-                <span className="text-amber-300 font-bold">Роль: {roleConfig.shortLabel}</span>
+                <span>Сентябрь: 14 смен</span>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* 1.1 ROLE SWITCHER (RBAC СЕЛЕКТОР РОЛИ ДЛЯ ТЕСТИРОВАНИЯ) */}
-        <div className="bg-slate-900 border border-slate-800/90 rounded-2xl p-3 shadow-sm flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-xs font-black text-slate-200">Тестирование ролевой модели (RBAC)</span>
-            </div>
-            <span className="text-[9px] font-mono font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-800 px-1.5 py-0.5 rounded">
-              {roleConfig.badge}
-            </span>
-          </div>
-
-          <p className="text-[10px] text-slate-400 leading-tight">
-            Выберите роль для проверки Conditional Rendering и блокировки интерфейса:
-          </p>
-
-          <div className="grid grid-cols-2 gap-1.5">
-            {APP_USER_ROLES.map(role => {
-              const cfg = APP_ROLE_CONFIGS[role];
-              const isCurrent = userRole === role;
-
-              return (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => {
-                    setUserRole(role);
-                    addEvent(`Переключена роль пользователя: ${cfg.label}`);
-                    if (navigator.vibrate) navigator.vibrate(20);
-                  }}
-                  className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col gap-0.5 ${
-                    isCurrent
-                      ? 'bg-indigo-950/80 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500/50'
-                      : 'bg-slate-950/70 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-bold leading-tight flex items-center gap-1">
-                      <span>{cfg.badge}</span>
-                      <span className={isCurrent ? 'text-indigo-200' : 'text-slate-300'}>{cfg.shortLabel}</span>
-                    </span>
-                    {isCurrent && (
-                      <span className="text-[8px] bg-indigo-500 text-slate-950 font-black px-1 rounded">
-                        АКТИВНА
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[9px] text-slate-400 leading-tight line-clamp-2">
-                    {cfg.description}
-                  </span>
-                </button>
-              );
-            })}
           </div>
         </div>
 
@@ -311,25 +250,25 @@ export const MenuServiceSlide: React.FC<MenuServiceSlideProps> = ({
         </div>
 
         {/* Quick jump back to shift slides */}
-        <div className="pt-2 border-t border-slate-800/60 grid grid-cols-3 gap-1.5 text-xs">
+        <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-2 text-xs">
           <button
             type="button"
             onClick={() => scrollToSlide(0)}
-            className="py-2 px-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sky-400 font-bold transition-all text-center cursor-pointer text-[11px]"
+            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-all text-center cursor-pointer"
           >
-            📋 Рутина
+            🩺 Физиология
           </button>
           <button
             type="button"
             onClick={() => scrollToSlide(1)}
-            className="py-2 px-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-bold transition-all text-center cursor-pointer text-[11px]"
+            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-bold transition-all text-center cursor-pointer"
           >
-            🥣 Кухня
+            🥣 На кухню
           </button>
           <button
             type="button"
             onClick={() => scrollToSlide(2)}
-            className="py-2 px-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-purple-400 font-bold transition-all text-center cursor-pointer text-[11px]"
+            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold transition-all text-center cursor-pointer"
           >
             🧹 Хозяйство
           </button>
@@ -667,7 +606,11 @@ export const MenuServiceSlide: React.FC<MenuServiceSlideProps> = ({
         </div>
       )}
 
-      {/* Tech Card & Full Diet Specification Modal removed */}
+      {/* Tech Card & Full Diet Specification Modal */}
+      <RecipeBottomSheet
+        isOpen={isRecipeModalOpen}
+        onClose={() => setIsRecipeModalOpen(false)}
+      />
 
     </div>
   );

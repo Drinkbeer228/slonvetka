@@ -14,7 +14,6 @@ import {
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useRole } from '../context/RoleContext';
 import { FeedEntry, INITIAL_FEED_ENTRIES } from '../types/engine';
-import { compressImage } from '../utils/imageCompressor';
 
 interface FeedScreenProps {
   onAddEventExternal?: (text: string, badge?: string) => void;
@@ -33,8 +32,7 @@ export function FeedScreen({ onAddEventExternal }: FeedScreenProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedBadge, setSelectedBadge] = useState('📷 Фотоотчёт');
 
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const triggerHaptic = (pattern: number | number[]) => {
     try {
@@ -44,27 +42,16 @@ export function FeedScreen({ onAddEventExternal }: FeedScreenProps) {
     } catch {}
   };
 
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      // Сжимаем до 800 KB / 1080p перед сохранением
-      const compressed = await compressImage(file);
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(compressed);
-      });
-      setSelectedPhoto(dataUrl);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedPhoto(reader.result as string);
       triggerHaptic(15);
-    } catch (err) {
-      console.error('Photo select/compress error:', err);
-      // Фоллбек: читаем без сжатия
-      const reader = new FileReader();
-      reader.onload = () => { setSelectedPhoto(reader.result as string); triggerHaptic(15); };
-      reader.readAsDataURL(file);
-    }
+    };
+    reader.readAsDataURL(file);
     e.target.value = '';
   };
 
@@ -117,7 +104,7 @@ export function FeedScreen({ onAddEventExternal }: FeedScreenProps) {
   };
 
   return (
-    <div className="flex flex-col gap-2.5 max-w-lg mx-auto w-full">
+    <div className="flex flex-col gap-2.5 max-w-lg mx-auto w-full pb-20">
       
       {/* HEADER С КНОПКОЙ ДОБАВЛЕНИЯ ЗАПИСИ */}
       <div className="flex items-center justify-between gap-2 pt-1">
@@ -284,24 +271,15 @@ export function FeedScreen({ onAddEventExternal }: FeedScreenProps) {
                 />
               </div>
 
-              {/* Камера / Галерея — два отдельных input для capture и галереи */}
+              {/* Прикрепление фото */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-zinc-300">Фотография</label>
-
-                {/* Камера — capture="environment" */}
+                
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  ref={cameraInputRef}
-                  className="hidden"
-                  onChange={handlePhotoSelect}
-                />
-                {/* Галерея / файлы — без capture чтобы iPhone открывал Медиатеку */}
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={galleryInputRef}
+                  ref={fileInputRef}
                   className="hidden"
                   onChange={handlePhotoSelect}
                 />
@@ -318,24 +296,14 @@ export function FeedScreen({ onAddEventExternal }: FeedScreenProps) {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => cameraInputRef.current?.click()}
-                      className="h-16 rounded-xl border border-dashed border-zinc-700 hover:border-emerald-500 bg-zinc-950/60 flex flex-col items-center justify-center gap-1 text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer active:scale-95 touch-manipulation"
-                    >
-                      <Camera className="w-5 h-5" />
-                      <span className="text-xs font-bold">Камера</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => galleryInputRef.current?.click()}
-                      className="h-16 rounded-xl border border-dashed border-zinc-700 hover:border-zinc-400 bg-zinc-950/60 flex flex-col items-center justify-center gap-1 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer active:scale-95 touch-manipulation"
-                    >
-                      <ImageIcon className="w-5 h-5" />
-                      <span className="text-xs font-bold">Галерея</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-16 rounded-xl border border-dashed border-zinc-700 hover:border-emerald-500 bg-zinc-950/60 flex flex-col items-center justify-center gap-1 text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                  >
+                    <Camera className="w-5 h-5" />
+                    <span className="text-xs font-bold">Сделать снимок камеры или выбрать фото</span>
+                  </button>
                 )}
               </div>
 

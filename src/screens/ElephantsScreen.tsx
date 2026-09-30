@@ -9,6 +9,7 @@ import { Assignment, Elephant } from '../types';
 import {
   ElephantShiftChecklist,
   createInitialChecklist,
+  normalizeChecklist,
   ELEPHANTS_CHECKLIST_CONFIG
 } from '../types/conservation';
 import { evaluateChecklist } from '../utils/conservationStandard';
@@ -42,7 +43,14 @@ export function ElephantsScreen() {
   const [checklists, setChecklists] = useState<Record<string, ElephantShiftChecklist>>(() => {
     try {
       const saved = localStorage.getItem(`slonovet_checklists_${todayStr}`);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          margo: normalizeChecklist(parsed.margo, 'margo', todayStr),
+          audrey: normalizeChecklist(parsed.audrey, 'audrey', todayStr),
+          pretty: normalizeChecklist(parsed.pretty, 'pretty', todayStr),
+        };
+      }
     } catch {}
     return {
       margo: createInitialChecklist('margo', todayStr),
@@ -63,9 +71,27 @@ export function ElephantsScreen() {
     saveChecklists(next);
 
     // Sync key clinical metrics back to the shift hook for cross-system consistency
-    if (updated.eehv.cyanosis || updated.eehv.facial_edema || updated.eehv.trunk_lethargy) {
-      hook.updateMetricField({ vital_alert: true });
-    }
+    const hasCritical = Boolean(
+      updated.urgent_signs.cyanosis ||
+      updated.urgent_signs.facial_edema ||
+      updated.urgent_signs.severe_lethargy
+    );
+
+    const washStatus = updated.body_care.washing === 'full_brush'
+      ? 'full_wash'
+      : updated.body_care.washing === 'rinsed'
+      ? 'rinsed'
+      : 'not_washed';
+
+    hook.updateMetricField({
+      vital_alert: hasCritical,
+      poop_count: updated.defecation.poop_count,
+      urination_count: updated.urination.urination_count,
+      wash_status: washStatus,
+      water_checked: updated.feeding_water.water_bowl === 'clean',
+      temporal_gland_score: updated.body_care.temporal_gland_score,
+      notes: updated.photo_notes.vet_notes,
+    });
   };
 
   // Automated health evaluation across all 3 elephants
@@ -217,14 +243,14 @@ export function ElephantsScreen() {
         </button>
       </div>
 
-      {/* ═══ 3 КАРТОЧКИ В РЯД: МАРГО · ОДРИ · ПРЭТТИ ═══ */}
+      {/* ═══ СЕЛЕКТОР СЛОНИХ: МАРГО · ОДРИ · ПРЭТТИ ═══ */}
       <section className="space-y-1.5">
         <div className="flex items-center justify-between px-1">
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
             Слонихи на смене • 12 часов
           </span>
           <span className="text-[10px] text-zinc-500 font-mono">
-            Стандарт заповедника
+            Регламент смены
           </span>
         </div>
         <ElephantCardsHeader

@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
 
 /* ============================================================
    LIQUID GLASS DESIGN SYSTEM — SlonVet
@@ -43,21 +43,13 @@ input[type=number] {
 }
 
 /* --- Базовый фон страницы --- */
-html, body {
-  background-color: #020617;
+html, body, #root {
+  background-color: #020617 !important; /* bg-slate-950 */
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-#root {
-  min-height: 100%;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
 body {

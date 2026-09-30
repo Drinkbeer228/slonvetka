@@ -9,7 +9,7 @@ interface ObservationModalProps {
   onComplete: (data: {
     elephantId: string;
     comment: string;
-    photoBlob: Blob | null;  // Фото опционально
+    photoBlob: Blob;
   }) => Promise<void>;
 }
 
@@ -46,7 +46,10 @@ export function ObservationModal({ elephants, onClose, onComplete }: Observation
       alert('Выберите слона');
       return;
     }
-    // Фото опционально — текстовое наблюдение без фото тоже сохраняется
+    if (!photoBlob) {
+      alert('Пожалуйста, прикрепите фотографию');
+      return;
+    }
     if (!comment.trim()) {
       alert('Пожалуйста, добавьте комментарий');
       return;
@@ -95,7 +98,7 @@ export function ObservationModal({ elephants, onClose, onComplete }: Observation
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-bold text-zinc-700">Фотофиксация <span className="text-zinc-400 font-normal text-xs">(необязательно)</span></label>
+            <label className="block text-sm font-bold text-zinc-700">Фотофиксация <span className="text-red-500">*</span></label>
             
             {photoUrl ? (
               <div className="relative rounded-2xl overflow-hidden bg-black flex justify-center border-2 border-zinc-200">

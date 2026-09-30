@@ -7,7 +7,6 @@ import { AlertTriangle, Loader2, Plus, Search, WifiOff } from 'lucide-react';
 import { SyncManager } from '../services/SyncManager';
 import { getOfflineDb, TreatmentRecordQueueItem } from '../services/offlineDb';
 
-import { PhotoPreview } from '../components/PhotoPreview';
 import { ObservationModal } from '../components/ObservationModal';
 import { TreatmentRecordCard } from '../components/TreatmentRecordCard';
 import { EditRecordModal } from '../components/EditRecordModal';

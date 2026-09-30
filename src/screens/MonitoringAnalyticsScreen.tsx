@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Activity, Calendar, Filter, ChevronLeft, ChevronRight, 
-  AlertTriangle, Check, Info, TrendingUp, Clock, Bookmark, 
-  RotateCcw, Sparkles, Droplets, Moon, Sun, ArrowUpRight, ArrowDownRight
+  Calendar, Filter, ChevronLeft, 
+  AlertTriangle, Check, Bookmark, RotateCcw
 } from 'lucide-react';
-import { bodyMonitoringService, DailyPhysioRecord, SleepPhaseItem } from '../services/bodyMonitoringService';
+import { bodyMonitoringService, DailyPhysioRecord } from '../services/bodyMonitoringService';
 
 interface MonitoringAnalyticsScreenProps {
   onNavigate?: (screen: string) => void;

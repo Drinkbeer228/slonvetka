@@ -69,11 +69,11 @@ export function VetAssignmentsSection({
         </div>
       ) : (
         <div className="space-y-2.5">
-          {assignments.map(assignment => {
+          {assignments.map((assignment, idx) => {
             const completed = isAssignmentDone(assignment.id);
             return (
               <VeterinaryAssignmentCard
-                key={assignment.id}
+                key={`${assignment.id || 'asgn'}-${idx}`}
                 assignment={assignment}
                 isCompletedToday={completed}
                 isLocked={isLocked}

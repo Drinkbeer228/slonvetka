@@ -25,23 +25,6 @@ export const supabaseService = {
     }
   },
 
-  async getProfiles(): Promise<Profile[]> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('name');
-      if (error) {
-        console.warn('Supabase getProfiles notice:', error.message || error);
-        return [];
-      }
-      return (data as Profile[]) || [];
-    } catch (err) {
-      console.warn('Network offline or Supabase unreachable (getProfiles):', err);
-      return [];
-    }
-  },
-
   async getElephants(): Promise<Elephant[]> {
     try {
       const { data, error } = await supabase
@@ -233,21 +216,6 @@ export const supabaseService = {
     return data;
   },
 
-  async claimAssignment(id: string, keeperId: string): Promise<Assignment> {
-    const now = new Date().toISOString();
-    return this.updateAssignment(id, {
-      claimed_by: keeperId,
-      claimed_at: now,
-    });
-  },
-
-  async unclaimAssignment(id: string): Promise<Assignment> {
-    return this.updateAssignment(id, {
-      claimed_by: null,
-      claimed_at: null,
-    });
-  },
-
   async archiveAssignment(id: string): Promise<void> {
     const { error } = await supabase
       .from('assignments')
@@ -331,8 +299,7 @@ export const supabaseService = {
   },
 
   async uploadShiftMedia(file: Blob, shiftDate: string, section: string): Promise<string> {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData?.session?.user?.id || 'unknown';
+    await supabase.auth.getSession();
     const timestamp = Date.now();
     const filePath = `shifts/${shiftDate}/${section}_${timestamp}.jpg`;
     

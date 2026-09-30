@@ -360,7 +360,7 @@ export function BrigadeTasksScreen() {
             </p>
           </div>
         ) : (
-          filteredAssignments.map((assignment) => {
+          filteredAssignments.map((assignment, idx) => {
             const isDone = isAssignmentDone(assignment.id);
             const isClaimedByMe = assignment.claimed_by === profile?.id;
             const isClaimedByOther = Boolean(assignment.claimed_by && !isClaimedByMe);
@@ -370,7 +370,7 @@ export function BrigadeTasksScreen() {
 
             return (
               <div
-                key={assignment.id}
+                key={`${assignment.id || 'task'}-${idx}`}
                 className={`rounded-3xl border p-4 transition-all shadow-md flex flex-col gap-3 ${
                   isDone
                     ? 'bg-zinc-950/60 border-zinc-800/60 opacity-70'

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Check, RefreshCw, Trash2, X } from 'lucide-react';
+import { Camera, Check, RefreshCw, Trash2 } from 'lucide-react';
 import { ShiftPhoto } from '../../types/shift';
 import { SectionPhotoTrigger } from './SectionPhotoTrigger';
 import { compressImage } from '../../utils/imageCompressor';

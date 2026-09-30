@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import { Profile } from '../types';
 
 export const authService = {
   async registerDeviceSession(userId: string, sessionToken: string): Promise<void> {

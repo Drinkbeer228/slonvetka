@@ -1,9 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Trash2, X, Plus, Loader2 } from 'lucide-react';
+import { Camera, Trash2, X } from 'lucide-react';
 import { ShiftPhoto } from '../../types/shift';
 import { compressImage } from '../../utils/imageCompressor';
 import { supabaseService } from '../../services/supabaseService';
-import { supabase } from '../../lib/supabase';
 
 interface Props {
   isOpen: boolean;

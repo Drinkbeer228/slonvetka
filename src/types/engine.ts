@@ -12,15 +12,6 @@ export interface DailyTask {
   completedBy?: string;
   createdAt: string;
   createdBy?: string;
-  // ─── Новые поля v2 (Экран «ЗАДАЧИ») ───
-  /** Приоритет задачи */
-  priority?: 'urgent' | 'normal';
-  /** ID пользователя, забравшего задачу */
-  claimed_by?: string;
-  /** Имя пользователя, забравшего задачу */
-  claimed_by_name?: string;
-  /** URL фото-пруфа выполнения */
-  photo_proof_url?: string;
 }
 
 export interface FeedEntry {

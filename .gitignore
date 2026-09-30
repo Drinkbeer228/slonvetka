@@ -54,6 +54,9 @@ Desktop.ini
 *.bak
 *.patch
 *.diff
+*.cjs
+.cleanup-marker
+openapi.json
 
 # Logs
 logs/
@@ -71,7 +74,3 @@ supabase/.temp/
 # PWA
 .workbox/
 sw.js.map
-
-# Project artifacts / stubs
-.cleanup-marker
-openapi.json

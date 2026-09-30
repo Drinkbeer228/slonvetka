@@ -4,7 +4,6 @@ import {
   ElephantDailyMetrics, 
   FeedInventoryItem, 
   FeedInventoryType, 
-  createDefaultElephantMetrics,
   clampCount 
 } from '../types/shift';
 import { 

@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { X, LogOut, Home, Stethoscope, HeartPulse, Moon, Sun, Trophy,
-  CheckCircle2, BookOpen, History, ClipboardList, Users, Activity 
+import { X, LogOut, Home, Stethoscope, Moon, Sun, Trophy,
+  History, ClipboardList, Users, Activity 
 } from 'lucide-react';
 import { useStore } from '../store';
 import { InstallPrompt } from './InstallPrompt';
 import { Header } from './Header';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { ShiftWheelModal } from './daily-shift/ShiftWheelModal';
 import { canManageUsers } from '../lib/permissions';
-import { ROLE_LABELS } from '../types/rbac';
+import { ROLE_LABELS } from '../types/roles';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  const [wheelOpen, setWheelOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('slonovet_theme') === 'dark');
 
   const toggleTheme = () => {
@@ -162,6 +164,15 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
               </button>
             );
           })}
+          <div className="px-4 py-2 mt-2">
+            <button
+              onClick={() => { setWheelOpen(true); setDrawerOpen(false); }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-[16px] font-black text-sm transition-all active:scale-95 shadow-md shadow-amber-500/20 bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              <Trophy size={18} />
+              Жребий смены (Колесо)
+            </button>
+          </div>
         </nav>
 
         {/* Профиль + выход */}
@@ -229,6 +240,10 @@ export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
 
       {profileSettingsOpen && (
         <ProfileSettingsModal onClose={() => setProfileSettingsOpen(false)} />
+      )}
+
+      {wheelOpen && (
+        <ShiftWheelModal isOpen={wheelOpen} onClose={() => setWheelOpen(false)} />
       )}
     </div>
   );

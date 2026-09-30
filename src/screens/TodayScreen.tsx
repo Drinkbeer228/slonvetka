@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { Assignment, Elephant, TreatmentRecordWithPhotos } from '../types';
 import { ExecutionModal } from '../components/ExecutionModal';
-import { CheckCircle2, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Loader2 } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import { formatTime } from '../utils/dates';
 import { SyncManager } from '../services/SyncManager';
@@ -95,10 +95,6 @@ export function TodayScreen({ onElephantClick }: TodayScreenProps) {
     }, null);
 
     await fetchDrafts();
-  };
-
-  const handleRetrySync = () => {
-    SyncManager.triggerSync();
   };
 
   const activeAssignments = assignments.filter(a => a.is_active);
