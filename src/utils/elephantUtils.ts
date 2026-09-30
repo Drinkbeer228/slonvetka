@@ -1,100 +1,79 @@
 import { Elephant } from '../types';
 
-export type ElephantSlug = 'margo' | 'audrey' | 'pretty';
+/**
+ * Universal Elephant identifier (supports canonical slugs, UUIDs, or custom elephant IDs)
+ */
+export type ElephantSlug = string;
 
 export interface ElephantMeta {
-  id: ElephantSlug;
+  id: string;
   name: string;
-  focus: string;
-  icon: string;
+  focus?: string;
+  icon?: string;
 }
 
 export const ELEPHANTS_META: readonly ElephantMeta[] = [
   { id: 'margo', name: 'Марго', focus: 'Контроль массы', icon: '🐘' },
   { id: 'audrey', name: 'Одри', focus: 'Подросток / Рост', icon: '🐘' },
-  { id: 'pretty', name: 'Прэтти', focus: 'Возрастная / Суставы', icon: '🐘' }
-] as const;
+  { id: 'pretty', name: 'Прэтти', focus: 'Возрастная / Суставы', icon: '🐘' },
+];
 
 /**
  * Normalizes any elephant identifier (slug, Russian name, or Supabase UUID)
- * to one of the strict 3 canonical slugs: 'margo' | 'audrey' | 'pretty'.
+ * Supports dynamic elephants beyond the initial 3.
  */
 export function normalizeElephantSlug(
   idOrSlugOrName: string | undefined | null,
   storeElephants?: Elephant[]
-): ElephantSlug {
-  if (!idOrSlugOrName) return 'margo';
+): string {
+  if (!idOrSlugOrName) return storeElephants?.[0]?.id || 'margo';
 
   const raw = String(idOrSlugOrName).trim();
   const lower = raw.toLowerCase();
 
-  // 1. Direct slug or name checks
-  if (lower === 'margo' || lower.includes('марго') || lower.includes('марг')) {
-    return 'margo';
-  }
-  if (lower === 'audrey' || lower === 'odri' || lower.includes('одри') || lower.includes('одр')) {
-    return 'audrey';
-  }
-  if (lower === 'pretty' || lower.includes('прэтти') || lower.includes('претти') || lower.includes('прэт') || lower.includes('прет')) {
-    return 'pretty';
-  }
-
-  // 2. Check store elephants (matching by UUID)
+  // 1. Direct match by store elephants (by ID or Name)
   if (storeElephants && storeElephants.length > 0) {
-    const matched = storeElephants.find(e => e.id === raw);
-    if (matched && matched.name) {
-      const matchLower = matched.name.toLowerCase();
-      if (matchLower.includes('марг')) return 'margo';
-      if (matchLower.includes('одр')) return 'audrey';
-      if (matchLower.includes('прэт') || matchLower.includes('прет')) return 'pretty';
-    }
-
-    // Fallback: match by index if array of 3 elephants
-    const idx = storeElephants.findIndex(e => e.id === raw);
-    if (idx === 0) return 'margo';
-    if (idx === 1) return 'audrey';
-    if (idx === 2) return 'pretty';
+    const matched = storeElephants.find(
+      e => e.id.toLowerCase() === lower || e.name.toLowerCase() === lower
+    );
+    if (matched) return matched.id;
   }
 
-  return 'margo';
+  // 2. Canonical slug matching
+  if (lower === 'margo' || lower.includes('марго') || lower.includes('марг')) return 'margo';
+  if (lower === 'audrey' || lower === 'odri' || lower.includes('одри') || lower.includes('одр')) return 'audrey';
+  if (lower === 'pretty' || lower.includes('прэтти') || lower.includes('претти') || lower.includes('прэт') || lower.includes('прет')) return 'pretty';
+
+  // 3. Fallback: return raw ID for dynamically added elephants
+  return raw;
 }
 
 /**
- * Returns the proper Russian display name ('Марго', 'Одри', 'Прэтти')
- * for any given elephant identifier (slug, UUID, or name).
- * Never returns a raw UUID.
+ * Returns the proper display name for any given elephant identifier (slug, UUID, or name).
+ * Dynamically resolves from storeElephants if available.
  */
 export function getElephantName(
   idOrSlugOrName: string | undefined | null,
   storeElephants?: Elephant[]
 ): string {
-  if (!idOrSlugOrName) return 'Марго';
+  if (!idOrSlugOrName) return storeElephants?.[0]?.name || 'Марго';
 
   const raw = String(idOrSlugOrName).trim();
 
-  // If already a recognized Russian name
-  if (raw === 'Марго' || raw === 'Одри' || raw === 'Прэтти') {
-    return raw;
-  }
-
-  // Check store elephants if it's a UUID
+  // 1. Check store elephants (by ID or name)
   if (storeElephants && storeElephants.length > 0) {
-    const matched = storeElephants.find(e => e.id === raw);
-    if (matched && matched.name && !matched.name.includes('-')) {
-      return matched.name;
-    }
+    const matched = storeElephants.find(
+      e => e.id === raw || e.name.toLowerCase() === raw.toLowerCase()
+    );
+    if (matched && matched.name) return matched.name;
   }
 
-  // Resolve via normalized slug
-  const slug = normalizeElephantSlug(raw, storeElephants);
-  switch (slug) {
-    case 'margo':
-      return 'Марго';
-    case 'audrey':
-      return 'Одри';
-    case 'pretty':
-      return 'Прэтти';
-    default:
-      return 'Марго';
-  }
+  // 2. Check canonical names
+  const lower = raw.toLowerCase();
+  if (lower === 'margo' || lower.includes('марг')) return 'Марго';
+  if (lower === 'audrey' || lower.includes('одр')) return 'Одри';
+  if (lower === 'pretty' || lower.includes('прет') || lower.includes('прэт')) return 'Прэтти';
+
+  // 3. Dynamic fallback
+  return raw;
 }

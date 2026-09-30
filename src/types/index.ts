@@ -1,4 +1,4 @@
-import { UserRole } from './roles';
+import { UserRole } from './rbac';
 
 export interface Profile {
   id: string;
@@ -35,6 +35,10 @@ export interface Assignment {
   created_by: string;
   created_at: string;
   updated_at: string;
+  // ─── Бригадная модель v2 ───
+  priority?: 'urgent' | 'normal';
+  claimed_by?: string | null;
+  claimed_at?: string | null;
 }
 
 export interface TreatmentRecord {

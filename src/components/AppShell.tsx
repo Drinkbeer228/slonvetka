@@ -2,8 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { ElephantsScreen } from '../screens/ElephantsScreen';
 import { BrigadeTasksScreen } from '../screens/BrigadeTasksScreen';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { DailyTask, INITIAL_DAILY_TASKS } from '../types/engine';
 import {
   Loader2, CheckCircle2, Clock
 } from 'lucide-react';
@@ -16,11 +14,12 @@ type AppScreen = 'elephants' | 'tasks';
  */
 export function AppShell() {
   const [activeScreen, setActiveScreen] = useState<AppScreen>('elephants');
-  const { profile, globalSaveStatus } = useStore();
+  const { profile, globalSaveStatus, assignments } = useStore();
 
-  // Read tasks count for badge
-  const [tasks] = useLocalStorage<DailyTask[]>('slonovet_daily_tasks_v2', INITIAL_DAILY_TASKS);
-  const activeTasksCount = useMemo(() => tasks.filter(t => !t.isCompleted).length, [tasks]);
+  // Read unassigned active tasks count for badge
+  const activeTasksCount = useMemo(() => {
+    return assignments.filter(a => a.is_active && !a.claimed_by).length;
+  }, [assignments]);
 
   const triggerHaptic = (ms: number = 10) => {
     try {

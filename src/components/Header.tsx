@@ -4,7 +4,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useStore } from '../store';
-import { ROLE_SHORT_LABELS } from '../types/roles';
+import { ROLE_SHORT_LABELS } from '../types/rbac';
 import { shiftService } from '../services/shiftService';
 import { getTodayStr } from '../utils/dates';
 
@@ -30,14 +30,14 @@ export function Header({ currentScreen, onOpenMenu, onNavigate }: HeaderProps) {
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const roleBadgeClass = profile?.role === 'admin'
     ? 'bg-rose-50 text-rose-800'
-    : profile?.role === 'director'
+    : profile?.role === 'chief'
       ? 'bg-amber-50 text-amber-800'
       : profile?.role === 'vet'
         ? 'bg-sky-50 text-sky-800'
         : 'bg-emerald-50 text-emerald-800';
   const roleDotClass = profile?.role === 'admin'
     ? 'bg-rose-500'
-    : profile?.role === 'director'
+    : profile?.role === 'chief'
       ? 'bg-amber-500'
       : profile?.role === 'vet'
         ? 'bg-sky-500'

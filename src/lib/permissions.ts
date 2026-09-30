@@ -1,6 +1,6 @@
 import { Profile } from '../types';
 import { DailyShift } from '../types/shift';
-import { UserRole } from '../types/roles';
+import { UserRole } from '../types/rbac';
 
 function getTodayDateString(): string {
   return new Date().toISOString().split('T')[0];
@@ -23,7 +23,7 @@ export function canEditShiftByRole(role: UserRole | null | undefined, isDutyKeep
 }
 
 export function canManageInventory(role: UserRole | null | undefined, isDutyKeeper: boolean): boolean {
-  return isAdmin(role) || (role === 'keeper' && isDutyKeeper);
+  return isAdmin(role) || role === 'warehouse' || (role === 'keeper' && isDutyKeeper);
 }
 
 export function canManageUsers(profile: Pick<Profile, 'role'> | null | undefined): boolean {
@@ -35,7 +35,7 @@ export function canCreateMedicalAssignment(profile: Pick<Profile, 'role'> | null
 }
 
 export function canCreateTrainingPlan(profile: Pick<Profile, 'role'> | null | undefined): boolean {
-  return profile?.role === 'director' || isAdmin(profile?.role);
+  return profile?.role === 'admin' || profile?.role === 'chief';
 }
 
 export function canEditShift(

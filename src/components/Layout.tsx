@@ -7,7 +7,7 @@ import { InstallPrompt } from './InstallPrompt';
 import { Header } from './Header';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
 import { canManageUsers } from '../lib/permissions';
-import { ROLE_LABELS } from '../types/roles';
+import { ROLE_LABELS } from '../types/rbac';
 
 interface LayoutProps {
   children: React.ReactNode;

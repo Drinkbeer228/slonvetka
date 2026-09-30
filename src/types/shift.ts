@@ -147,6 +147,26 @@ export interface ElephantDailyMetrics {
   feeding_records?: FeedingRecord[];
   /** Поилка вымыта и заполнена */
   water_checked?: boolean;
+  /** Фото-осмотр 4 лап (ПП, ЛП, ПЗ, ЛЗ) */
+  feet_photos?: Partial<Record<'front_right' | 'front_left' | 'rear_right' | 'rear_left', { url: string; date: string }>>;
+  /** Оценка височных желез для Претти: шкала TGS 0-4 */
+  temporal_gland_score?: number;
+  /** Промывка височных желез антисептиком */
+  temporal_gland_washed?: boolean;
+  /** Нанесение защитной мази на височную железу */
+  temporal_gland_ointment?: boolean;
+  /** Фото височной железы */
+  temporal_gland_photo_url?: string;
+
+  // ─── Витальные клинические маркеры (Reporting by Exception) ───
+  /** Состояние слизистой и языка (EEHV контроль) */
+  mucosa_tongue?: 'normal_pink' | 'cyanosis_blue' | 'petechiae' | null;
+  /** Отёки морды и периорбитальные */
+  facial_edema?: 'none' | 'trunk_periorbital' | 'sunken_temples' | null;
+  /** Общий флаг витальной тревоги */
+  vital_alert?: boolean;
+  /** Фото подтверждение клинического симптома */
+  vital_photo_url?: string;
 }
 
 export function createDefaultElephantMetrics(shiftId: string, elephantId: string): ElephantDailyMetrics {

@@ -10,6 +10,7 @@ interface StoreState {
   isAdmin: boolean;
   elephants: Elephant[];
   assignments: Assignment[];
+  profiles: Profile[];
   loading: boolean;
   selectedDate: string;
   activeElephantId: string;
@@ -22,6 +23,15 @@ interface StoreContextType extends StoreState {
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAssignments: () => Promise<void>;
+  claimAssignment: (id: string, keeperId: string) => Promise<void>;
+  unclaimAssignment: (id: string) => Promise<void>;
+  createBrigadeAssignment: (data: {
+    title: string;
+    description?: string;
+    elephant_id: string;
+    priority?: 'urgent' | 'normal';
+    requires_photo?: boolean;
+  }) => Promise<Assignment>;
   setSelectedDate: (date: string) => void;
   setActiveElephantId: (id: string) => void;
   setGlobalSaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => void;
@@ -99,6 +109,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   });
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false); // Init to false, SafeGate handles its own loading
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [globalSaveStatus, setGlobalSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -163,9 +174,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         
         // Then attempt to fetch latest from server in background if available
         try {
-          const [els, asgs] = await Promise.all([
+          const [els, asgs, profs] = await Promise.all([
             supabaseService.getElephants(),
-            supabaseService.getActiveAssignments()
+            supabaseService.getActiveAssignments(),
+            supabaseService.getProfiles()
           ]);
           
           if (els && els.length > 0) {
@@ -175,6 +187,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           if (asgs && asgs.length > 0) {
             setAssignments(asgs);
             await cacheAssignments(asgs).catch(() => {});
+          }
+          if (profs && profs.length > 0) {
+            setProfiles(profs);
           }
         } catch (fetchErr) {
           console.warn('Backend unavailable, running in offline mode:', fetchErr);
@@ -245,6 +260,82 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.warn('Failed to refresh assignments in background', e);
     }
+  };
+
+  const claimAssignment = async (id: string, keeperId: string) => {
+    const now = new Date().toISOString();
+    // Optimistic local state update
+    setAssignments(prev => {
+      const updated = prev.map(a => a.id === id ? { ...a, claimed_by: keeperId, claimed_at: now } : a);
+      cacheAssignments(updated).catch(() => {});
+      return updated;
+    });
+
+    try {
+      await supabaseService.claimAssignment(id, keeperId);
+    } catch (e) {
+      console.warn('Network offline, assignment claimed locally:', e);
+    }
+  };
+
+  const unclaimAssignment = async (id: string) => {
+    // Optimistic local state update
+    setAssignments(prev => {
+      const updated = prev.map(a => a.id === id ? { ...a, claimed_by: null, claimed_at: null } : a);
+      cacheAssignments(updated).catch(() => {});
+      return updated;
+    });
+
+    try {
+      await supabaseService.unclaimAssignment(id);
+    } catch (e) {
+      console.warn('Network offline, assignment unclaimed locally:', e);
+    }
+  };
+
+  const createBrigadeAssignment = async (data: {
+    title: string;
+    description?: string;
+    elephant_id: string;
+    priority?: 'urgent' | 'normal';
+    requires_photo?: boolean;
+  }): Promise<Assignment> => {
+    const newAsg: Omit<Assignment, 'id' | 'created_at' | 'updated_at'> = {
+      elephant_id: data.elephant_id || 'margo',
+      title: data.title,
+      description: data.description || null,
+      schedule_type: 'as_needed',
+      requires_photo: data.requires_photo ?? false,
+      requires_before_after: false,
+      assessment_type: null,
+      medicine: null,
+      is_active: true,
+      created_by: profile?.id || 'anon',
+      priority: data.priority || 'normal',
+      claimed_by: null,
+      claimed_at: null,
+    };
+
+    let created: Assignment;
+    try {
+      created = await supabaseService.createAssignment(newAsg);
+    } catch (e) {
+      console.warn('Offline fallback for assignment creation:', e);
+      created = {
+        ...newAsg,
+        id: `asg-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    setAssignments(prev => {
+      const next = [created, ...prev];
+      cacheAssignments(next).catch(() => {});
+      return next;
+    });
+
+    return created;
   };
 
   const isAdmin = canManageUsers(profile);
@@ -358,7 +449,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      profile, setProfile: safeSetProfile, isAdmin, elephants, activeElephantId, setActiveElephantId: safeSetActiveElephantId, assignments, loading, selectedDate, login, logout, refreshAssignments, setSelectedDate: safeSetSelectedDate, globalSaveStatus, setGlobalSaveStatus: safeSetGlobalSaveStatus,
+      profile, setProfile: safeSetProfile, isAdmin, elephants, activeElephantId, setActiveElephantId: safeSetActiveElephantId, assignments, profiles, loading, selectedDate, login, logout, refreshAssignments, claimAssignment, unclaimAssignment, createBrigadeAssignment, setSelectedDate: safeSetSelectedDate, globalSaveStatus, setGlobalSaveStatus: safeSetGlobalSaveStatus,
       fodderInventory, updateFodderAmount, deductFodderKg, addFodderItem, deleteFodderItem, editFodderItem
     }}>
       {children}

@@ -2,6 +2,29 @@ export const APP_USER_ROLES = ['keeper', 'vet', 'admin', 'warehouse', 'chief'] a
 
 export type AppUserRole = (typeof APP_USER_ROLES)[number];
 
+export type UserRole = AppUserRole;
+export const USER_ROLES = APP_USER_ROLES;
+
+export function isUserRole(value: unknown): value is UserRole {
+  return typeof value === 'string' && APP_USER_ROLES.includes(value as UserRole);
+}
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  keeper: 'Кипер',
+  vet: 'Ветврач',
+  admin: 'Шеф / Админ',
+  warehouse: 'Склад',
+  chief: 'Шеф (Наблюдатель)',
+};
+
+export const ROLE_SHORT_LABELS: Record<UserRole, string> = {
+  keeper: 'Кипер',
+  vet: 'Вет',
+  admin: 'Шеф',
+  warehouse: 'Склад',
+  chief: 'Шеф',
+};
+
 export interface RoleConfig {
   id: AppUserRole;
   label: string;

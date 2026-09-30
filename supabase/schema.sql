@@ -8,7 +8,7 @@ create extension if not exists "uuid-ossp";
 create table public.profiles (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
-  role text check (role in ('keeper', 'vet', 'director', 'admin')) not null,
+  role text check (role in ('keeper', 'vet', 'admin', 'warehouse', 'chief', 'director')) not null,
   invite_code text unique,
   active boolean default true,
   is_admin boolean generated always as (role = 'admin') stored,
@@ -103,13 +103,33 @@ create table public.elephant_daily_metrics (
   feces_traits jsonb default '["Сформирован (норма)"]',
   urination_count integer default 0 check (urination_count >= 0),
   urination_traits jsonb default '["Прозрачная (норма)"]',
-  behavior text default 'Спокойная / В норме',
+  behavior text default 'Спокойное',
+  sleep_state jsonb default '{"duration": "🟢 3-4ч (норма)"}',
   sleep_minutes integer default 0 check (sleep_minutes >= 0 and sleep_minutes <= 720), -- max 12h per shift
   sleep_intervals jsonb default '[]',
   notes text default '',
-  photos jsonb default '[]', -- массив ShiftPhoto объектов (base64 dataUrl)
-  trunk_tone text,
-  breathing_observation text,
+  photos jsonb default '[]', -- массив ShiftPhoto объектов
+  -- ─── КЛИНИЧЕСКИЕ И ВИТАЛЬНЫЕ МАРКЕРЫ (EEHV, ЖКТ, ДЫХАНИЕ, ОРТОПЕДИЯ) ───
+  trunk_tone text default 'active', -- 'active', 'weak_loop', 'colic_clamping'
+  mucosa_tongue text default 'normal_pink', -- 'normal_pink', 'cyanosis_blue', 'petechiae'
+  breathing_observation text default 'nasal_normal', -- 'nasal_normal', 'mouth_dyspnea'
+  gait_assessment text default 'stable', -- 'stable', 'weight_shift_high', 'three_legs_pain'
+  facial_edema text default 'none', -- 'none', 'trunk_periorbital', 'sunken_temples'
+  vital_alert boolean default false,
+  vital_photo_url text,
+  -- ─── УХОД ЗА ТЕЛОМ, 4 ЛАПЫ И ПЕДИКЮР ───
+  wash_status text default 'not_washed', -- 'not_washed', 'rinsed', 'full_wash'
+  limb_status jsonb default '{"front_right":"ok","front_left":"ok","rear_right":"ok","rear_left":"ok"}',
+  feet_photos jsonb default '{}',
+  -- ─── СПЕЦ-МОНИТОРИНГ ВИСОЧНОЙ ЖЕЛЕЗЫ (TGS 0-4) ───
+  temporal_gland_score integer default 0 check (temporal_gland_score >= 0 and temporal_gland_score <= 4),
+  temporal_gland_washed boolean default false,
+  temporal_gland_ointment boolean default false,
+  temporal_gland_photo_url text,
+  -- ─── КОРМЛЕНИЕ И ПОЕНИЕ ───
+  feeding_records jsonb default '[]',
+  water_checked boolean default false,
+  -- ─── ДОПОЛНИТЕЛЬНЫЕ НАБЛЮДЕНИЯ ───
   trunk_tip_condition text,
   nasal_discharge text,
   dust_bathing boolean default false,
@@ -120,11 +140,27 @@ create table public.elephant_daily_metrics (
   selective_eating text default '',
   foreign_object_suspected boolean default false,
   foreign_object_note text default '',
-  gait_assessment text,
   favored_leg text,
   hoof_warmth text,
   arena_reaction text,
   unique (shift_id, elephant_id)
+);
+
+-- CHIEF APPROVAL REQUESTS (запросы добра шефу с фиксацией решения)
+create table public.chief_approvals (
+  id text primary key,
+  shift_id text references public.daily_shifts(id) on delete set null,
+  elephant_id text not null,
+  elephant_name text not null,
+  requested_by_id uuid references public.profiles(id),
+  requested_by_name text not null,
+  category text check (category in ('arena_cancel', 'urgent_med', 'ration_change', 'emergency')) not null,
+  title text not null,
+  reason text not null,
+  status text check (status in ('pending', 'approved', 'rejected')) default 'pending',
+  chief_comment text,
+  resolved_at timestamptz,
+  created_at timestamptz default now()
 );
 
 -- FEED INVENTORY (учет остатков кормов на складе: сено, рулоны, ветки)

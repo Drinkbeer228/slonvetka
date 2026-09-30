@@ -292,6 +292,79 @@ export function useDailyShift() {
     if (next) logEvent(`Поилка: ${activeElephant.name} — вымыта и заполнена`, '💧');
   }, [activeMetric.water_checked, activeElephant.name, updateMetricField, triggerHaptic, logEvent]);
 
+  // ─── Fodder & warehouse inventory handlers ───
+
+  const handleUpdateFodder = useCallback((
+    field: 'hay_bales_distributed' | 'hay_bags_distributed',
+    delta: number
+  ) => {
+    triggerHaptic(15);
+    if (!shift) return;
+    const newShift: DailyShift = {
+      ...shift,
+      [field]: Math.max(0, (shift[field] ?? 0) + delta),
+    };
+    setShift(newShift);
+    persistChanges(metrics, newShift);
+
+    // Sync with warehouse inventory:
+    // delta > 0 = issued (deduct from warehouse), delta < 0 = returned (add to warehouse)
+    if (delta !== 0) {
+      const parentId = field === 'hay_bales_distributed' ? 'bales' : 'rolls';
+      const targetItem = fodderInventory.find(
+        (item) => item.parentId === parentId || (parentId === 'bales' && item.name.toLowerCase().includes('тюк'))
+      );
+      if (targetItem) {
+        updateFodderAmount(targetItem.id, -delta);
+      }
+    }
+
+    const title =
+      field === 'hay_bales_distributed'
+        ? `Раздача сена в тюках (${delta > 0 ? '+' : ''}${delta})`
+        : `Раздача рулонов / мешков (${delta > 0 ? '+' : ''}${delta})`;
+    logEvent(title, '🌾');
+  }, [shift, metrics, fodderInventory, updateFodderAmount, persistChanges, triggerHaptic, logEvent]);
+
+  // ─── Inspection & photo handlers ───
+
+  const handleSaveFeetPhoto = useCallback((
+    limb: 'front_right' | 'front_left' | 'rear_right' | 'rear_left',
+    photoUrl: string
+  ) => {
+    triggerHaptic(20);
+    const currentFeet = activeMetric.feet_photos || {};
+    const nextFeet = {
+      ...currentFeet,
+      [limb]: { url: photoUrl, date: new Date().toISOString() },
+    };
+    updateMetricField({ feet_photos: nextFeet });
+    const limbLabels: Record<string, string> = {
+      front_right: 'ПП', front_left: 'ЛП', rear_right: 'ПЗ', rear_left: 'ЛЗ',
+    };
+    logEvent(`Недельное фото лапы: ${activeElephant.name} (${limbLabels[limb]})`, '📸');
+  }, [activeMetric.feet_photos, activeElephant.name, updateMetricField, triggerHaptic, logEvent]);
+
+  const handleUpdateTemporalGland = useCallback((data: {
+    score: number;
+    washed: boolean;
+    ointment: boolean;
+    photoUrl?: string;
+  }) => {
+    triggerHaptic(15);
+    const updates: Partial<ElephantDailyMetrics> = {
+      temporal_gland_score: data.score,
+      temporal_gland_washed: data.washed,
+      temporal_gland_ointment: data.ointment,
+      temporal_glands: `TGS-${data.score}${data.washed ? ' / Промыто' : ''}${data.ointment ? ' / Мазь' : ''}`,
+    };
+    if (data.photoUrl) {
+      updates.temporal_gland_photo_url = data.photoUrl;
+    }
+    updateMetricField(updates);
+    logEvent(`Височные железы: ${activeElephant.name} (TGS-${data.score})`, '🩺');
+  }, [activeElephant.name, updateMetricField, triggerHaptic, logEvent]);
+
   // ─── Assignment helpers ───
 
   const elephantAssignments = useMemo(() => {
@@ -390,13 +463,16 @@ export function useDailyShift() {
     handleSetSleepState,
     handleSetBehavior,
 
-    // Body care
-    handleSetWashStatus,
-    handleSetLimbCondition,
-
-    // Feeding
+    // Feeding & Fodder
     handleMarkFeedingServed,
     handleToggleWaterCheck,
+    handleUpdateFodder,
+
+    // Body care & Inspection
+    handleSetWashStatus,
+    handleSetLimbCondition,
+    handleSaveFeetPhoto,
+    handleUpdateTemporalGland,
 
     // Assignments
     isAssignmentDone,

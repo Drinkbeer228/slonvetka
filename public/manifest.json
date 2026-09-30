@@ -1,0 +1,18 @@
+{
+  "short_name": "СлоноВет",
+  "name": "СлоноВет — Полевой журнал слоновника",
+  "description": "Полевой журнал и система мониторинга состояния слонов",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "display": "standalone",
+  "orientation": "portrait"
+}

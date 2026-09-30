@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useStore } from '../store';
 import { Plus, X, Loader2, User } from 'lucide-react';
 import { isAdmin } from '../lib/permissions';
-import { isUserRole, ROLE_LABELS, USER_ROLES, UserRole } from '../types/roles';
+import { isUserRole, ROLE_LABELS, USER_ROLES, UserRole } from '../types/rbac';
 
 // Create a separate Supabase client that doesn't persist the session.
 // This allows us to sign up a new user without logging out the current admin.
@@ -177,11 +177,13 @@ export function StaffScreen() {
                     ? 'bg-rose-50 text-rose-600'
                     : member.role === 'vet'
                       ? 'bg-blue-50 text-blue-600'
-                      : member.role === 'director'
+                      : member.role === 'chief'
                         ? 'bg-amber-50 text-amber-600'
-                        : member.role === 'keeper'
-                          ? 'bg-emerald-50 text-emerald-600'
-                          : 'bg-zinc-100 text-zinc-600'
+                        : member.role === 'warehouse'
+                          ? 'bg-purple-50 text-purple-600'
+                          : member.role === 'keeper'
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : 'bg-zinc-100 text-zinc-600'
                 }`}>
                 {member.role === 'unknown' ? 'Неизвестная роль' : ROLE_LABELS[member.role]}
                 </span>

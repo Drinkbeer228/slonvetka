@@ -9,7 +9,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useRole } from '../context/RoleContext';
-import { TasksScreen } from './TasksScreen';
+import { BrigadeTasksScreen } from './BrigadeTasksScreen';
 import { FeedScreen } from './FeedScreen';
 import { HandbookScreen } from './HandbookScreen';
 import { ProfileScreen } from './ProfileScreen';
@@ -58,7 +58,7 @@ export function DynamicAppFrame() {
   const renderActiveTab = () => {
     switch (currentTab) {
       case 'tasks':
-        return <TasksScreen onAddFeedLog={handleAddFeedLog} />;
+        return <BrigadeTasksScreen />;
       case 'feed':
         return <FeedScreen onAddEventExternal={handleAddFeedLog} />;
       case 'handbook':
@@ -66,7 +66,7 @@ export function DynamicAppFrame() {
       case 'profile':
         return <ProfileScreen />;
       default:
-        return <TasksScreen onAddFeedLog={handleAddFeedLog} />;
+        return <BrigadeTasksScreen />;
     }
   };
 

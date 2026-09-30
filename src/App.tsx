@@ -1,13 +1,13 @@
 import React from 'react';
 import { LoginPage } from './components/auth/LoginPage';
 import { RoleProvider } from './context/RoleContext';
-import { DailyShiftPage } from './screens/DailyShiftPage';
+import { AppShell } from './components/AppShell';
 
 export default function App() {
   return (
     <RoleProvider>
       <LoginPage>
-        <DailyShiftPage />
+        <AppShell />
       </LoginPage>
     </RoleProvider>
   );
